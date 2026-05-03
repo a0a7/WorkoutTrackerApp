@@ -1,0 +1,175 @@
+import { openDB, type IDBPDatabase } from 'idb';
+import type { WorkoutSet, Workout } from './types';
+
+const DB_NAME = 'workout-tracker';
+const DB_VERSION = 1;
+
+interface WorkoutDB {
+  sets: {
+    key: string;
+    value: WorkoutSet;
+    indexes: { by_workout: string; by_created_at: number };
+  };
+  workouts: {
+    key: string;
+    value: Workout;
+    indexes: { by_start_time: number };
+  };
+  pendingSync: {
+    key: string;
+    value: { id: string; type: 'set' | 'workout'; operation: 'upsert' | 'delete'; data?: unknown; timestamp: number };
+    indexes: { by_timestamp: number };
+  };
+}
+
+let dbInstance: IDBPDatabase<WorkoutDB> | null = null;
+
+export async function initDB(): Promise<IDBPDatabase<WorkoutDB>> {
+  if (dbInstance) return dbInstance;
+  dbInstance = await openDB<WorkoutDB>(DB_NAME, DB_VERSION, {
+    upgrade(db) {
+      if (!db.objectStoreNames.contains('sets')) {
+        const setsStore = db.createObjectStore('sets', { keyPath: 'id' });
+        setsStore.createIndex('by_workout', 'localWorkoutId');
+        setsStore.createIndex('by_created_at', 'createdAt');
+      }
+      if (!db.objectStoreNames.contains('workouts')) {
+        const workoutsStore = db.createObjectStore('workouts', { keyPath: 'id' });
+        workoutsStore.createIndex('by_start_time', 'startTime');
+      }
+      if (!db.objectStoreNames.contains('pendingSync')) {
+        const pendingStore = db.createObjectStore('pendingSync', { keyPath: 'id' });
+        pendingStore.createIndex('by_timestamp', 'timestamp');
+      }
+    },
+  });
+  return dbInstance;
+}
+
+export async function getDB(): Promise<IDBPDatabase<WorkoutDB>> {
+  return initDB();
+}
+
+export async function saveSets(sets: WorkoutSet[]): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction('sets', 'readwrite');
+  await Promise.all([...sets.map((s) => tx.store.put(s)), tx.done]);
+}
+
+export async function deleteSet(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('sets', id);
+}
+
+export async function getSetsByWorkoutId(workoutId: string): Promise<WorkoutSet[]> {
+  const db = await getDB();
+  return db.getAllFromIndex('sets', 'by_workout', workoutId);
+}
+
+export async function getSetsCreatedBetween(start: number, end: number): Promise<WorkoutSet[]> {
+  const db = await getDB();
+  const all = await db.getAllFromIndex('sets', 'by_created_at', IDBKeyRange.bound(start, end));
+  return all.sort((a, b) => a.createdAt - b.createdAt);
+}
+
+export async function getAllSets(): Promise<WorkoutSet[]> {
+  const db = await getDB();
+  const all = await db.getAll('sets');
+  return all.sort((a, b) => a.createdAt - b.createdAt);
+}
+
+export async function getTodaySets(): Promise<WorkoutSet[]> {
+  const now = Date.now();
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  // Include sets from last 24h to catch late-night sessions
+  const windowStart = Math.min(startOfDay.getTime(), now - 24 * 60 * 60 * 1000);
+  return getSetsCreatedBetween(windowStart, now + 1000);
+}
+
+export function groupSetsIntoWorkouts(sets: WorkoutSet[]): Workout[] {
+  if (sets.length === 0) return [];
+  const sorted = [...sets].sort((a, b) => a.createdAt - b.createdAt);
+  const GAP = 2 * 60 * 60 * 1000; // 2 hours
+  const groups: WorkoutSet[][] = [];
+  let current: WorkoutSet[] = [sorted[0]];
+
+  for (let i = 1; i < sorted.length; i++) {
+    const gap = sorted[i].createdAt - sorted[i - 1].createdAt;
+    if (gap < GAP) {
+      current.push(sorted[i]);
+    } else {
+      groups.push(current);
+      current = [sorted[i]];
+    }
+  }
+  groups.push(current);
+
+  return groups.map((group) => {
+    const first = group[0];
+    const last = group[group.length - 1];
+    return {
+      id: first.localWorkoutId,
+      startTime: first.createdAt - 10 * 60 * 1000,
+      endTime: last.createdAt,
+      sets: group,
+      synced: false,
+    };
+  });
+}
+
+export async function getAllWorkoutGroups(): Promise<Workout[]> {
+  const sets = await getAllSets();
+  return groupSetsIntoWorkouts(sets);
+}
+
+export async function saveWorkout(workout: Workout): Promise<void> {
+  const db = await getDB();
+  await db.put('workouts', workout);
+}
+
+export async function getWorkout(id: string): Promise<Workout | undefined> {
+  const db = await getDB();
+  const stored = await db.get('workouts', id);
+  if (stored) return stored;
+  // Try to reconstruct from sets
+  const sets = await getSetsByWorkoutId(id);
+  if (sets.length === 0) return undefined;
+  const sorted = sets.sort((a, b) => a.createdAt - b.createdAt);
+  return {
+    id,
+    startTime: sorted[0].createdAt - 10 * 60 * 1000,
+    endTime: sorted[sorted.length - 1].createdAt,
+    sets: sorted,
+    synced: false,
+  };
+}
+
+export async function getAllWorkouts(): Promise<Workout[]> {
+  const db = await getDB();
+  const stored = await db.getAllFromIndex('workouts', 'by_start_time');
+  if (stored.length > 0) {
+    return stored.sort((a, b) => b.startTime - a.startTime);
+  }
+  return getAllWorkoutGroups();
+}
+
+export async function addPendingSync(
+  id: string,
+  type: 'set' | 'workout',
+  operation: 'upsert' | 'delete',
+  data?: unknown
+): Promise<void> {
+  const db = await getDB();
+  await db.put('pendingSync', { id, type, operation, data, timestamp: Date.now() });
+}
+
+export async function getPendingSync() {
+  const db = await getDB();
+  return db.getAllFromIndex('pendingSync', 'by_timestamp');
+}
+
+export async function clearPendingSync(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('pendingSync', id);
+}
