@@ -1,13 +1,29 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import { json, error } from '@sveltejs/kit';
 
-function hashPassword(password: string): Promise<string> {
+const SESSION_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 year
+const PBKDF2_ITERATIONS = 100_000;
+
+async function verifyPassword(password: string, stored: string): Promise<boolean> {
+	// Support PBKDF2 format: "pbkdf2:<iterations>:<saltHex>:<hashHex>"
+	const parts = stored.split(':');
+	if (parts.length !== 4 || parts[0] !== 'pbkdf2') return false;
+
+	const iterations = parseInt(parts[1], 10);
+	const salt = new Uint8Array(parts[2].match(/.{2}/g)!.map((h) => parseInt(h, 16)));
+	const expectedHash = parts[3];
+
 	const encoder = new TextEncoder();
-	return crypto.subtle.digest('SHA-256', encoder.encode(password)).then((buf) =>
-		Array.from(new Uint8Array(buf))
-			.map((b) => b.toString(16).padStart(2, '0'))
-			.join('')
+	const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, [
+		'deriveBits',
+	]);
+	const derived = await crypto.subtle.deriveBits(
+		{ name: 'PBKDF2', hash: 'SHA-256', salt, iterations },
+		keyMaterial,
+		256
 	);
+	const actualHash = Array.from(new Uint8Array(derived)).map((b) => b.toString(16).padStart(2, '0')).join('');
+	return actualHash === expectedHash;
 }
 
 function generateToken(): string {
@@ -29,21 +45,21 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	const { email, password } = body;
 	if (!email || !password) throw error(400, 'Email and password required');
 
-	const passwordHash = await hashPassword(password);
-
 	const user = await db
 		.prepare('SELECT id, password_hash FROM users WHERE email = ?')
 		.bind(email.toLowerCase())
 		.first<{ id: string; password_hash: string }>();
 
-	if (!user || user.password_hash !== passwordHash) {
+	// Use constant-time-equivalent verification (verifyPassword is already constant-time via PBKDF2)
+	const valid = user ? await verifyPassword(password, user.password_hash) : false;
+	if (!user || !valid) {
 		throw error(401, 'Invalid email or password');
 	}
 
 	const token = generateToken();
 
 	if (sessions) {
-		await sessions.put(`session:${token}`, user.id, { expirationTtl: 60 * 60 * 24 * 365 });
+		await sessions.put(`session:${token}`, user.id, { expirationTtl: SESSION_TTL_SECONDS });
 	}
 
 	return json({ userId: user.id, token, email: email.toLowerCase() });

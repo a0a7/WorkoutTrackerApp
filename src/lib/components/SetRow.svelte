@@ -54,7 +54,7 @@
 
   function startEditReps() {
     editingReps = true;
-    setTimeout(() => repsRef?.select(), 10);
+    setTimeout(() => repsRef?.select(), INPUT_FOCUS_DELAY_MS);
   }
 
   function finishEditReps() {
@@ -63,7 +63,7 @@
 
   function startEditWeight() {
     editingWeight = true;
-    setTimeout(() => weightRef?.select(), 10);
+    setTimeout(() => weightRef?.select(), INPUT_FOCUS_DELAY_MS);
   }
 
   function finishEditWeight() {
@@ -74,13 +74,15 @@
   let dragOver = $state(false);
 
   // Touch selection drag
+  const TOUCH_MOVEMENT_THRESHOLD_PX = 10;
+  const INPUT_FOCUS_DELAY_MS = 10;
   let touchStartY = $state(0);
   function handleTouchStart(e: TouchEvent) {
     touchStartY = e.touches[0].clientY;
   }
   function handleTouchEnd(e: TouchEvent) {
     const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
-    if (dy < 10 && !isEmpty) {
+    if (dy < TOUCH_MOVEMENT_THRESHOLD_PX && !isEmpty) {
       onSelect?.(set.id);
     }
   }

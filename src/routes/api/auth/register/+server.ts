@@ -1,13 +1,24 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import { json, error } from '@sveltejs/kit';
 
-function hashPassword(password: string): Promise<string> {
+const SESSION_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 year
+const PBKDF2_ITERATIONS = 100_000;
+const SALT_LENGTH = 16;
+
+async function hashPassword(password: string): Promise<string> {
 	const encoder = new TextEncoder();
-	return crypto.subtle.digest('SHA-256', encoder.encode(password)).then((buf) =>
-		Array.from(new Uint8Array(buf))
-			.map((b) => b.toString(16).padStart(2, '0'))
-			.join('')
+	const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+	const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, [
+		'deriveBits',
+	]);
+	const derived = await crypto.subtle.deriveBits(
+		{ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: PBKDF2_ITERATIONS },
+		keyMaterial,
+		256
 	);
+	const saltHex = Array.from(salt).map((b) => b.toString(16).padStart(2, '0')).join('');
+	const hashHex = Array.from(new Uint8Array(derived)).map((b) => b.toString(16).padStart(2, '0')).join('');
+	return `pbkdf2:${PBKDF2_ITERATIONS}:${saltHex}:${hashHex}`;
 }
 
 function generateToken(): string {
@@ -48,7 +59,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		.run();
 
 	if (sessions) {
-		await sessions.put(`session:${token}`, userId, { expirationTtl: 60 * 60 * 24 * 365 });
+		await sessions.put(`session:${token}`, userId, { expirationTtl: SESSION_TTL_SECONDS });
 	}
 
 	return json({ userId, token, email: email.toLowerCase() }, { status: 201 });
