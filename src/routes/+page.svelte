@@ -11,8 +11,10 @@
   let selected = $state<Set<string>>(new Set());
   let dragFromIndex = $state<number | null>(null);
   let dragToIndex = $state<number | null>(null);
-  let unit = $state<'lbs' | 'kg'>('lbs');
   let sessionLocation = $state<{ lat: number; lng: number; label?: string } | null>(null);
+
+  // Reactive unit preference — auto-subscribes and updates when the store changes
+  const unit = $derived($unitPreference);
 
   // Stable session ID — one unique ID per app session (supports multiple sessions/day)
   const sessionId = `session-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
@@ -44,13 +46,10 @@
 
   onMount(async () => {
     initUnitPreference();
-    const unsub = unitPreference.subscribe((u) => { unit = u; });
 
     const loaded = await getTodaySets();
     sets = loaded.sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
     setsStore.set(sets);
-
-    return unsub;
   });
 
   // Capture geolocation once when the first real set is added

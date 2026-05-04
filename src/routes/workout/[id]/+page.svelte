@@ -13,7 +13,9 @@
 
   let workout = $state<Workout | null>(null);
   let loading = $state(true);
-  let unit = $state<'lbs' | 'kg'>('lbs');
+
+  // Reactive unit preference — auto-subscribes and updates when the store changes
+  const unit = $derived($unitPreference);
 
   // Time editing state
   let editingTimes = $state(false);
@@ -59,12 +61,10 @@
 
   onMount(async () => {
     initUnitPreference();
-    const unsub = unitPreference.subscribe((u) => { unit = u; });
     if (workoutId) {
       workout = await getWorkout(workoutId) ?? null;
     }
     loading = false;
-    return unsub;
   });
 
   const durationMs = $derived(workout ? workout.endTime - workout.startTime : 0);
