@@ -14,8 +14,8 @@
   let unit = $state<'lbs' | 'kg'>('lbs');
   let sessionLocation = $state<{ lat: number; lng: number; label?: string } | null>(null);
 
-  // Stable session ID — new session when app first loads (not date-based to support multiple sessions/day)
-  const sessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  // Stable session ID — one unique ID per app session (supports multiple sessions/day)
+  const sessionId = `session-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
   // Workout start time is backdated by this offset before the first set
   const WORKOUT_START_OFFSET_MS = 10 * 60 * 1000; // 10 minutes
 
