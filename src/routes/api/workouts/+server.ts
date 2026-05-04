@@ -63,8 +63,8 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
 	await db
 		.prepare(
-			`INSERT INTO workouts (id, user_id, start_time, end_time, notes, location_lat, location_lng, location_label, synced, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+			`INSERT INTO workouts (id, user_id, start_time, end_time, notes, location_lat, location_lng, location_label, synced, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          start_time = excluded.start_time,
          end_time = excluded.end_time,
@@ -72,7 +72,9 @@ export const POST: RequestHandler = async ({ request, platform }) => {
          location_lat = excluded.location_lat,
          location_lng = excluded.location_lng,
          location_label = excluded.location_label,
-         synced = 1`
+         synced = 1,
+         updated_at = excluded.updated_at
+       WHERE excluded.updated_at > workouts.updated_at`
 		)
 		.bind(
 			body.id,
@@ -83,6 +85,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 			location?.lat ?? null,
 			location?.lng ?? null,
 			location?.label ?? null,
+			now,
 			now
 		)
 		.run();

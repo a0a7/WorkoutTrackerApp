@@ -13,13 +13,14 @@
   let dragToIndex = $state<number | null>(null);
   let sessionLocation = $state<{ lat: number; lng: number; label?: string } | null>(null);
   let locationDenied = $state(false);
+  // sessionId is generated once per component mount — one ID per workout session
+  let sessionId = $state('');
 
   // Reactive unit preference — auto-subscribes and updates when the store changes
   const unit = $derived($unitPreference);
 
   // Stable session ID — one unique ID per app session (supports multiple sessions/day)
-  const sessionId = `session-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-  // Workout start time is backdated by this offset before the first set
+  // Defined inside onMount so each component mount gets a fresh session ID
   const WORKOUT_START_OFFSET_MS = 10 * 60_000; // 10 minutes
 
   // Geolocation options
@@ -50,6 +51,7 @@
   const allRows = $derived([...sets, ...emptyRows]);
 
   onMount(async () => {
+    sessionId = `session-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
     initUnitPreference();
 
     const loaded = await getTodaySets();

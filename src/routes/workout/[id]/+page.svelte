@@ -80,20 +80,24 @@
     return `${Math.floor(min / 60)}h ${min % 60}m`;
   });
 
+  const ACTIVATION_RANK: Record<string, number> = { primary: 3, secondary: 2, tertiary: 1 };
+
   const allActivations = $derived(() => {
     if (!workout) return [];
-    const map = new Map<string, { activation: 'primary' | 'secondary' | 'tertiary'; count: number }>();
+    const map = new Map<string, 'primary' | 'secondary' | 'tertiary'>();
     for (const s of workout.sets) {
       const ex = EXERCISE_MAP.get(s.exerciseId);
       if (!ex) continue;
       for (const ma of ex.muscleActivations) {
         const existing = map.get(ma.muscle);
-        if (!existing || (ma.activation === 'primary' && existing.activation !== 'primary')) {
-          map.set(ma.muscle, { activation: ma.activation, count: 1 });
+        const incomingRank = ACTIVATION_RANK[ma.activation] ?? 0;
+        const existingRank = existing ? (ACTIVATION_RANK[existing] ?? 0) : 0;
+        if (incomingRank > existingRank) {
+          map.set(ma.muscle, ma.activation);
         }
       }
     }
-    return [...map.entries()].map(([muscle, { activation }]) => ({
+    return [...map.entries()].map(([muscle, activation]) => ({
       muscle: muscle as MuscleActivation['muscle'],
       activation,
     }));

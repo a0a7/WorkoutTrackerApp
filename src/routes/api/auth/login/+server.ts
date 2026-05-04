@@ -1,11 +1,10 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import { json, error } from '@sveltejs/kit';
+import { bytesToHex, generateToken, HEX_CHARS_PER_BYTE } from '$lib/server/auth';
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 year
 const PBKDF2_ITERATIONS = 600_000; // OWASP recommended minimum for PBKDF2-SHA256
 const SALT_LENGTH = 16; // bytes (128-bit salt)
-
-const HEX_CHARS_PER_BYTE = 2;
 
 async function verifyPassword(password: string, stored: string): Promise<boolean> {
 	// Support PBKDF2 format: "pbkdf2:<iterations>:<saltHex>:<hashHex>"
@@ -31,12 +30,8 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
 		keyMaterial,
 		256
 	);
-	const actualHash = Array.from(new Uint8Array(derived)).map((b) => b.toString(16).padStart(2, '0')).join('');
+	const actualHash = bytesToHex(new Uint8Array(derived));
 	return actualHash === expectedHash;
-}
-
-function generateToken(): string {
-	return crypto.randomUUID() + '-' + crypto.randomUUID();
 }
 
 export const POST: RequestHandler = async ({ request, platform }) => {
