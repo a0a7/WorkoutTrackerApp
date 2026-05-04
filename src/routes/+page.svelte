@@ -16,6 +16,8 @@
 
   // Stable session ID — new session when app first loads (not date-based to support multiple sessions/day)
   const sessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  // Workout start time is backdated by this offset before the first set
+  const WORKOUT_START_OFFSET_MS = 10 * 60 * 1000; // 10 minutes
 
   const dateLabel = $derived(
     new Date().toLocaleDateString('en-US', {
@@ -71,7 +73,7 @@
     const sorted = [...sets].sort((a, b) => a.createdAt - b.createdAt);
     await saveWorkout({
       id: sessionId,
-      startTime: sorted[0].createdAt - 10 * 60 * 1000,
+      startTime: sorted[0].createdAt - WORKOUT_START_OFFSET_MS,
       endTime: sorted[sorted.length - 1].createdAt,
       sets: sorted,
       synced: false,

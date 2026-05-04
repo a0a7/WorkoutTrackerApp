@@ -3,7 +3,7 @@ import { json, error } from '@sveltejs/kit';
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 year
 const PBKDF2_ITERATIONS = 100_000;
-const SALT_LENGTH = 16; // bytes
+const SALT_LENGTH = 16; // bytes (128-bit salt)
 
 async function verifyPassword(password: string, stored: string): Promise<boolean> {
 	// Support PBKDF2 format: "pbkdf2:<iterations>:<saltHex>:<hashHex>"
@@ -11,7 +11,10 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
 	if (parts.length !== 4 || parts[0] !== 'pbkdf2') return false;
 
 	const iterations = parseInt(parts[1], 10);
-	const saltHexPairs = parts[2].match(/.{2}/g);
+	if (isNaN(iterations) || iterations <= 0) return false;
+	const saltHex = parts[2];
+	if (saltHex.length !== SALT_LENGTH * 2 || !/^[0-9a-f]+$/i.test(saltHex)) return false;
+	const saltHexPairs = saltHex.match(/.{2}/g);
 	if (!saltHexPairs || saltHexPairs.length !== SALT_LENGTH) return false;
 
 	const salt = new Uint8Array(saltHexPairs.map((h) => parseInt(h, 16)));

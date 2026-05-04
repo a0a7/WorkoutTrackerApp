@@ -52,24 +52,27 @@ export async function getDB(): Promise<IDBPDatabase<WorkoutDB>> {
 
 export async function saveSets(sets: WorkoutSet[]): Promise<void> {
   const db = await getDB();
-  const tx = db.transaction('sets', 'readwrite');
-  await Promise.all([...sets.map((s) => tx.store.put(s)), tx.done]);
-  // Queue for cloud sync
-  const syncDb = await getDB();
-  const syncTx = syncDb.transaction('pendingSync', 'readwrite');
+  const tx = db.transaction(['sets', 'pendingSync'], 'readwrite');
+  const setsStore = tx.objectStore('sets');
+  const syncStore = tx.objectStore('pendingSync');
+  const now = Date.now();
   await Promise.all([
+    ...sets.map((s) => setsStore.put(s)),
     ...sets.map((s) =>
-      syncTx.store.put({ id: s.id, type: 'set', operation: 'upsert', data: s, timestamp: Date.now() })
+      syncStore.put({ id: s.id, type: 'set', operation: 'upsert', data: s, timestamp: now })
     ),
-    syncTx.done,
+    tx.done,
   ]);
 }
 
 export async function deleteSet(id: string): Promise<void> {
   const db = await getDB();
-  await db.delete('sets', id);
-  // Queue deletion for cloud sync
-  await db.put('pendingSync', { id, type: 'set', operation: 'delete', timestamp: Date.now() });
+  const tx = db.transaction(['sets', 'pendingSync'], 'readwrite');
+  await Promise.all([
+    tx.objectStore('sets').delete(id),
+    tx.objectStore('pendingSync').put({ id, type: 'set', operation: 'delete', timestamp: Date.now() }),
+    tx.done,
+  ]);
 }
 
 export async function getSetsByWorkoutId(workoutId: string): Promise<WorkoutSet[]> {

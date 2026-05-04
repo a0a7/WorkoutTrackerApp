@@ -43,12 +43,16 @@
     editingTimes = true;
   }
 
+  let timeEditError = $state('');
+
   async function saveEditedTimes() {
     if (!workout) return;
     const newStart = fromDateTimeInputs(editStartDate, editStartTime);
     const newEnd = fromDateTimeInputs(editEndDate, editEndTime);
-    if (isNaN(newStart) || isNaN(newEnd)) return;
-    workout = { ...workout, startTime: newStart, endTime: Math.max(newStart, newEnd) };
+    if (isNaN(newStart) || isNaN(newEnd)) { timeEditError = 'Invalid date or time.'; return; }
+    if (newEnd < newStart) { timeEditError = 'End time must be after start time.'; return; }
+    timeEditError = '';
+    workout = { ...workout, startTime: newStart, endTime: newEnd };
     await saveWorkout(workout);
     editingTimes = false;
   }
@@ -171,9 +175,12 @@
             </div>
           </div>
           <button
-            onclick={() => { editingTimes = false; }}
+            onclick={() => { editingTimes = false; timeEditError = ''; }}
             class="mt-1 text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
           >Cancel</button>
+          {#if timeEditError}
+            <p class="text-xs text-red-500 mt-1">{timeEditError}</p>
+          {/if}
         </div>
       {/if}
 

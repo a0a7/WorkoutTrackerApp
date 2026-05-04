@@ -3,7 +3,7 @@ import { json, error } from '@sveltejs/kit';
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 year
 const PBKDF2_ITERATIONS = 100_000;
-const SALT_LENGTH = 16;
+const SALT_LENGTH = 16; // bytes (128-bit salt)
 
 async function hashPassword(password: string): Promise<string> {
 	const encoder = new TextEncoder();
