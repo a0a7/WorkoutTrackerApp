@@ -57,10 +57,8 @@ export async function saveSets(sets: WorkoutSet[]): Promise<void> {
   const syncStore = tx.objectStore('pendingSync');
   const now = Date.now();
   await Promise.all([
-    ...sets.flatMap((s) => [
-      setsStore.put(s),
-      syncStore.put({ id: s.id, type: 'set', operation: 'upsert', data: s, timestamp: now }),
-    ]),
+    ...sets.map((s) => setsStore.put(s)),
+    ...sets.map((s) => syncStore.put({ id: s.id, type: 'set', operation: 'upsert', data: s, timestamp: now })),
     tx.done,
   ]);
 }

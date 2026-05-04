@@ -13,7 +13,7 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
 	const iterations = parseInt(parts[1], 10);
 	if (isNaN(iterations) || iterations <= 0) return false;
 	const saltHex = parts[2];
-	if (saltHex.length !== SALT_LENGTH * 2 || !/^[0-9a-f]+$/i.test(saltHex)) return false;
+	if (saltHex.length !== SALT_LENGTH * 2 || !/^[0-9a-f]+$/.test(saltHex)) return false;
 	const saltHexPairs = saltHex.match(/.{2}/g);
 	if (!saltHexPairs || saltHexPairs.length !== SALT_LENGTH) return false;
 

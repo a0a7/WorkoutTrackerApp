@@ -40,7 +40,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	const { email, password } = body;
 	if (!email || !password) throw error(400, 'Email and password required');
 	if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw error(400, 'Invalid email');
-	if (password.length < 6) throw error(400, 'Password must be at least 6 characters');
+	if (password.length < 8) throw error(400, 'Password must be at least 8 characters');
 
 	const existing = await db
 		.prepare('SELECT id FROM users WHERE email = ?')
