@@ -12,6 +12,7 @@
   let dragFromIndex = $state<number | null>(null);
   let dragToIndex = $state<number | null>(null);
   let sessionLocation = $state<{ lat: number; lng: number; label?: string } | null>(null);
+  let locationDenied = $state(false);
 
   // Reactive unit preference — auto-subscribes and updates when the store changes
   const unit = $derived($unitPreference);
@@ -19,7 +20,11 @@
   // Stable session ID — one unique ID per app session (supports multiple sessions/day)
   const sessionId = `session-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
   // Workout start time is backdated by this offset before the first set
-  const WORKOUT_START_OFFSET_MS = 10 * 60 * 1000; // 10 minutes
+  const WORKOUT_START_OFFSET_MS = 10 * 60_000; // 10 minutes
+
+  // Geolocation options
+  const GEOLOCATION_CACHE_MS = 5 * 60_000;  // allow cached position up to 5 minutes old
+  const GEOLOCATION_TIMEOUT_MS = 10_000;     // give up after 10 seconds
 
   const dateLabel = $derived(
     new Date().toLocaleDateString('en-US', {
@@ -62,8 +67,8 @@
         // Persist workout with location once we have it
         if (sets.length > 0) persistWorkoutMeta();
       },
-      () => { /* ignore permission denial */ },
-      { maximumAge: 5 * 60 * 1000, timeout: 10_000 }
+      () => { locationDenied = true; },
+      { maximumAge: GEOLOCATION_CACHE_MS, timeout: GEOLOCATION_TIMEOUT_MS }
     );
   }
 
@@ -305,4 +310,10 @@
   <p class="mt-3 mb-4 text-center text-xs text-[hsl(var(--muted-foreground))]">
     {sets.length} {sets.length === 1 ? 'set' : 'sets'} logged today
   </p>
+
+  {#if locationDenied}
+    <p class="mb-4 text-center text-xs text-[hsl(var(--muted-foreground))]">
+      📍 Location access denied — workout won't be geotagged.
+    </p>
+  {/if}
 </div>

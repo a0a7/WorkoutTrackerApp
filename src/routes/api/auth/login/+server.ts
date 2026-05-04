@@ -2,8 +2,10 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { json, error } from '@sveltejs/kit';
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 year
-const PBKDF2_ITERATIONS = 100_000;
+const PBKDF2_ITERATIONS = 600_000; // OWASP recommended minimum for PBKDF2-SHA256
 const SALT_LENGTH = 16; // bytes (128-bit salt)
+
+const HEX_CHARS_PER_BYTE = 2;
 
 async function verifyPassword(password: string, stored: string): Promise<boolean> {
 	// Support PBKDF2 format: "pbkdf2:<iterations>:<saltHex>:<hashHex>"
@@ -13,7 +15,7 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
 	const iterations = parseInt(parts[1], 10);
 	if (isNaN(iterations) || iterations <= 0) return false;
 	const saltHex = parts[2];
-	if (saltHex.length !== SALT_LENGTH * 2 || !/^[0-9a-f]+$/.test(saltHex)) return false;
+	if (saltHex.length !== SALT_LENGTH * HEX_CHARS_PER_BYTE || !/^[0-9a-f]+$/.test(saltHex)) return false;
 	const saltHexPairs = saltHex.match(/.{2}/g);
 	if (!saltHexPairs || saltHexPairs.length !== SALT_LENGTH) return false;
 

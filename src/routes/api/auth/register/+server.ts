@@ -2,7 +2,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { json, error } from '@sveltejs/kit';
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 year
-const PBKDF2_ITERATIONS = 100_000;
+const PBKDF2_ITERATIONS = 600_000; // OWASP recommended minimum for PBKDF2-SHA256
 const SALT_LENGTH = 16; // bytes (128-bit salt)
 
 async function hashPassword(password: string): Promise<string> {

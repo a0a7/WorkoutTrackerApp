@@ -40,6 +40,10 @@
   let repsRef = $state<HTMLInputElement | undefined>(undefined);
   let weightRef = $state<HTMLInputElement | undefined>(undefined);
 
+  function startEditExercise() {
+    editingExercise = true;
+  }
+
   function handleExerciseSelect(ex: Exercise) {
     onUpdate?.(set.id, 'exerciseId', ex.id);
     onUpdate?.(set.id, 'exerciseName', ex.name);
@@ -130,7 +134,7 @@
       <button
         type="button"
         class="w-full text-left text-sm font-medium text-[hsl(var(--foreground))] hover:text-[hsl(var(--primary))] transition-colors truncate"
-        onclick={() => { editingExercise = true; }}
+        onclick={startEditExercise}
         title="Tap to change exercise"
       >
         {set.exerciseName}
