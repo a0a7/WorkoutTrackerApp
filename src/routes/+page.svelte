@@ -3,19 +3,19 @@
   import { onMount } from 'svelte';
   import SetRow from '$lib/components/SetRow.svelte';
   import { setsStore, selectedIds, pushUndo, undo, redo, hasUndo, hasRedo } from '$lib/stores/workoutStore';
-  import { getTodaySets, saveSets, deleteSet as dbDeleteSet } from '$lib/db';
+  import { getTodaySets, saveSets, deleteSet as dbDeleteSet, saveWorkout } from '$lib/db';
+  import { unitPreference, initUnitPreference } from '$lib/stores/userStore';
   import type { WorkoutSet } from '$lib/types';
 
   let sets = $state<WorkoutSet[]>([]);
   let selected = $state<Set<string>>(new Set());
   let dragFromIndex = $state<number | null>(null);
   let dragToIndex = $state<number | null>(null);
+  let unit = $state<'lbs' | 'kg'>('lbs');
+  let sessionLocation = $state<{ lat: number; lng: number; label?: string } | null>(null);
 
-  // Today's workout ID - group by calendar day
-  const todayWorkoutId = $derived(() => {
-    const d = new Date();
-    return `local-${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-  });
+  // Stable session ID — new session when app first loads (not date-based to support multiple sessions/day)
+  const sessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
   const dateLabel = $derived(
     new Date().toLocaleDateString('en-US', {
@@ -28,7 +28,7 @@
   const emptyRows = $derived(
     Array.from({ length: EMPTY_COUNT }, (_, i) => ({
       id: `empty-${i}`,
-      localWorkoutId: todayWorkoutId(),
+      localWorkoutId: sessionId,
       exerciseId: '',
       exerciseName: '',
       reps: null,
@@ -41,22 +41,56 @@
   const allRows = $derived([...sets, ...emptyRows]);
 
   onMount(async () => {
+    initUnitPreference();
+    const unsub = unitPreference.subscribe((u) => { unit = u; });
+
     const loaded = await getTodaySets();
     sets = loaded.sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
     setsStore.set(sets);
+
+    return unsub;
   });
+
+  // Capture geolocation once when the first real set is added
+  function captureLocation() {
+    if (sessionLocation !== null) return; // already captured
+    if (!('geolocation' in navigator)) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        sessionLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        // Persist workout with location once we have it
+        if (sets.length > 0) persistWorkoutMeta();
+      },
+      () => { /* ignore permission denial */ },
+      { maximumAge: 5 * 60 * 1000, timeout: 10_000 }
+    );
+  }
+
+  async function persistWorkoutMeta() {
+    if (sets.length === 0) return;
+    const sorted = [...sets].sort((a, b) => a.createdAt - b.createdAt);
+    await saveWorkout({
+      id: sessionId,
+      startTime: sorted[0].createdAt - 10 * 60 * 1000,
+      endTime: sorted[sorted.length - 1].createdAt,
+      sets: sorted,
+      synced: false,
+      ...(sessionLocation ? { location: sessionLocation } : {}),
+    });
+  }
 
   async function persistSets(newSets: WorkoutSet[]) {
     sets = newSets;
     setsStore.set(newSets);
     await saveSets(newSets);
+    await persistWorkoutMeta();
   }
 
   function getOrCreateRealSet(emptyId: string): WorkoutSet {
     const emptyIndex = parseInt(emptyId.replace('empty-', ''));
     return {
       id: crypto.randomUUID(),
-      localWorkoutId: todayWorkoutId(),
+      localWorkoutId: sessionId,
       exerciseId: '',
       exerciseName: '',
       reps: null,
@@ -73,6 +107,8 @@
       (newSet as Record<string, unknown>)[field] = value;
       pushUndo('Add set', sets);
       const newSets = [...sets, newSet];
+      // Capture location when first set is added
+      if (sets.length === 0) captureLocation();
       await persistSets(newSets);
       return;
     }
@@ -225,7 +261,7 @@
           <th class="w-8 px-1 py-2 text-center"></th>
           <th class="px-1 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Exercise</th>
           <th class="w-16 px-1 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Reps</th>
-          <th class="w-20 px-1 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Weight</th>
+          <th class="w-20 px-1 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">{unit}</th>
           <th class="w-16 px-1 py-2"></th>
           <th class="w-8 px-1 py-2"></th>
         </tr>

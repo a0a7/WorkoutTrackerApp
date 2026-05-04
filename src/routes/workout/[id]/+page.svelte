@@ -4,20 +4,63 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import MuscleMap from '$lib/components/MuscleMap.svelte';
-  import { getWorkout } from '$lib/db';
+  import { getWorkout, saveWorkout } from '$lib/db';
   import { EXERCISE_MAP } from '$lib/exercises';
+  import { unitPreference, initUnitPreference } from '$lib/stores/userStore';
   import type { Workout, MuscleActivation } from '$lib/types';
 
   const workoutId = $derived($page.params.id);
 
   let workout = $state<Workout | null>(null);
   let loading = $state(true);
+  let unit = $state<'lbs' | 'kg'>('lbs');
+
+  // Time editing state
+  let editingTimes = $state(false);
+  let editStartDate = $state('');
+  let editStartTime = $state('');
+  let editEndDate = $state('');
+  let editEndTime = $state('');
+
+  function toDateInput(ts: number) {
+    const d = new Date(ts);
+    return d.toISOString().slice(0, 10);
+  }
+  function toTimeInput(ts: number) {
+    const d = new Date(ts);
+    return d.toTimeString().slice(0, 5); // HH:MM
+  }
+  function fromDateTimeInputs(date: string, time: string): number {
+    return new Date(`${date}T${time}:00`).getTime();
+  }
+
+  function beginEditTimes() {
+    if (!workout) return;
+    editStartDate = toDateInput(workout.startTime);
+    editStartTime = toTimeInput(workout.startTime);
+    editEndDate = toDateInput(workout.endTime);
+    editEndTime = toTimeInput(workout.endTime);
+    editingTimes = true;
+  }
+
+  async function saveEditedTimes() {
+    if (!workout) return;
+    const newStart = fromDateTimeInputs(editStartDate, editStartTime);
+    const newEnd = fromDateTimeInputs(editEndDate, editEndTime);
+    if (isNaN(newStart) || isNaN(newEnd)) return;
+    workout = { ...workout, startTime: newStart, endTime: Math.max(newStart, newEnd) };
+    await saveWorkout(workout);
+    editingTimes = false;
+  }
 
   onMount(async () => {
+    initUnitPreference();
+    const unsub = unitPreference.subscribe((u) => { unit = u; });
     if (workoutId) {
       workout = await getWorkout(workoutId) ?? null;
     }
     loading = false;
+    return unsub;
   });
 
   const durationMs = $derived(workout ? workout.endTime - workout.startTime : 0);
@@ -35,7 +78,6 @@
       if (!ex) continue;
       for (const ma of ex.muscleActivations) {
         const existing = map.get(ma.muscle);
-        const priority = ma.activation === 'primary' ? 3 : ma.activation === 'secondary' ? 2 : 1;
         if (!existing || (ma.activation === 'primary' && existing.activation !== 'primary')) {
           map.set(ma.muscle, { activation: ma.activation, count: 1 });
         }
@@ -97,9 +139,45 @@
   {:else}
     <!-- Workout metadata -->
     <div class="mb-5 rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] p-4 shadow-sm">
-      <h1 class="text-xl font-bold text-[hsl(var(--foreground))]">{dateLabel}</h1>
-      <p class="text-sm text-[hsl(var(--muted-foreground))] mt-0.5">{timeLabel}</p>
-      <div class="mt-3 flex gap-4">
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <h1 class="text-xl font-bold text-[hsl(var(--foreground))]">{dateLabel}</h1>
+          {#if !editingTimes}
+            <p class="text-sm text-[hsl(var(--muted-foreground))] mt-0.5">{timeLabel}</p>
+          {/if}
+        </div>
+        <button
+          onclick={editingTimes ? saveEditedTimes : beginEditTimes}
+          class="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors {editingTimes ? 'bg-[hsl(var(--primary))] text-white' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'}"
+        >
+          {editingTimes ? 'Save' : 'Edit times'}
+        </button>
+      </div>
+
+      {#if editingTimes}
+        <div class="mt-3 flex flex-col gap-2">
+          <div>
+            <p class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">Start</p>
+            <div class="flex gap-2">
+              <input type="date" bind:value={editStartDate} class="flex-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+              <input type="time" bind:value={editStartTime} class="w-28 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+            </div>
+          </div>
+          <div>
+            <p class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">End</p>
+            <div class="flex gap-2">
+              <input type="date" bind:value={editEndDate} class="flex-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+              <input type="time" bind:value={editEndTime} class="w-28 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+            </div>
+          </div>
+          <button
+            onclick={() => { editingTimes = false; }}
+            class="mt-1 text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+          >Cancel</button>
+        </div>
+      {/if}
+
+      <div class="mt-3 flex gap-4 flex-wrap">
         <div class="flex items-center gap-1.5">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--primary))" stroke-width="2" stroke-linecap="round">
             <circle cx="12" cy="12" r="10"/>
@@ -144,11 +222,11 @@
                   <span class="w-6 text-center text-xs font-medium text-[hsl(var(--muted-foreground))]">{i + 1}</span>
                   <span class="flex-1 text-sm text-[hsl(var(--foreground))]">
                     {#if s.reps !== null && s.weight !== null}
-                      <span class="font-semibold">{s.reps}</span> reps × <span class="font-semibold">{s.weight}</span> lbs
+                      <span class="font-semibold">{s.reps}</span> reps × <span class="font-semibold">{s.weight}</span> {unit}
                     {:else if s.reps !== null}
                       <span class="font-semibold">{s.reps}</span> reps
                     {:else if s.weight !== null}
-                      <span class="font-semibold">{s.weight}</span> lbs
+                      <span class="font-semibold">{s.weight}</span> {unit}
                     {:else}
                       —
                     {/if}
@@ -162,3 +240,4 @@
     </div>
   {/if}
 </div>
+

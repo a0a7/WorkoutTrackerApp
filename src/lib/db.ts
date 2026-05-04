@@ -54,11 +54,22 @@ export async function saveSets(sets: WorkoutSet[]): Promise<void> {
   const db = await getDB();
   const tx = db.transaction('sets', 'readwrite');
   await Promise.all([...sets.map((s) => tx.store.put(s)), tx.done]);
+  // Queue for cloud sync
+  const syncDb = await getDB();
+  const syncTx = syncDb.transaction('pendingSync', 'readwrite');
+  await Promise.all([
+    ...sets.map((s) =>
+      syncTx.store.put({ id: s.id, type: 'set', operation: 'upsert', data: s, timestamp: Date.now() })
+    ),
+    syncTx.done,
+  ]);
 }
 
 export async function deleteSet(id: string): Promise<void> {
   const db = await getDB();
   await db.delete('sets', id);
+  // Queue deletion for cloud sync
+  await db.put('pendingSync', { id, type: 'set', operation: 'delete', timestamp: Date.now() });
 }
 
 export async function getSetsByWorkoutId(workoutId: string): Promise<WorkoutSet[]> {
