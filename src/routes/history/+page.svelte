@@ -1,5 +1,4 @@
 <script lang="ts">
-  export const ssr = false;
 
   import { onMount } from 'svelte';
   import WorkoutCard from '$lib/components/WorkoutCard.svelte';

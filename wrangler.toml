@@ -1,6 +1,7 @@
 name = "workout-tracker"
 main = "src/worker/index.ts"
-compatibility_date = "2024-01-01"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
 
 [assets]
 directory = ".svelte-kit/cloudflare"
@@ -10,6 +11,7 @@ binding = "ASSETS"
 binding = "DB"
 database_name = "workout-tracker-db"
 database_id = "local-dev-id"
+migrations_dir = "migrations"
 
 [[kv_namespaces]]
 binding = "SESSIONS"

@@ -1,5 +1,4 @@
 <script lang="ts">
-  export const ssr = false;
 
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
@@ -15,7 +14,9 @@
   let loading = $state(true);
 
   onMount(async () => {
-    workout = await getWorkout(workoutId) ?? null;
+    if (workoutId) {
+      workout = await getWorkout(workoutId) ?? null;
+    }
     loading = false;
   });
 

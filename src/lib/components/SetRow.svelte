@@ -29,9 +29,17 @@
     index: number;
   } = $props();
 
+  // Local editing state for filled fields
+  let editingReps = $state(false);
+  let editingWeight = $state(false);
+  let editingExercise = $state(false);
+  let repsRef = $state<HTMLInputElement | undefined>(undefined);
+  let weightRef = $state<HTMLInputElement | undefined>(undefined);
+
   function handleExerciseSelect(ex: Exercise) {
     onUpdate?.(set.id, 'exerciseId', ex.id);
     onUpdate?.(set.id, 'exerciseName', ex.name);
+    editingExercise = false;
   }
 
   function handleRepsChange(e: Event) {
@@ -44,8 +52,38 @@
     onUpdate?.(set.id, 'weight', val ? parseFloat(val) : null);
   }
 
+  function startEditReps() {
+    editingReps = true;
+    setTimeout(() => repsRef?.select(), 10);
+  }
+
+  function finishEditReps() {
+    editingReps = false;
+  }
+
+  function startEditWeight() {
+    editingWeight = true;
+    setTimeout(() => weightRef?.select(), 10);
+  }
+
+  function finishEditWeight() {
+    editingWeight = false;
+  }
+
   let dragging = $state(false);
   let dragOver = $state(false);
+
+  // Touch selection drag
+  let touchStartY = $state(0);
+  function handleTouchStart(e: TouchEvent) {
+    touchStartY = e.touches[0].clientY;
+  }
+  function handleTouchEnd(e: TouchEvent) {
+    const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
+    if (dy < 10 && !isEmpty) {
+      onSelect?.(set.id);
+    }
+  }
 </script>
 
 <tr
@@ -63,6 +101,8 @@
         ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))]'
         : 'border-[hsl(var(--border))] bg-transparent hover:border-[hsl(var(--primary)/0.5)]'}"
       onclick={(e) => onSelect?.(set.id, e.shiftKey)}
+      ontouchstart={handleTouchStart}
+      ontouchend={handleTouchEnd}
       aria-label="Select set"
     >
       {#if selected}
@@ -75,7 +115,7 @@
 
   <!-- Exercise -->
   <td class="min-w-0 flex-1 px-1 py-2">
-    {#if isEmpty || !set.exerciseName}
+    {#if isEmpty || !set.exerciseName || editingExercise}
       <ExerciseAutocomplete
         value={set.exerciseName ?? ''}
         exerciseId={set.exerciseId ?? ''}
@@ -86,7 +126,8 @@
       <button
         type="button"
         class="w-full text-left text-sm font-medium text-[hsl(var(--foreground))] hover:text-[hsl(var(--primary))] transition-colors truncate"
-        onclick={() => {}}
+        onclick={() => { editingExercise = true; }}
+        title="Tap to change exercise"
       >
         {set.exerciseName}
       </button>
@@ -95,21 +136,24 @@
 
   <!-- Reps -->
   <td class="w-16 px-1 py-2">
-    {#if isEmpty || set.reps === null}
+    {#if isEmpty || set.reps === null || editingReps}
       <input
+        bind:this={repsRef}
         type="number"
         value={set.reps ?? ''}
         placeholder="Reps"
         min="0"
         max="9999"
         oninput={handleRepsChange}
+        onblur={finishEditReps}
         class="w-full rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1 text-center text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] placeholder:text-[hsl(var(--muted-foreground))]"
       />
     {:else}
       <button
         type="button"
-        class="w-full text-center text-sm font-semibold text-[hsl(var(--foreground))]"
-        onclick={() => { onUpdate?.(set.id, 'reps', null); }}
+        class="w-full text-center text-sm font-semibold text-[hsl(var(--foreground))] hover:text-[hsl(var(--primary))] transition-colors"
+        onclick={startEditReps}
+        title="Tap to edit"
       >
         {set.reps}
       </button>
@@ -118,8 +162,9 @@
 
   <!-- Weight -->
   <td class="w-20 px-1 py-2">
-    {#if isEmpty || set.weight === null}
+    {#if isEmpty || set.weight === null || editingWeight}
       <input
+        bind:this={weightRef}
         type="number"
         value={set.weight ?? ''}
         placeholder="lbs"
@@ -127,13 +172,15 @@
         max="9999"
         step="2.5"
         oninput={handleWeightChange}
+        onblur={finishEditWeight}
         class="w-full rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1 text-center text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] placeholder:text-[hsl(var(--muted-foreground))]"
       />
     {:else}
       <button
         type="button"
-        class="w-full text-center text-sm font-semibold text-[hsl(var(--foreground))]"
-        onclick={() => { onUpdate?.(set.id, 'weight', null); }}
+        class="w-full text-center text-sm font-semibold text-[hsl(var(--foreground))] hover:text-[hsl(var(--primary))] transition-colors"
+        onclick={startEditWeight}
+        title="Tap to edit"
       >
         {set.weight}
       </button>
@@ -193,3 +240,4 @@
     {/if}
   </td>
 </tr>
+

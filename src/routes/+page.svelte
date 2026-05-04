@@ -1,5 +1,4 @@
 <script lang="ts">
-  export const ssr = false;
 
   import { onMount } from 'svelte';
   import SetRow from '$lib/components/SetRow.svelte';
