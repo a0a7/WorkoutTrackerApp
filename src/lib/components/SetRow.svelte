@@ -5,7 +5,7 @@
 
   // UI constants
   const TOUCH_MOVEMENT_THRESHOLD_PX = 10;
-  const INPUT_FOCUS_DELAY_MS = 10; // Brief delay to ensure DOM updates complete before focusing the input
+  const INPUT_FOCUS_DELAY_MS = 10; // Minimal delay to allow Svelte's reactive update cycle to complete before focusing the input
 
   let {
     set,
