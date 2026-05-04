@@ -73,7 +73,7 @@
   let dragging = $state(false);
   let dragOver = $state(false);
 
-  // Touch selection drag
+  // Touch tap detection for set selection
   const TOUCH_MOVEMENT_THRESHOLD_PX = 10;
   const INPUT_FOCUS_DELAY_MS = 10;
   let touchStartY = $state(0);
