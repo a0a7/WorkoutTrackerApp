@@ -58,7 +58,8 @@
     const newEnd = fromDateTimeInputs(editEndDate, editEndTime);
     if (isNaN(newStart)) { timeEditError = 'Invalid start date or time.'; return; }
     if (isNaN(newEnd)) { timeEditError = 'Invalid end date or time.'; return; }
-    if (newEnd <= newStart) { timeEditError = 'End time must be after start time.'; return; }
+    // Prevent zero-duration workouts — end time must be strictly after start time
+    if (newEnd <= newStart) { timeEditError = 'End time must be strictly after start time (no zero-duration workouts).'; return; }
     timeEditError = '';
     workout = { ...workout, startTime: newStart, endTime: newEnd };
     await saveWorkout(workout);

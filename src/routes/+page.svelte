@@ -21,6 +21,7 @@
 
   // Stable session ID — one unique ID per app session (supports multiple sessions/day)
   // Defined inside onMount so each component mount gets a fresh session ID
+  // Workout start time is backdated by this offset to account for warmup before the first logged set
   const WORKOUT_START_OFFSET_MS = 10 * 60_000; // 10 minutes
 
   // Geolocation options

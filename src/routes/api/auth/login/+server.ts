@@ -14,7 +14,10 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
 	const iterations = parseInt(parts[1], 10);
 	if (isNaN(iterations) || iterations <= 0) return false;
 	const saltHex = parts[2];
-	if (saltHex.length !== SALT_LENGTH * HEX_CHARS_PER_BYTE || !/^[0-9a-f]+$/.test(saltHex)) return false; // lowercase-only to match bytesToHex output; uppercase would indicate a foreign hash format
+	// Reject wrong length — must be exactly SALT_LENGTH bytes × 2 hex chars per byte
+	if (saltHex.length !== SALT_LENGTH * HEX_CHARS_PER_BYTE) return false;
+	// Reject uppercase — only lowercase is accepted to match the bytesToHex output format
+	if (!/^[0-9a-f]+$/.test(saltHex)) return false;
 	const saltHexPairs = saltHex.match(/.{2}/g);
 	if (!saltHexPairs || saltHexPairs.length !== SALT_LENGTH) return false;
 
