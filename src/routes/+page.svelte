@@ -51,7 +51,8 @@
   const allRows = $derived([...sets, ...emptyRows]);
 
   onMount(async () => {
-    sessionId = `session-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    // Use a full UUID for session IDs — sufficient entropy for local workout session tracking
+    sessionId = crypto.randomUUID();
     initUnitPreference();
 
     const loaded = await getTodaySets();

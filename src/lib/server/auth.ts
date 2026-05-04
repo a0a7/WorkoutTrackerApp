@@ -3,7 +3,10 @@ import { error } from '@sveltejs/kit';
 /** Two hex characters are needed to represent one byte. */
 export const HEX_CHARS_PER_BYTE = 2;
 
-/** Convert a Uint8Array to a lowercase hex string. */
+/**
+ * Converts a Uint8Array to a lowercase hexadecimal string.
+ * Each byte is represented as exactly two lowercase hex characters.
+ */
 export function bytesToHex(buf: Uint8Array): string {
 	return Array.from(buf).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
