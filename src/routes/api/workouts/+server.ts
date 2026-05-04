@@ -13,6 +13,7 @@ interface DbWorkout {
 	location_label: string | null;
 	synced: number;
 	created_at: number;
+	updated_at: number;
 }
 
 function rowToWorkout(row: DbWorkout) {
