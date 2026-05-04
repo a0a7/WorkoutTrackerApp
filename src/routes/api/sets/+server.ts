@@ -62,7 +62,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	if (!Array.isArray(sets)) throw error(400, 'sets must be an array');
 
 	const now = Date.now();
-	// "last write wins" by timestamp — the DO UPDATE only fires when the incoming updated_at is
+	// "last write wins" by timestamp — the conflict update only fires when the incoming updated_at is
 	// strictly greater than the stored value, so equal or older timestamps leave existing data intact.
 	const stmt = db.prepare(
 		`INSERT INTO sets (id, user_id, local_workout_id, exercise_id, exercise_name, reps, weight, notes, sort_order, created_at, updated_at, deleted)
