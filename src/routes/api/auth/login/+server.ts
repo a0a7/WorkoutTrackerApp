@@ -18,9 +18,7 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
 	if (saltHex.length !== SALT_LENGTH * HEX_CHARS_PER_BYTE) return false;
 	// Reject uppercase — only lowercase is accepted to match the bytesToHex output format
 	if (!/^[0-9a-f]+$/.test(saltHex)) return false;
-	const saltHexPairs = saltHex.match(/.{2}/g);
-	if (!saltHexPairs || saltHexPairs.length !== SALT_LENGTH) return false;
-
+	const saltHexPairs = saltHex.match(/.{2}/g)!; // length already verified above
 	const salt = new Uint8Array(saltHexPairs.map((h) => parseInt(h, 16)));
 	const expectedHash = parts[3];
 
