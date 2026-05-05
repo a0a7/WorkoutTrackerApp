@@ -1,4 +1,4 @@
-# WorkOut Tracker
+# WorkOutTracker
 
 A beautiful, offline-first Progressive Web App (PWA) for tracking weightlifting workouts. Works perfectly on iOS when added to the home screen, syncs data to the cloud when online.
 
