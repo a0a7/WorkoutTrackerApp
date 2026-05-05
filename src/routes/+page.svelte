@@ -110,6 +110,14 @@
     };
   }
 
+  async function handleBulkAdd(sets_: WorkoutSet[]) {
+    // Called when user types shorthand like "3x12x145" — adds multiple pre-filled sets
+    pushUndo('Bulk add sets', sets);
+    if (sets.length === 0) captureLocation();
+    const newSets = [...sets, ...sets_];
+    await persistSets(newSets);
+  }
+
   async function handleUpdate(id: string, field: keyof WorkoutSet, value: unknown) {
     // If editing an empty row, promote to real set
     if (id.startsWith('empty-')) {
@@ -210,10 +218,7 @@
 <div class="px-4 pt-safe-top">
   <!-- Header -->
   <div class="sticky top-0 z-10 bg-[hsl(var(--background)/0.9)] backdrop-blur-sm py-3 flex items-center justify-between">
-    <div>
-      <h1 class="text-2xl font-bold text-[hsl(var(--foreground))]">Today</h1>
-      <p class="text-sm text-[hsl(var(--muted-foreground))]">{dateLabel}</p>
-    </div>
+    <p class="text-sm font-semibold text-[hsl(var(--muted-foreground))]">{dateLabel}</p>
     <div class="flex items-center gap-2">
       {#if selected.size > 0}
         <span class="text-sm font-medium text-[hsl(var(--primary))]">{selected.size} selected</span>
@@ -253,22 +258,11 @@
   </div>
 
   <!-- Sets table -->
-  {#if sets.length === 0 && emptyRows.length > 0}
-    <div class="mt-6 mb-3 flex flex-col items-center gap-2 text-center">
-      <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-[hsl(var(--primary)/0.1)]">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--primary))" stroke-width="2" stroke-linecap="round">
-          <path d="M6.5 6.5h11M6.5 12h11M6.5 17.5h11"/>
-        </svg>
-      </div>
-      <p class="text-sm text-[hsl(var(--muted-foreground))]">Start logging your workout below</p>
-    </div>
-  {/if}
-
   <div class="overflow-x-auto rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm">
     <table class="w-full min-w-[400px] border-collapse">
       <thead>
         <tr class="border-b border-[hsl(var(--border))]">
-          <th class="w-8 px-1 py-2 text-center"></th>
+          <th class="w-8 px-1 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">#</th>
           <th class="px-1 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Exercise</th>
           <th class="w-16 px-1 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Reps</th>
           <th class="w-20 px-1 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">{unit}</th>
@@ -283,6 +277,7 @@
             selected={selected.has(set.id)}
             isEmpty={false}
             index={i}
+            setNumber={i + 1}
             onUpdate={handleUpdate}
             onDelete={handleDelete}
             onDuplicate={handleDuplicate}
@@ -290,6 +285,7 @@
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
+            onBulkAdd={handleBulkAdd}
           />
         {/each}
         {#each emptyRows as emptySet, i}
@@ -298,6 +294,7 @@
             selected={false}
             isEmpty={true}
             index={sets.length + i}
+            setNumber={null}
             onUpdate={handleUpdate}
             onDelete={() => {}}
             onDuplicate={() => {}}
@@ -305,18 +302,15 @@
             onDragStart={() => {}}
             onDragOver={() => {}}
             onDrop={() => {}}
+            onBulkAdd={handleBulkAdd}
           />
         {/each}
       </tbody>
     </table>
   </div>
 
-  <p class="mt-3 mb-4 text-center text-xs text-[hsl(var(--muted-foreground))]">
-    {sets.length} {sets.length === 1 ? 'set' : 'sets'} logged today
-  </p>
-
   {#if locationDenied}
-    <p class="mb-4 text-center text-xs text-[hsl(var(--muted-foreground))]">
+    <p class="mt-2 mb-1 text-center text-xs text-[hsl(var(--muted-foreground))]">
       📍 Location access denied — workout won't be geotagged.
     </p>
   {/if}

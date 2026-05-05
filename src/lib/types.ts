@@ -1,7 +1,7 @@
 export interface Exercise {
 	id: string;
 	name: string;
-	category: 'free-weight' | 'machine' | 'bodyweight' | 'cable' | 'barbell';
+	category: 'free-weight' | 'machine';
 	muscleActivations: MuscleActivation[];
 	equipment?: string;
 }

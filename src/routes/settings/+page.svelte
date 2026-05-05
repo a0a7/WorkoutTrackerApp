@@ -26,8 +26,6 @@
     unitPreference.set(u);
     localStorage.setItem('unit_preference', u);
   }
-
-  const version = '1.0.0';
 </script>
 
 <svelte:head>
@@ -90,21 +88,6 @@
             class="rounded-md px-3 py-1 text-sm font-medium transition-all {unit === 'kg' ? 'bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-sm' : 'text-[hsl(var(--muted-foreground))]'}"
           >kg</button>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- About -->
-  <section>
-    <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">About</h2>
-    <div class="rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] overflow-hidden shadow-sm">
-      <div class="flex items-center justify-between px-4 py-3 border-b border-[hsl(var(--border))]">
-        <span class="text-sm text-[hsl(var(--foreground))]">Version</span>
-        <span class="text-sm text-[hsl(var(--muted-foreground))]">{version}</span>
-      </div>
-      <div class="flex items-center justify-between px-4 py-3">
-        <span class="text-sm text-[hsl(var(--foreground))]">Offline-first PWA</span>
-        <span class="flex h-2 w-2 rounded-full bg-green-500"></span>
       </div>
     </div>
   </section>
