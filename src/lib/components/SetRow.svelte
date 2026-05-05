@@ -55,8 +55,13 @@
     editingExercise = false;
   }
 
-  // Parse NxRxW shorthand: "3x12x145" → { sets: 3, reps: 12, weight: 145 }
-  // Also handles "12x145" (reps x weight) and plain numbers.
+  /**
+   * Parse NxRxW shorthand from the reps input field.
+   * Supported formats:
+   *  - "3x12x145" → { sets: 3, reps: 12, weight: 145 }  (bulk: 3 sets of 12 @ 145)
+   *  - "12" → { reps: 12 }  (single set, plain reps)
+   * Returns null if the input cannot be parsed.
+   */
   function parseRepsInput(raw: string): { sets: number; reps: number; weight: number | null } | { reps: number } | null {
     const s = raw.trim().toLowerCase().replace(/\s+/g, '');
     if (!s) return null;

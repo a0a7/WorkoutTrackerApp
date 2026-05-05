@@ -20,9 +20,17 @@
   let inputEl: HTMLInputElement;
 
   /**
-   * Smart multi-token fuzzy search.
-   * Splits the query into tokens; every token must appear in the exercise name.
-   * Ranks exact prefix matches highest, then "all tokens" matches.
+   * Smart multi-token fuzzy search over the exercise list.
+   *
+   * Splits the query into whitespace-separated tokens; every token must appear
+   * somewhere in the exercise name (case-insensitive substring match).
+   *
+   * Scoring (higher = ranked first):
+   *  - +position bonus: tokens that appear earlier in the name score higher (100 − index)
+   *  - +50 for each token that is a prefix of the name
+   *  - +100 if the name starts with the first query token
+   *
+   * Returns up to 20 results sorted by descending score.
    */
   function smartSearch(q: string): Exercise[] {
     if (!q || q.length < 1) return EXERCISES.slice(0, 20);
