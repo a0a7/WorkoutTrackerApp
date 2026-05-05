@@ -254,7 +254,7 @@
         ontouchend={handleTouchEnd}
         aria-label="Select set"
       >
-        {setNumber}
+        {setNumber ?? ''}
       </button>
     {/if}
   </td>
