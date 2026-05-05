@@ -10,9 +10,9 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "workout-tracker-db"
-database_id = "local-dev-id"
+database_id = "5219de50-232e-4bfc-871d-515d71cf0c86"
 migrations_dir = "migrations"
 
 [[kv_namespaces]]
 binding = "SESSIONS"
-id = "local-kv-id"
+id = "051c538b4c224f02b823b6b3f51cf3df"
