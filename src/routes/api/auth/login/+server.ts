@@ -3,7 +3,7 @@ import { json, error } from '@sveltejs/kit';
 import { bytesToHex, generateToken, HEX_CHARS_PER_BYTE } from '$lib/server/auth';
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 year
-const PBKDF2_ITERATIONS = 600_000; // OWASP recommended minimum for PBKDF2-SHA256
+const PBKDF2_ITERATIONS = 100_000; // Cloudflare Workers crypto.subtle limit
 const SALT_LENGTH = 16; // bytes (128-bit salt)
 
 async function verifyPassword(password: string, stored: string): Promise<boolean> {
