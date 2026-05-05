@@ -64,6 +64,8 @@
   // Delayed commit timer: necessary because clicking an autocomplete dropdown
   // briefly moves focus to the dropdown button (inside the row) then to body
   // (when the button unmounts), triggering a spurious focusout on the TR.
+  // 200ms is enough to span the autocomplete-select focus round-trip while
+  // still feeling immediate to the user.
   let commitTimer: ReturnType<typeof setTimeout> | undefined;
 
   // ── Input refs ───────────────────────────────────────────────────────────
