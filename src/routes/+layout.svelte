@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
+  import { get } from 'svelte/store';
   import ThemeToggle from '$lib/components/ThemeToggle.svelte';
   import { initDB } from '$lib/db';
   import { userStore } from '$lib/stores/userStore';
@@ -16,34 +17,37 @@
     { href: '/settings', label: 'Settings', icon: 'settings' },
   ];
 
-  onMount(async () => {
-    // Init theme
+  onMount(() => {
+    // 1. Theme (synchronous — avoid flash of wrong theme)
     const saved = localStorage.getItem('theme');
     if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       document.documentElement.classList.add('dark');
     }
 
-    // Init DB
-    await initDB();
-
-    // Init user store
+    // 2. Restore session (synchronous localStorage read — must happen before auth guard)
     userStore.init();
 
-    // Register service worker
-    if ('serviceWorker' in navigator) {
-      try {
-        await navigator.serviceWorker.register('/service-worker.js', { type: 'module' });
-      } catch {
-        // SW optional
-      }
+    // 3. Auth guard — redirect to login if not authenticated
+    const user = get(userStore);
+    if (!user && $page.url.pathname !== '/login') {
+      goto('/login');
+      return;
     }
 
-    // Setup sync listeners if logged in
+    // 4. Start IndexedDB in the background — don't block render
+    initDB().catch(() => {});
+
+    // 5. Register service worker (fire and forget)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js', { type: 'module' }).catch(() => {});
+    }
+
+    // 6. Setup cloud sync when logged in
     let cleanup: (() => void) | undefined;
-    const unsub = userStore.subscribe((user) => {
+    const unsub = userStore.subscribe((u) => {
       cleanup?.();
-      if (user) {
-        cleanup = setupSyncListeners(user);
+      if (u) {
+        cleanup = setupSyncListeners(u);
       }
     });
     return () => { unsub(); cleanup?.(); };
@@ -58,12 +62,13 @@
 </script>
 
 <div class="flex min-h-screen flex-col bg-[hsl(var(--background))]">
-  <!-- Main content area -->
-  <main class="flex-1 overflow-y-auto pb-[calc(4rem+env(safe-area-inset-bottom,0px))]">
+  <!-- Main content area: no bottom padding on login page -->
+  <main class="flex-1 overflow-y-auto {currentPath !== '/login' ? 'pb-[calc(4rem+env(safe-area-inset-bottom,0px))]' : ''}">
     {@render children()}
   </main>
 
-  <!-- Bottom Navigation -->
+  <!-- Bottom Navigation — hidden on the login page -->
+  {#if currentPath !== '/login'}
   <nav
     class="fixed bottom-0 left-0 right-0 z-50 glass border-t border-[hsl(var(--border))]"
     style="padding-bottom: env(safe-area-inset-bottom, 0px)"
@@ -101,4 +106,5 @@
       <ThemeToggle />
     </div>
   </nav>
+  {/if}
 </div>

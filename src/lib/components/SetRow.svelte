@@ -285,6 +285,7 @@
       bind:this={repsInput}
       type="text"
       inputmode="numeric"
+      enterkeyhint="next"
       pattern="[0-9]*"
       value={isEmpty ? draftReps : localReps}
       placeholder="—"
@@ -305,6 +306,7 @@
       bind:this={weightInput}
       type="text"
       inputmode="decimal"
+      enterkeyhint="done"
       value={isEmpty ? draftWeight : localWeight}
       placeholder="—"
       oninput={handleWeightInput}

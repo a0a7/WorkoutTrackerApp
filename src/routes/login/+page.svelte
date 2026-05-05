@@ -21,25 +21,17 @@
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        error = data.error ?? 'Request failed';
+        error = data.message ?? data.error ?? `Request failed (${res.status})`;
         return;
       }
       const data = await res.json();
       userStore.login({ id: data.userId, email, token: data.token });
       goto('/');
     } catch {
-      error = 'Network error. Continuing in offline mode.';
-      // Allow offline use
-      userStore.login({ id: 'local-user', email, token: 'offline' });
-      goto('/');
+      error = 'Network error — check your connection and try again.';
     } finally {
       loading = false;
     }
-  }
-
-  function continueOffline() {
-    userStore.login({ id: 'local-user', email: 'offline@local', token: 'offline' });
-    goto('/');
   }
 </script>
 
@@ -110,21 +102,8 @@
         </button>
       </form>
 
-      <div class="mt-4 flex items-center gap-3">
-        <div class="flex-1 border-t border-[hsl(var(--border))]"></div>
-        <span class="text-xs text-[hsl(var(--muted-foreground))]">or</span>
-        <div class="flex-1 border-t border-[hsl(var(--border))]"></div>
-      </div>
-
-      <button
-        onclick={continueOffline}
-        class="mt-4 w-full rounded-xl border border-[hsl(var(--border))] py-3 text-sm font-medium text-[hsl(var(--foreground))] transition-all hover:bg-[hsl(var(--muted))] active:scale-[0.98]"
-      >
-        Continue Offline
-      </button>
-
       <p class="mt-4 text-center text-xs text-[hsl(var(--muted-foreground))]">
-        Works fully offline · Syncs when online
+        Your data is stored locally and syncs when online.
       </p>
     </div>
   </div>
