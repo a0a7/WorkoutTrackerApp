@@ -19,6 +19,12 @@
   let activeIndex = $state(0); // default to first so Enter always works
   let inputEl: HTMLInputElement;
 
+  // Sync internal query when external value prop changes (e.g. after row commit/reset)
+  $effect(() => {
+    const v = value;
+    if (!focused) query = v;
+  });
+
   /**
    * Smart multi-token fuzzy search over the exercise list.
    *
@@ -101,7 +107,11 @@
     onfocus={() => { focused = true; }}
     onblur={() => { setTimeout(() => { focused = false; }, 150); }}
     onkeydown={handleKeydown}
-    class="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-1.5 text-sm outline-none focus:border-[hsl(var(--primary))] focus:ring-1 focus:ring-[hsl(var(--ring))] placeholder:text-[hsl(var(--muted-foreground)/0.5)]"
+    class="w-full bg-transparent py-1.5 px-1 text-sm font-medium outline-none rounded
+           focus:bg-[hsl(var(--muted)/0.5)]
+           placeholder:text-[hsl(var(--muted-foreground)/0.35)]
+           transition-colors truncate"
+    style="font-size:16px"
     autocomplete="off"
     autocorrect="off"
     spellcheck="false"

@@ -110,30 +110,22 @@
     };
   }
 
-  async function handleBulkAdd(sets_: WorkoutSet[]) {
-    // Called when user types shorthand like "3x12x145" — adds multiple pre-filled sets
-    pushUndo('Bulk add sets', sets);
+  async function handleAdd(newSet: WorkoutSet) {
+    pushUndo('Add set', sets);
     if (sets.length === 0) captureLocation();
-    const newSets = [...sets, ...sets_];
+    await persistSets([...sets, newSet]);
+  }
+
+  async function handleExerciseUpdate(id: string, exerciseId: string, exerciseName: string) {
+    pushUndo('Edit exercise', sets);
+    const newSets = sets.map((s) => s.id === id ? { ...s, exerciseId, exerciseName } : s);
     await persistSets(newSets);
   }
 
   async function handleUpdate(id: string, field: keyof WorkoutSet, value: unknown) {
-    // If editing an empty row, promote to real set
-    if (id.startsWith('empty-')) {
-      const newSet = getOrCreateRealSet(id);
-      (newSet as Record<string, unknown>)[field] = value;
-      pushUndo('Add set', sets);
-      const newSets = [...sets, newSet];
-      // Capture location when first set is added
-      if (sets.length === 0) captureLocation();
-      await persistSets(newSets);
-      return;
-    }
-
     pushUndo('Edit set', sets);
-    // Apply to all selected if multiple selected and this one is selected
-    let targetIds = selected.has(id) && selected.size > 1 ? [...selected] : [id];
+    // Apply to all selected sets if multiple are selected and this one is among them
+    const targetIds = selected.has(id) && selected.size > 1 ? [...selected] : [id];
     const newSets = sets.map((s) =>
       targetIds.includes(s.id) ? { ...s, [field]: value } : s
     );

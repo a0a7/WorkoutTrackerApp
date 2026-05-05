@@ -1,11 +1,10 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import type { WorkoutSet } from '../types';
   import ExerciseAutocomplete from './ExerciseAutocomplete.svelte';
   import type { Exercise } from '../types';
 
-  // UI constants
   const TOUCH_MOVEMENT_THRESHOLD_PX = 10;
-  const INPUT_FOCUS_DELAY_MS = 10;
 
   let {
     set,
@@ -13,13 +12,13 @@
     isEmpty = false,
     setNumber = null,
     onUpdate,
+    onAdd,
+    onExerciseUpdate,
     onDelete,
-    onDuplicate,
     onSelect,
     onDragStart,
     onDragOver,
     onDrop,
-    onBulkAdd,
     index,
   }: {
     set: WorkoutSet;
@@ -27,125 +26,172 @@
     isEmpty?: boolean;
     setNumber?: number | null;
     onUpdate?: (id: string, field: keyof WorkoutSet, value: unknown) => void;
+    onAdd?: (set: WorkoutSet) => void;
+    onExerciseUpdate?: (id: string, exerciseId: string, exerciseName: string) => void;
     onDelete?: (id: string) => void;
-    onDuplicate?: (id: string) => void;
     onSelect?: (id: string, shiftKey?: boolean) => void;
     onDragStart?: (index: number) => void;
     onDragOver?: (index: number) => void;
     onDrop?: () => void;
-    onBulkAdd?: (sets: WorkoutSet[]) => void;
     index: number;
   } = $props();
 
-  let editingReps = $state(false);
-  let editingWeight = $state(false);
+  // ── Real-row local state (always-editable reps/weight) ───────────────────
+  let localReps = $state(set.reps !== null ? String(set.reps) : '');
+  let localWeight = $state(set.weight !== null ? String(set.weight) : '');
   let editingExercise = $state(false);
-  let repsRef = $state<HTMLInputElement | undefined>(undefined);
-  let weightRef = $state<HTMLInputElement | undefined>(undefined);
-  // Track raw text for reps field to support NxRxW shorthand
-  let repsRaw = $state('');
+  // Track whether any input in this row has focus (prevents effect from wiping mid-edit)
+  let isEditing = $state(false);
 
-  function startEditExercise() {
-    editingExercise = true;
-  }
+  // Keep local values in sync with parent when not actively editing (e.g. undo/redo)
+  $effect(() => {
+    const r = set.reps;
+    const w = set.weight;
+    untrack(() => {
+      if (!isEmpty && !isEditing) {
+        localReps = r !== null ? String(r) : '';
+        localWeight = w !== null ? String(w) : '';
+      }
+    });
+  });
 
-  function handleExerciseSelect(ex: Exercise) {
-    onUpdate?.(set.id, 'exerciseId', ex.id);
-    onUpdate?.(set.id, 'exerciseName', ex.name);
-    editingExercise = false;
-  }
+  // ── Empty-row draft state (committed as a single set) ────────────────────
+  let draftExerciseId = $state('');
+  let draftExerciseName = $state('');
+  let draftReps = $state('');
+  let draftWeight = $state('');
 
-  /**
-   * Parse NxRxW shorthand from the reps input field.
-   * Supported formats:
-   *  - "3x12x145" → { sets: 3, reps: 12, weight: 145 }  (bulk: 3 sets of 12 @ 145)
-   *  - "12" → { reps: 12 }  (single set, plain reps)
-   * Returns null if the input cannot be parsed.
-   */
-  function parseRepsInput(raw: string): { sets: number; reps: number; weight: number | null } | { reps: number } | null {
-    const s = raw.trim().toLowerCase().replace(/\s+/g, '');
-    if (!s) return null;
-    const parts = s.split('x').map(Number);
-    if (parts.some(isNaN)) return null;
-    if (parts.length === 3 && parts[0] > 0 && parts[1] > 0) {
-      return { sets: parts[0], reps: parts[1], weight: parts[2] > 0 ? parts[2] : null };
+  // Delayed commit timer: necessary because clicking an autocomplete dropdown
+  // briefly moves focus to the dropdown button (inside the row) then to body
+  // (when the button unmounts), triggering a spurious focusout on the TR.
+  let commitTimer: ReturnType<typeof setTimeout> | undefined;
+
+  // ── Input refs ───────────────────────────────────────────────────────────
+  let repsInput = $state<HTMLInputElement | undefined>(undefined);
+  let weightInput = $state<HTMLInputElement | undefined>(undefined);
+  let trEl = $state<HTMLTableRowElement | undefined>(undefined);
+
+  // ── Exercise ─────────────────────────────────────────────────────────────
+
+  function handleExerciseSelected(ex: Exercise) {
+    if (isEmpty) {
+      draftExerciseId = ex.id;
+      draftExerciseName = ex.name;
+    } else {
+      onExerciseUpdate?.(set.id, ex.id, ex.name);
+      editingExercise = false;
     }
-    if (parts.length === 1 && parts[0] > 0) {
-      return { reps: parts[0] };
-    }
-    return null;
+    // Move focus to reps after a brief pause (allows dropdown to close cleanly)
+    setTimeout(() => repsInput?.focus(), 15);
   }
+
+  // ── Reps ─────────────────────────────────────────────────────────────────
 
   function handleRepsInput(e: Event) {
-    repsRaw = (e.target as HTMLInputElement).value;
+    const val = (e.target as HTMLInputElement).value;
+    if (isEmpty) {
+      draftReps = val;
+    } else {
+      localReps = val;
+      // Save on every keystroke so tab-switching never loses data
+      onUpdate?.(set.id, 'reps', val !== '' ? (parseInt(val, 10) || null) : null);
+    }
   }
 
   function handleRepsKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
-      commitReps();
+      weightInput?.focus();
     }
   }
 
-  function commitReps() {
-    if (!repsRaw) { editingReps = false; return; }
-    const parsed = parseRepsInput(repsRaw);
-    if (!parsed) { editingReps = false; return; }
+  // ── Weight ────────────────────────────────────────────────────────────────
 
-    if ('sets' in parsed && parsed.sets > 1) {
-      // Bulk add: create N sets with the given reps/weight
-      const newSets: WorkoutSet[] = Array.from({ length: parsed.sets }, (_, i) => ({
+  function handleWeightInput(e: Event) {
+    const val = (e.target as HTMLInputElement).value;
+    if (isEmpty) {
+      draftWeight = val;
+    } else {
+      localWeight = val;
+      // Save on every keystroke
+      onUpdate?.(set.id, 'weight', val !== '' ? (parseFloat(val) || null) : null);
+    }
+  }
+
+  function handleWeightKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      if (isEmpty) flushEmptyRow();
+      focusNextRow();
+    }
+  }
+
+  // ── Empty-row commit ──────────────────────────────────────────────────────
+
+  function flushEmptyRow() {
+    if (!isEmpty) return;
+    const reps = draftReps !== '' ? (parseInt(draftReps, 10) || null) : null;
+    const weight = draftWeight !== '' ? (parseFloat(draftWeight) || null) : null;
+    if (draftExerciseName || reps !== null || weight !== null) {
+      onAdd?.({
         id: crypto.randomUUID(),
         localWorkoutId: set.localWorkoutId,
-        exerciseId: set.exerciseId,
-        exerciseName: set.exerciseName,
-        reps: parsed.reps,
-        weight: parsed.weight,
-        order: set.order + i,
-        createdAt: Date.now() + i,
-      }));
-      onBulkAdd?.(newSets);
-      repsRaw = '';
-      editingReps = false;
-    } else {
-      const reps = 'sets' in parsed ? parsed.reps : parsed.reps;
-      onUpdate?.(set.id, 'reps', reps);
-      if ('sets' in parsed && parsed.weight !== null) {
-        onUpdate?.(set.id, 'weight', parsed.weight);
-      }
-      repsRaw = '';
-      editingReps = false;
+        exerciseId: draftExerciseId,
+        exerciseName: draftExerciseName,
+        reps,
+        weight,
+        order: set.order,
+        createdAt: Date.now(),
+      });
+    }
+    draftExerciseId = '';
+    draftExerciseName = '';
+    draftReps = '';
+    draftWeight = '';
+  }
+
+  // ── Row focus tracking ────────────────────────────────────────────────────
+
+  function handleRowFocusIn() {
+    isEditing = true;
+    // Cancel any pending commit caused by a transient focus-leave
+    if (commitTimer !== undefined) {
+      clearTimeout(commitTimer);
+      commitTimer = undefined;
     }
   }
 
-  function handleWeightChange(e: Event) {
-    const val = (e.target as HTMLInputElement).value;
-    onUpdate?.(set.id, 'weight', val ? parseFloat(val) : null);
+  function handleRowFocusOut(e: FocusEvent) {
+    const tr = e.currentTarget as HTMLElement;
+    if (!tr.contains(e.relatedTarget as Node)) {
+      // Focus has left the row – but wait briefly in case it's a transient
+      // departure (e.g. autocomplete dropdown button unmounting)
+      isEditing = false;
+      if (isEmpty) {
+        commitTimer = setTimeout(() => {
+          commitTimer = undefined;
+          // Only commit if focus truly hasn't returned
+          if (trEl && !trEl.contains(document.activeElement)) {
+            flushEmptyRow();
+          }
+        }, 200);
+      }
+    }
   }
 
-  function startEditReps() {
-    repsRaw = set.reps !== null ? String(set.reps) : '';
-    editingReps = true;
-    setTimeout(() => repsRef?.select(), INPUT_FOCUS_DELAY_MS);
+  // ── Cross-row Enter navigation ────────────────────────────────────────────
+
+  function focusNextRow() {
+    const tr = weightInput?.closest('tr') ?? repsInput?.closest('tr');
+    const nextTr = tr?.nextElementSibling as HTMLElement | null;
+    if (!nextTr) return;
+    const firstInput = nextTr.querySelector('input') as HTMLInputElement | null;
+    firstInput?.focus();
   }
 
-  function finishEditReps() {
-    commitReps();
-  }
+  // ── Drag / touch ──────────────────────────────────────────────────────────
 
-  function startEditWeight() {
-    editingWeight = true;
-    setTimeout(() => weightRef?.select(), INPUT_FOCUS_DELAY_MS);
-  }
-
-  function finishEditWeight() {
-    editingWeight = false;
-  }
-
-  let dragging = $state(false);
   let dragOver = $state(false);
-
-  // Touch drag for mobile reorder
   let touchStartY = $state(0);
   let touchDragging = $state(false);
 
@@ -167,20 +213,25 @@
 </script>
 
 <tr
-  class="group transition-colors {selected ? 'bg-[hsl(var(--primary)/0.08)]' : 'hover:bg-[hsl(var(--muted)/0.4)]'} {dragOver ? 'outline outline-2 outline-[hsl(var(--primary))] outline-offset-[-1px]' : ''}"
+  bind:this={trEl}
+  class="group border-b border-[hsl(var(--border)/0.5)] last:border-b-0 transition-colors
+    {selected ? 'bg-[hsl(var(--primary)/0.06)]' : 'hover:bg-[hsl(var(--muted)/0.25)]'}
+    {dragOver ? 'outline outline-2 outline-[hsl(var(--primary))] outline-offset-[-1px]' : ''}"
   draggable="false"
+  onfocusin={handleRowFocusIn}
+  onfocusout={handleRowFocusOut}
   ondragover={(e) => { e.preventDefault(); dragOver = true; onDragOver?.(index); }}
   ondragleave={() => { dragOver = false; }}
   ondrop={(e) => { e.preventDefault(); dragOver = false; onDrop?.(); }}
 >
   <!-- Set number / select -->
-  <td class="w-8 px-1 py-2 text-center">
+  <td class="w-8 text-center py-0 px-0.5">
     {#if isEmpty}
       <span class="block h-5 w-5 mx-auto"></span>
     {:else if selected}
       <button
         type="button"
-        class="flex h-5 w-5 mx-auto items-center justify-center rounded-full bg-[hsl(var(--primary))] transition-all"
+        class="flex h-5 w-5 mx-auto items-center justify-center rounded-full bg-[hsl(var(--primary))]"
         onclick={(e) => onSelect?.(set.id, e.shiftKey)}
         ontouchstart={handleTouchStart}
         ontouchmove={handleTouchMove}
@@ -194,13 +245,12 @@
     {:else}
       <button
         type="button"
-        class="flex h-5 w-5 mx-auto items-center justify-center rounded-full text-xs font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--primary)/0.12)] hover:text-[hsl(var(--primary))] transition-all"
+        class="flex h-5 w-5 mx-auto items-center justify-center rounded-full text-xs font-semibold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--primary)/0.1)] hover:text-[hsl(var(--primary))] transition-colors"
         onclick={(e) => onSelect?.(set.id, e.shiftKey)}
         ontouchstart={handleTouchStart}
         ontouchmove={handleTouchMove}
         ontouchend={handleTouchEnd}
         aria-label="Select set"
-        title="Click to select"
       >
         {setNumber}
       </button>
@@ -208,128 +258,82 @@
   </td>
 
   <!-- Exercise -->
-  <td class="min-w-0 px-1 py-1.5">
-    {#if isEmpty || !set.exerciseName || editingExercise}
+  <td class="min-w-0 py-0.5 px-1">
+    {#if isEmpty || editingExercise}
       <ExerciseAutocomplete
-        value={set.exerciseName ?? ''}
-        exerciseId={set.exerciseId ?? ''}
-        onSelect={handleExerciseSelect}
+        value={isEmpty ? draftExerciseName : (set.exerciseName ?? '')}
+        exerciseId={isEmpty ? draftExerciseId : (set.exerciseId ?? '')}
+        onSelect={handleExerciseSelected}
         placeholder="Exercise…"
       />
     {:else}
       <button
         type="button"
-        class="w-full text-left text-sm font-medium text-[hsl(var(--foreground))] hover:text-[hsl(var(--primary))] transition-colors truncate"
-        onclick={startEditExercise}
+        class="w-full text-left text-sm font-medium text-[hsl(var(--foreground))] hover:text-[hsl(var(--primary))] py-1.5 px-1 transition-colors truncate block"
+        onclick={() => { editingExercise = true; }}
       >
-        {set.exerciseName}
+        {set.exerciseName || '—'}
       </button>
     {/if}
   </td>
 
-  <!-- Reps -->
-  <td class="w-20 px-1 py-1.5">
-    {#if isEmpty || set.reps === null || editingReps}
-      <input
-        bind:this={repsRef}
-        type="text"
-        inputmode="decimal"
-        value={repsRaw || (set.reps !== null ? String(set.reps) : '')}
-        placeholder="Reps"
-        oninput={handleRepsInput}
-        onkeydown={handleRepsKeydown}
-        onblur={finishEditReps}
-        class="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1 text-center text-sm outline-none focus:border-[hsl(var(--primary))] focus:ring-1 focus:ring-[hsl(var(--ring))] placeholder:text-[hsl(var(--muted-foreground)/0.5)]"
-        autocomplete="off"
-      />
-    {:else}
+  <!-- Reps – always-editable, looks like plain text -->
+  <td class="w-16 py-0.5 px-0.5">
+    <input
+      bind:this={repsInput}
+      type="text"
+      inputmode="numeric"
+      pattern="[0-9]*"
+      value={isEmpty ? draftReps : localReps}
+      placeholder="—"
+      oninput={handleRepsInput}
+      onkeydown={handleRepsKeydown}
+      class="w-full bg-transparent text-center py-1.5 px-0 rounded outline-none
+             focus:bg-[hsl(var(--muted)/0.5)]
+             placeholder:text-[hsl(var(--muted-foreground)/0.35)]
+             transition-colors"
+      style="font-size:16px"
+      autocomplete="off"
+    />
+  </td>
+
+  <!-- Weight – always-editable, looks like plain text -->
+  <td class="w-16 py-0.5 px-0.5">
+    <input
+      bind:this={weightInput}
+      type="text"
+      inputmode="decimal"
+      value={isEmpty ? draftWeight : localWeight}
+      placeholder="—"
+      oninput={handleWeightInput}
+      onkeydown={handleWeightKeydown}
+      class="w-full bg-transparent text-center py-1.5 px-0 rounded outline-none
+             focus:bg-[hsl(var(--muted)/0.5)]
+             placeholder:text-[hsl(var(--muted-foreground)/0.35)]
+             transition-colors"
+      style="font-size:16px"
+      autocomplete="off"
+    />
+  </td>
+
+  <!-- Delete -->
+  <td class="w-8 py-0.5 px-0.5">
+    {#if !isEmpty}
       <button
         type="button"
-        class="w-full text-center text-sm font-semibold text-[hsl(var(--foreground))] hover:text-[hsl(var(--primary))] transition-colors"
-        onclick={startEditReps}
+        onclick={() => onDelete?.(set.id)}
+        class="flex h-6 w-6 mx-auto items-center justify-center rounded
+               text-[hsl(var(--muted-foreground)/0.3)]
+               opacity-0 group-hover:opacity-100
+               hover:text-red-500 dark:hover:text-red-400
+               transition-all"
+        title="Delete set"
+        aria-label="Delete set"
       >
-        {set.reps}
-      </button>
-    {/if}
-  </td>
-
-  <!-- Weight -->
-  <td class="w-20 px-1 py-1.5">
-    {#if isEmpty || set.weight === null || editingWeight}
-      <input
-        bind:this={weightRef}
-        type="number"
-        inputmode="decimal"
-        value={set.weight ?? ''}
-        placeholder="—"
-        min="0"
-        max="9999"
-        step="2.5"
-        oninput={handleWeightChange}
-        onblur={finishEditWeight}
-        class="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1 text-center text-sm outline-none focus:border-[hsl(var(--primary))] focus:ring-1 focus:ring-[hsl(var(--ring))] placeholder:text-[hsl(var(--muted-foreground)/0.5)]"
-      />
-    {:else}
-      <button
-        type="button"
-        class="w-full text-center text-sm font-semibold text-[hsl(var(--foreground))] hover:text-[hsl(var(--primary))] transition-colors"
-        onclick={startEditWeight}
-      >
-        {set.weight}
-      </button>
-    {/if}
-  </td>
-
-  <!-- Actions (dup / delete) -->
-  <td class="w-12 px-0.5 py-1.5">
-    {#if !isEmpty}
-      <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          type="button"
-          onclick={() => onDuplicate?.(set.id)}
-          class="flex h-6 w-6 items-center justify-center rounded text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] transition-colors"
-          title="Duplicate"
-        >
-          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5">
-            <rect x="5" y="5" width="8" height="8" rx="1.5"/>
-            <path d="M3 11V4a1 1 0 011-1h7"/>
-          </svg>
-        </button>
-        <button
-          type="button"
-          onclick={() => onDelete?.(set.id)}
-          class="flex h-6 w-6 items-center justify-center rounded text-[hsl(var(--muted-foreground))] hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/20 transition-colors"
-          title="Delete"
-        >
-          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5M3 4l1 9a1 1 0 001 1h6a1 1 0 001-1l1-9"/>
-          </svg>
-        </button>
-      </div>
-    {/if}
-  </td>
-
-  <!-- Drag handle – always visible on real rows -->
-  <td class="w-7 px-0.5 py-1.5">
-    {#if !isEmpty}
-      <div
-        draggable="true"
-        ondragstart={() => { dragging = true; onDragStart?.(index); }}
-        ondragend={() => { dragging = false; }}
-        class="flex h-6 w-6 cursor-grab items-center justify-center rounded text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] active:cursor-grabbing transition-colors"
-        role="button"
-        tabindex="-1"
-        aria-label="Drag to reorder"
-      >
-        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" opacity="0.5">
-          <circle cx="5" cy="4" r="1.2"/>
-          <circle cx="11" cy="4" r="1.2"/>
-          <circle cx="5" cy="8" r="1.2"/>
-          <circle cx="11" cy="8" r="1.2"/>
-          <circle cx="5" cy="12" r="1.2"/>
-          <circle cx="11" cy="12" r="1.2"/>
+        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5M3 4l1 9a1 1 0 001 1h6a1 1 0 001-1l1-9"/>
         </svg>
-      </div>
+      </button>
     {/if}
   </td>
 </tr>
