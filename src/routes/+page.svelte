@@ -50,7 +50,6 @@
   );
 
   const allRows = $derived([...sets, ...emptyRows]);
-
   onMount(async () => {
     // Use a full UUID for session IDs — sufficient entropy for local workout session tracking
     sessionId = crypto.randomUUID();
@@ -96,20 +95,6 @@
     await persistWorkoutMeta();
   }
 
-  function getOrCreateRealSet(emptyId: string): WorkoutSet {
-    const emptyIndex = parseInt(emptyId.replace('empty-', ''));
-    return {
-      id: crypto.randomUUID(),
-      localWorkoutId: sessionId,
-      exerciseId: '',
-      exerciseName: '',
-      reps: null,
-      weight: null,
-      order: sets.length + emptyIndex,
-      createdAt: Date.now(),
-    };
-  }
-
   async function handleAdd(newSet: WorkoutSet) {
     pushUndo('Add set', sets);
     if (sets.length === 0) captureLocation();
@@ -140,17 +125,6 @@
     await dbDeleteSet(id);
     selected.delete(id);
     selected = new Set(selected);
-  }
-
-  async function handleDuplicate(id: string) {
-    if (id.startsWith('empty-')) return;
-    const original = sets.find((s) => s.id === id);
-    if (!original) return;
-    pushUndo('Duplicate set', sets);
-    const dup: WorkoutSet = { ...original, id: crypto.randomUUID(), createdAt: Date.now(), order: original.order + 0.5 };
-    const idx = sets.findIndex((s) => s.id === id);
-    const newSets = [...sets.slice(0, idx + 1), dup, ...sets.slice(idx + 1)].map((s, i) => ({ ...s, order: i }));
-    await persistSets(newSets);
   }
 
   function handleSelect(id: string, shiftKey = false) {
@@ -250,15 +224,14 @@
   </div>
 
   <!-- Sets table -->
-  <div class="overflow-x-auto rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm">
-    <table class="w-full min-w-[400px] border-collapse">
+  <div class="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm min-h-[200px]">
+    <table class="w-full border-collapse">
       <thead>
         <tr class="border-b border-[hsl(var(--border))]">
           <th class="w-8 px-1 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">#</th>
           <th class="px-1 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Exercise</th>
           <th class="w-16 px-1 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Reps</th>
-          <th class="w-20 px-1 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">{unit}</th>
-          <th class="w-16 px-1 py-2"></th>
+          <th class="w-16 px-1 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">{unit}</th>
           <th class="w-8 px-1 py-2"></th>
         </tr>
       </thead>
@@ -271,13 +244,12 @@
             index={i}
             setNumber={i + 1}
             onUpdate={handleUpdate}
+            onExerciseUpdate={handleExerciseUpdate}
             onDelete={handleDelete}
-            onDuplicate={handleDuplicate}
             onSelect={handleSelect}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
-            onBulkAdd={handleBulkAdd}
           />
         {/each}
         {#each emptyRows as emptySet, i}
@@ -287,14 +259,10 @@
             isEmpty={true}
             index={sets.length + i}
             setNumber={null}
-            onUpdate={handleUpdate}
-            onDelete={() => {}}
-            onDuplicate={() => {}}
-            onSelect={() => {}}
+            onAdd={handleAdd}
             onDragStart={() => {}}
             onDragOver={() => {}}
             onDrop={() => {}}
-            onBulkAdd={handleBulkAdd}
           />
         {/each}
       </tbody>

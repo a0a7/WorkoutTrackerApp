@@ -37,8 +37,8 @@
   } = $props();
 
   // ── Real-row local state (always-editable reps/weight) ───────────────────
-  let localReps = $state(set.reps !== null ? String(set.reps) : '');
-  let localWeight = $state(set.weight !== null ? String(set.weight) : '');
+  let localReps = $state('');
+  let localWeight = $state('');
   let editingExercise = $state(false);
   // Track whether any input in this row has focus (prevents effect from wiping mid-edit)
   let isEditing = $state(false);
