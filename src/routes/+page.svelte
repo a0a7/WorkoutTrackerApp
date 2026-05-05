@@ -101,6 +101,13 @@
     await persistSets([...sets, newSet]);
   }
 
+  async function handleAddMultiple(newSets: WorkoutSet[]) {
+    if (newSets.length === 0) return;
+    pushUndo(`Add ${newSets.length} sets`, sets);
+    if (sets.length === 0) captureLocation();
+    await persistSets([...sets, ...newSets]);
+  }
+
   async function handleExerciseUpdate(id: string, exerciseId: string, exerciseName: string) {
     pushUndo('Edit exercise', sets);
     const newSets = sets.map((s) => s.id === id ? { ...s, exerciseId, exerciseName } : s);
@@ -260,6 +267,7 @@
             index={sets.length + i}
             setNumber={null}
             onAdd={handleAdd}
+            onAddMultiple={handleAddMultiple}
             onDragStart={() => {}}
             onDragOver={() => {}}
             onDrop={() => {}}

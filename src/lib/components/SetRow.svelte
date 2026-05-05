@@ -13,6 +13,7 @@
     setNumber = null,
     onUpdate,
     onAdd,
+    onAddMultiple,
     onExerciseUpdate,
     onDelete,
     onSelect,
@@ -27,6 +28,7 @@
     setNumber?: number | null;
     onUpdate?: (id: string, field: keyof WorkoutSet, value: unknown) => void;
     onAdd?: (set: WorkoutSet) => void;
+    onAddMultiple?: (sets: WorkoutSet[]) => void;
     onExerciseUpdate?: (id: string, exerciseId: string, exerciseName: string) => void;
     onDelete?: (id: string) => void;
     onSelect?: (id: string, shiftKey?: boolean) => void;
@@ -130,8 +132,47 @@
 
   // ── Empty-row commit ──────────────────────────────────────────────────────
 
+  const MAX_MULTI_SET_COUNT = 99;
+
   function flushEmptyRow() {
     if (!isEmpty) return;
+
+    // Parse "NxRepxWeight" shorthand — e.g. "3x12x200" creates 3 sets of 12 reps @ 200 lbs.
+    // Supported separators: x, X, ×, *. Weight portion is optional (falls back to the weight field).
+    const multi = draftReps.match(/^(\d+)[xX×*](\d+)(?:[xX×*]([\d.]+))?$/);
+    if (multi) {
+      const count = parseInt(multi[1], 10);
+      const reps = parseInt(multi[2], 10);
+      const weight = multi[3]
+        ? parseFloat(multi[3])
+        : draftWeight !== ''
+          ? parseFloat(draftWeight) || null
+          : null;
+      if (count >= 1 && count <= MAX_MULTI_SET_COUNT && (draftExerciseName || reps > 0 || weight !== null)) {
+        const now = Date.now();
+        const newSets: WorkoutSet[] = Array.from({ length: count }, (_, i) => ({
+          id: crypto.randomUUID(),
+          localWorkoutId: set.localWorkoutId,
+          exerciseId: draftExerciseId,
+          exerciseName: draftExerciseName,
+          reps,
+          weight,
+          order: set.order + i,
+          createdAt: now + i,
+        }));
+        if (onAddMultiple) {
+          onAddMultiple(newSets);
+        } else {
+          newSets.forEach((s) => onAdd?.(s));
+        }
+        draftExerciseId = '';
+        draftExerciseName = '';
+        draftReps = '';
+        draftWeight = '';
+        return;
+      }
+    }
+
     const reps = draftReps !== '' ? (parseInt(draftReps, 10) || null) : null;
     const weight = draftWeight !== '' ? (parseFloat(draftWeight) || null) : null;
     if (draftExerciseName || reps !== null || weight !== null) {
@@ -284,9 +325,7 @@
     <input
       bind:this={repsInput}
       type="text"
-      inputmode="numeric"
       enterkeyhint="next"
-      pattern="[0-9]*"
       value={isEmpty ? draftReps : localReps}
       placeholder="—"
       oninput={handleRepsInput}
@@ -320,7 +359,7 @@
     />
   </td>
 
-  <!-- Delete -->
+  <!-- Delete / commit -->
   <td class="w-8 py-0.5 px-0.5">
     {#if !isEmpty}
       <button
@@ -336,6 +375,21 @@
       >
         <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5">
           <path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5M3 4l1 9a1 1 0 001 1h6a1 1 0 001-1l1-9"/>
+        </svg>
+      </button>
+    {:else if draftExerciseName || draftReps || draftWeight}
+      <button
+        type="button"
+        onclick={() => flushEmptyRow()}
+        class="flex h-6 w-6 mx-auto items-center justify-center rounded
+               text-[hsl(var(--primary))]
+               hover:bg-[hsl(var(--primary)/0.1)]
+               transition-all"
+        title="Add set"
+        aria-label="Add set"
+      >
+        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 8l4 4 8-8"/>
         </svg>
       </button>
     {/if}
