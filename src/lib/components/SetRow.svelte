@@ -112,7 +112,7 @@
       e.preventDefault();
       // On non-empty rows, check for shorthand expand before moving to weight
       if (!isEmpty && onExpandSet) {
-        const multi = localReps.match(/^(\d+)[xX×*](\d+)(?:[xX×*]([\d.]+))?$/);
+        const multi = localReps.match(MULTI_SET_RE);
         if (multi) {
           const count = parseInt(multi[1], 10);
           const reps = parseInt(multi[2], 10);
@@ -165,14 +165,17 @@
 
   // ── Empty-row commit ──────────────────────────────────────────────────────
 
+  // Maximum N for the NxRepsxWeight shorthand (e.g. "99x10x200")
   const MAX_MULTI_SET_COUNT = 99;
+  // Shared regex for multi-set shorthand: "NxRepsxWeight" with optional weight.
+  // Supported separators: x, X, ×, *.
+  const MULTI_SET_RE = /^(\d+)[xX×*](\d+)(?:[xX×*]([\d.]+))?$/;
 
   function flushEmptyRow() {
     if (!isEmpty) return;
 
     // Parse "NxRepxWeight" shorthand — e.g. "3x12x200" creates 3 sets of 12 reps @ 200 lbs.
-    // Supported separators: x, X, ×, *. Weight portion is optional (falls back to the weight field).
-    const multi = draftReps.match(/^(\d+)[xX×*](\d+)(?:[xX×*]([\d.]+))?$/);
+    const multi = draftReps.match(MULTI_SET_RE);
     if (multi) {
       const count = parseInt(multi[1], 10);
       const reps = parseInt(multi[2], 10);

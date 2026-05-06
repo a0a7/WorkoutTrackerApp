@@ -63,6 +63,16 @@
   );
 
   const allRows = $derived([...sets, ...emptyRows]);
+
+  // Label shown on the "Edit times" button when custom times have been set
+  const customTimesLabel = $derived(() => {
+    if (!customStartTime && !customEndTime) return null;
+    const fmt = (ts: number) =>
+      new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    const s = fmt(customStartTime ?? (sets[0]?.createdAt - WORKOUT_START_OFFSET_MS));
+    const e = fmt(customEndTime ?? sets[sets.length - 1]?.createdAt);
+    return `${s} – ${e} · Edit times`;
+  });
   onMount(async () => {
     // Use a full UUID for session IDs — sufficient entropy for local workout session tracking
     sessionId = crypto.randomUUID();
@@ -268,11 +278,7 @@
           onclick={beginEditTimes}
           class="text-left text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] transition-colors"
         >
-          {#if customStartTime || customEndTime}
-            {new Date(customStartTime ?? (sets[0]?.createdAt - WORKOUT_START_OFFSET_MS)).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} – {new Date(customEndTime ?? sets[sets.length - 1]?.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} · Edit times
-          {:else}
-            Edit times
-          {/if}
+          {customTimesLabel() ?? 'Edit times'}
         </button>
       {/if}
     </div>
