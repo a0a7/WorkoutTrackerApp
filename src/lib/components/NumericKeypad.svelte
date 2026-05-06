@@ -54,6 +54,10 @@
 </script>
 
 {#if $keypadConfig}
+  <!-- Backdrop — tap anywhere outside to dismiss -->
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <div class="fixed inset-0 z-[59]" onclick={handleCancel}></div>
+
   <div
     class="fixed bottom-0 left-0 right-0 z-[60]
            bg-[hsl(var(--card))] border-t border-[hsl(var(--border))] shadow-lg"
@@ -115,6 +119,19 @@
     </div>
 
     <div class="flex gap-1 px-2 pb-2">
+      <!-- Close keyboard button -->
+      <button
+        onclick={handleCancel}
+        class="h-10 w-12 flex-none rounded-xl bg-[hsl(var(--muted))]
+               text-[hsl(var(--muted-foreground))]
+               active:scale-95 transition-transform select-none touch-manipulation"
+        aria-label="Close keyboard"
+      >
+        <svg class="mx-auto" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+
       {#if $keypadConfig.onNext}
         <button
           onclick={handleNext}

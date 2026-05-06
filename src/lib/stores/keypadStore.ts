@@ -1,6 +1,8 @@
 import { writable } from 'svelte/store';
 
 export interface KeypadConfig {
+  /** Unique identifier for this keypad instance (used to highlight the active cell) */
+  id?: string;
   /** Current value string (digits, decimal point, and/or 'x' for shorthand) */
   value: string;
   /** Whether a decimal point is allowed (weight fields) */

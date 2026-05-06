@@ -3,7 +3,7 @@
   import type { WorkoutSet } from '../types';
   import ExerciseAutocomplete from './ExerciseAutocomplete.svelte';
   import type { Exercise } from '../types';
-  import { openKeypad, closeKeypad } from '$lib/stores/keypadStore';
+  import { openKeypad, closeKeypad, keypadConfig } from '$lib/stores/keypadStore';
 
   const TOUCH_MOVEMENT_THRESHOLD_PX = 10;
 
@@ -29,6 +29,7 @@
     isEmpty?: boolean;
     setNumber?: number | null;
     onUpdate?: (id: string, field: keyof WorkoutSet, value: unknown) => void;
+    onUpdateMultiple?: (id: string, updates: Partial<WorkoutSet>) => void;
     onAdd?: (set: WorkoutSet) => void;
     onAddMultiple?: (sets: WorkoutSet[]) => void;
     onExerciseUpdate?: (id: string, exerciseId: string, exerciseName: string) => void;
@@ -108,12 +109,15 @@
   }
 
   function doOpenWeightKeypad() {
+    let captured = isEmpty ? draftWeight : localWeight;
     openKeypad({
-      value: isEmpty ? draftWeight : localWeight,
+      id: `${set.id}:weight`,
+      value: captured,
       allowDecimal: true,
       allowShorthand: false,
       label: 'Weight',
       onInput: (v) => {
+        captured = v;
         if (isEmpty) {
           draftWeight = v;
         } else {
@@ -131,43 +135,64 @@
   }
 
   function doOpenRepsKeypad() {
+    let captured = isEmpty ? draftReps : localReps;
     openKeypad({
-      value: isEmpty ? draftReps : localReps,
+      id: `${set.id}:reps`,
+      value: captured,
       allowDecimal: false,
       allowShorthand: true,
       label: 'Reps',
-      onInput: handleRepsInput,
+      onInput: (v) => {
+        captured = v;
+        handleRepsInput(v);
+      },
       onNext: doOpenWeightKeypad,
       onDone: () => {
-        // On non-empty rows, check for shorthand expand
-        if (!isEmpty && onExpandSet) {
-          const multi = (isEmpty ? draftReps : localReps).match(MULTI_SET_RE);
-          if (multi) {
-            const count = parseInt(multi[1], 10);
-            const reps = parseInt(multi[2], 10);
-            const weight = multi[3]
-              ? parseFloat(multi[3])
-              : localWeight !== ''
-                ? parseFloat(localWeight) || null
-                : null;
-            if (count >= 1 && count <= MAX_MULTI_SET_COUNT) {
-              const now = Date.now();
-              const newSets: WorkoutSet[] = Array.from({ length: count }, (_, i) => ({
-                id: crypto.randomUUID(),
-                localWorkoutId: set.localWorkoutId,
-                exerciseId: set.exerciseId,
-                exerciseName: set.exerciseName,
-                reps,
-                weight,
-                order: set.order + i,
-                createdAt: now + i,
-              }));
-              onExpandSet(set.id, newSets);
-              return;
-            }
+        if (isEmpty) {
+          flushEmptyRow();
+          return;
+        }
+
+        // 3-part NxRxW → expand to N sets
+        const multi = captured.match(MULTI_SET_RE);
+        if (multi && onExpandSet) {
+          const count = parseInt(multi[1], 10);
+          const reps = parseInt(multi[2], 10);
+          const weight = parseFloat(multi[3]);
+          if (count >= 1 && count <= MAX_MULTI_SET_COUNT) {
+            const now = Date.now();
+            const newSets: WorkoutSet[] = Array.from({ length: count }, (_, i) => ({
+              id: crypto.randomUUID(),
+              localWorkoutId: set.localWorkoutId,
+              exerciseId: set.exerciseId,
+              exerciseName: set.exerciseName,
+              reps,
+              weight,
+              order: set.order + i,
+              createdAt: now + i,
+            }));
+            onExpandSet(set.id, newSets);
+            return;
           }
         }
-        // Move to weight
+
+        // 2-part RxW → update this set's reps and weight together
+        const pair = captured.match(SINGLE_PAIR_RE);
+        if (pair) {
+          const reps = parseInt(pair[1], 10) || null;
+          const weight = parseFloat(pair[2]) || null;
+          if (onUpdateMultiple) {
+            onUpdateMultiple(set.id, { reps, weight });
+          } else {
+            onUpdate?.(set.id, 'reps', reps);
+            onUpdate?.(set.id, 'weight', weight);
+          }
+          localReps = reps !== null ? String(reps) : '';
+          localWeight = weight !== null ? String(weight) : '';
+          return;
+        }
+
+        // Plain reps — move to weight keypad
         doOpenWeightKeypad();
       },
     });
@@ -186,9 +211,10 @@
 
   // Maximum N for the NxRepsxWeight shorthand (e.g. "99x10x200")
   const MAX_MULTI_SET_COUNT = 99;
-  // Shared regex for multi-set shorthand: "NxRepsxWeight" with optional weight.
-  // Supported separators: x, X, ×, *.
-  const MULTI_SET_RE = /^(\d+)[xX×*](\d+)(?:[xX×*]([\d.]+))?$/;
+  // 3-part shorthand: NxRepsxWeight — expands to N sets (all three parts required)
+  const MULTI_SET_RE = /^(\d+)[xX×*](\d+)[xX×*]([\d.]+)$/;
+  // 2-part shorthand: RepsxWeight — updates a single set
+  const SINGLE_PAIR_RE = /^(\d+)[xX×*]([\d.]+)$/;
 
   function flushEmptyRow() {
     if (!isEmpty) return;
@@ -198,12 +224,8 @@
     if (multi) {
       const count = parseInt(multi[1], 10);
       const reps = parseInt(multi[2], 10);
-      const weight = multi[3]
-        ? parseFloat(multi[3])
-        : draftWeight !== ''
-          ? parseFloat(draftWeight) || null
-          : null;
-      if (count >= 1 && count <= MAX_MULTI_SET_COUNT && (draftExerciseName || reps > 0 || weight !== null)) {
+      const weight = parseFloat(multi[3]);
+      if (count >= 1 && count <= MAX_MULTI_SET_COUNT && (draftExerciseName || reps > 0 || weight > 0)) {
         const now = Date.now();
         const newSets: WorkoutSet[] = Array.from({ length: count }, (_, i) => ({
           id: crypto.randomUUID(),
@@ -226,6 +248,30 @@
         draftWeight = '';
         return;
       }
+    }
+
+    // 2-part RxW shorthand — "12x150" creates one set with reps=12 and weight=150
+    const pair = draftReps.match(SINGLE_PAIR_RE);
+    if (pair) {
+      const reps = parseInt(pair[1], 10) || null;
+      const weight = parseFloat(pair[2]) || null;
+      if (draftExerciseName || reps !== null || weight !== null) {
+        onAdd?.({
+          id: crypto.randomUUID(),
+          localWorkoutId: set.localWorkoutId,
+          exerciseId: draftExerciseId,
+          exerciseName: draftExerciseName,
+          reps,
+          weight,
+          order: set.order,
+          createdAt: Date.now(),
+        });
+      }
+      draftExerciseId = '';
+      draftExerciseName = '';
+      draftReps = '';
+      draftWeight = '';
+      return;
     }
 
     const reps = draftReps !== '' ? (parseInt(draftReps, 10) || null) : null;
@@ -345,7 +391,7 @@
   </td>
 
   <!-- Exercise -->
-  <td class="min-w-0 py-0.5 px-1">
+  <td class="min-w-0 py-0.5 px-1" onfocusin={closeKeypad}>
     {#if isEmpty || editingExercise}
       <ExerciseAutocomplete
         value={isEmpty ? draftExerciseName : (set.exerciseName ?? '')}
@@ -357,7 +403,7 @@
       <button
         type="button"
         class="w-full text-left text-sm font-medium text-[hsl(var(--foreground))] hover:text-[hsl(var(--primary))] py-1.5 px-1 transition-colors truncate block"
-        onclick={() => { editingExercise = true; }}
+        onclick={() => { closeKeypad(); editingExercise = true; }}
       >
         {set.exerciseName || '—'}
       </button>
@@ -372,8 +418,10 @@
       onclick={doOpenRepsKeypad}
       class="w-full bg-transparent text-center py-1.5 px-0 rounded
              text-[hsl(var(--foreground))]
-             focus:bg-[hsl(var(--muted)/0.5)]
-             transition-colors select-none touch-manipulation"
+             transition-colors select-none touch-manipulation
+             {$keypadConfig?.id === `${set.id}:reps`
+               ? 'ring-2 ring-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.08)]'
+               : 'focus:bg-[hsl(var(--muted)/0.5)]'}"
       style="font-size:16px; min-height: 2.25rem;"
       aria-label="Reps"
     >
@@ -393,8 +441,10 @@
       onclick={doOpenWeightKeypad}
       class="w-full bg-transparent text-center py-1.5 px-0 rounded
              text-[hsl(var(--foreground))]
-             focus:bg-[hsl(var(--muted)/0.5)]
-             transition-colors select-none touch-manipulation"
+             transition-colors select-none touch-manipulation
+             {$keypadConfig?.id === `${set.id}:weight`
+               ? 'ring-2 ring-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.08)]'
+               : 'focus:bg-[hsl(var(--muted)/0.5)]'}"
       style="font-size:16px; min-height: 2.25rem;"
       aria-label="Weight"
     >
