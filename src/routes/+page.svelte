@@ -7,7 +7,7 @@
   import { setsStore, selectedIds, pushUndo, undo, redo, hasUndo, hasRedo } from '$lib/stores/workoutStore';
   import { getTodaySets, saveSets, deleteSet as dbDeleteSet, saveWorkout } from '$lib/db';
   import { unitPreference, initUnitPreference, userStore } from '$lib/stores/userStore';
-  import { syncToServer } from '$lib/sync';
+  import { syncToServer, syncFromServer, syncStore } from '$lib/sync';
   import type { WorkoutSet } from '$lib/types';
 
   let sets = $state<WorkoutSet[]>([]);
@@ -21,6 +21,26 @@
 
   // Reactive unit preference — auto-subscribes and updates when the store changes
   const unit = $derived($unitPreference);
+
+  // Sync state for the header button
+  const isSyncing = $derived($syncStore.syncing);
+  const syncError = $derived($syncStore.error);
+  const lastSync = $derived($syncStore.lastSync);
+
+  function handleSyncTap() {
+    const u = get(userStore);
+    if (!u) return;
+    syncFromServer(u).catch(() => {});
+    syncToServer(u).catch(() => {});
+  }
+
+  function formatLastSync(ts: number | null): string {
+    if (!ts) return '';
+    const diff = Math.floor((Date.now() - ts) / 1000);
+    if (diff < 60) return 'now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    return `${Math.floor(diff / 3600)}h ago`;
+  }
 
   // Stable session ID — one unique ID per app session (supports multiple sessions/day)
   // Defined inside onMount so each component mount gets a fresh session ID
@@ -284,6 +304,37 @@
       {/if}
     </div>
     <div class="flex items-center gap-2">
+      <!-- Sync button -->
+      <button
+        onclick={handleSyncTap}
+        class="flex h-8 w-8 items-center justify-center rounded-full transition-colors
+               {syncError ? 'text-red-500' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}"
+        aria-label="Sync — tap to sync"
+        title={syncError ?? (lastSync ? `Last synced ${formatLastSync(lastSync)}` : 'Not synced yet')}
+      >
+        {#if isSyncing}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+               class="animate-spin" style="animation-duration:1.2s">
+            <polyline points="23 4 23 10 17 10"/>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+        {:else if syncError}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+            <line x1="12" y1="13" x2="12" y2="16"/>
+            <circle cx="12" cy="18" r="0.5" fill="currentColor"/>
+          </svg>
+        {:else if lastSync}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+            <polyline points="9 16 11 18 15 14"/>
+          </svg>
+        {:else}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+          </svg>
+        {/if}
+      </button>
       {#if selected.size > 0}
         <span class="text-sm font-medium text-[hsl(var(--primary))]">{selected.size} selected</span>
         <button

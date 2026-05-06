@@ -127,6 +127,7 @@
         }
       },
     });
+    scrollRowIntoView();
   }
 
   function doOpenRepsKeypad() {
@@ -170,6 +171,13 @@
         doOpenWeightKeypad();
       },
     });
+    scrollRowIntoView();
+  }
+
+  function scrollRowIntoView() {
+    setTimeout(() => {
+      trEl?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 50);
   }
 
   // ── Weight ────────────────────────────────────────────────────────────────
