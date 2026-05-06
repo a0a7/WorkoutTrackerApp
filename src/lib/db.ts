@@ -149,6 +149,23 @@ export async function saveWorkout(workout: Workout, queueSync = true): Promise<v
   }
 }
 
+export async function deleteWorkout(id: string): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction(['workouts', 'sets', 'pendingSync'], 'readwrite');
+  const workoutsStore = tx.objectStore('workouts');
+  const setsStore = tx.objectStore('sets');
+  const pendingStore = tx.objectStore('pendingSync');
+  const workoutSets = await setsStore.index('by_workout').getAll(id);
+
+  await Promise.all([
+    workoutsStore.delete(id),
+    ...workoutSets.map((s) => setsStore.delete(s.id)),
+    pendingStore.put({ id, type: 'workout', operation: 'delete', timestamp: Date.now() }),
+    ...workoutSets.map((s) => pendingStore.put({ id: s.id, type: 'set', operation: 'delete', timestamp: Date.now() })),
+    tx.done,
+  ]);
+}
+
 export async function getWorkout(id: string): Promise<Workout | undefined> {
   const db = await getDB();
   const stored = await db.get('workouts', id);

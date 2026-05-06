@@ -13,6 +13,7 @@
     isEmpty = false,
     setNumber = null,
     onUpdate,
+    onUpdateMultiple,
     onAdd,
     onAddMultiple,
     onExerciseUpdate,
@@ -22,6 +23,7 @@
     onDragStart,
     onDragOver,
     onDrop,
+    onTouchReorder,
     index,
   }: {
     set: WorkoutSet;
@@ -39,6 +41,7 @@
     onDragStart?: (index: number) => void;
     onDragOver?: (index: number) => void;
     onDrop?: () => void;
+    onTouchReorder?: (fromIndex: number, toIndex: number) => void;
     index: number;
   } = $props();
 
@@ -327,6 +330,8 @@
   let dragOver = $state(false);
   let touchStartY = $state(0);
   let touchDragging = $state(false);
+  let handleTouchDragging = $state(false);
+  let touchDragStartIndex = $state<number | null>(null);
 
   function handleTouchStart(e: TouchEvent) {
     touchStartY = e.touches[0].clientY;
@@ -343,10 +348,39 @@
     }
     touchDragging = false;
   }
+
+  function handleDragHandleTouchStart(_e: TouchEvent) {
+    if (isEmpty) return;
+    handleTouchDragging = true;
+    touchDragStartIndex = index;
+  }
+
+  function handleDragHandleTouchMove(e: TouchEvent) {
+    if (!handleTouchDragging) return;
+    const touch = e.touches[0];
+    const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('tr[data-set-row-index]');
+    const targetIndex = targetEl ? Number((targetEl as HTMLElement).dataset.setRowIndex) : NaN;
+    if (!Number.isNaN(targetIndex)) {
+      onDragOver?.(targetIndex);
+    }
+  }
+
+  function handleDragHandleTouchEnd(e: TouchEvent) {
+    if (!handleTouchDragging || touchDragStartIndex === null) return;
+    const touch = e.changedTouches[0];
+    const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('tr[data-set-row-index]');
+    const targetIndex = targetEl ? Number((targetEl as HTMLElement).dataset.setRowIndex) : NaN;
+    if (!Number.isNaN(targetIndex)) {
+      onTouchReorder?.(touchDragStartIndex, targetIndex);
+    }
+    handleTouchDragging = false;
+    touchDragStartIndex = null;
+  }
 </script>
 
 <tr
   bind:this={trEl}
+  data-set-row-index={index}
   class="group border-b border-[hsl(var(--border)/0.5)] last:border-b-0 transition-colors
     {selected ? 'bg-[hsl(var(--primary)/0.06)]' : 'hover:bg-[hsl(var(--muted)/0.25)]'}
     {dragOver ? 'outline outline-2 outline-[hsl(var(--primary))] outline-offset-[-1px]' : ''}"
@@ -457,23 +491,39 @@
   </td>
 
   <!-- Delete / commit -->
-  <td class="w-8 py-0.5 px-0.5">
+  <td class="w-14 py-0.5 px-0.5">
     {#if !isEmpty}
-      <button
-        type="button"
-        onclick={() => onDelete?.(set.id)}
-        class="flex h-6 w-6 mx-auto items-center justify-center rounded
-               text-[hsl(var(--muted-foreground)/0.3)]
-               opacity-0 group-hover:opacity-100
-               hover:text-red-500 dark:hover:text-red-400
-               transition-all"
-        title="Delete set"
-        aria-label="Delete set"
-      >
-        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5M3 4l1 9a1 1 0 001 1h6a1 1 0 001-1l1-9"/>
-        </svg>
-      </button>
+      <div class="flex items-center justify-center gap-1">
+        <button
+          type="button"
+          onclick={() => onDelete?.(set.id)}
+          class="flex h-6 w-6 items-center justify-center rounded
+                 text-[hsl(var(--muted-foreground))]
+                 hover:text-red-500 dark:hover:text-red-400
+                 transition-colors"
+          title="Delete set"
+          aria-label="Delete set"
+        >
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5M3 4l1 9a1 1 0 001 1h6a1 1 0 001-1l1-9"/>
+          </svg>
+        </button>
+        <button
+          type="button"
+          draggable="true"
+          ondragstart={() => onDragStart?.(index)}
+          ontouchstart={handleDragHandleTouchStart}
+          ontouchmove={handleDragHandleTouchMove}
+          ontouchend={handleDragHandleTouchEnd}
+          class="flex h-6 w-6 items-center justify-center rounded text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] transition-colors cursor-grab active:cursor-grabbing touch-none"
+          title="Drag to reorder"
+          aria-label="Drag to reorder set"
+        >
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <path d="M3 4h10M3 8h10M3 12h10" />
+          </svg>
+        </button>
+      </div>
     {:else if draftExerciseName || draftReps || draftWeight}
       <button
         type="button"
@@ -492,4 +542,3 @@
     {/if}
   </td>
 </tr>
-

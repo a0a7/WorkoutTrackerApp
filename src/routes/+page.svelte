@@ -283,6 +283,16 @@
     dragFromIndex = null; dragToIndex = null;
     await persistSets(reordered);
   }
+
+  async function handleTouchReorder(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= sets.length || toIndex >= sets.length) return;
+    pushUndo('Reorder', sets);
+    const newSets = [...sets];
+    const [moved] = newSets.splice(fromIndex, 1);
+    newSets.splice(toIndex, 0, moved);
+    const reordered = newSets.map((s, i) => ({ ...s, order: i }));
+    await persistSets(reordered);
+  }
 </script>
 
 <svelte:head>
@@ -304,12 +314,10 @@
       {/if}
     </div>
     <div class="flex items-center gap-2">
-      <!-- Sync button -->
-      <button
-        onclick={handleSyncTap}
-        class="flex h-8 w-8 items-center justify-center rounded-full transition-colors
-               {syncError ? 'text-red-500' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}"
-        aria-label="Sync — tap to sync"
+      <div
+        class="flex h-8 w-8 items-center justify-center rounded-full
+               {syncError ? 'text-red-500' : 'text-[hsl(var(--muted-foreground))]'}"
+        aria-label="Sync status"
         title={syncError ?? (lastSync ? `Last synced ${formatLastSync(lastSync)}` : 'Not synced yet')}
       >
         {#if isSyncing}
@@ -334,6 +342,14 @@
             <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
           </svg>
         {/if}
+      </div>
+      <button
+        onclick={handleSyncTap}
+        class="h-8 rounded-full px-3 text-xs font-medium transition-colors bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--border))]"
+        aria-label="Sync now"
+        title="Sync now"
+      >
+        Sync
       </button>
       {#if selected.size > 0}
         <span class="text-sm font-medium text-[hsl(var(--primary))]">{selected.size} selected</span>
@@ -408,7 +424,7 @@
           <th class="px-1 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Exercise</th>
           <th class="w-16 px-1 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Reps</th>
           <th class="w-16 px-1 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">{unit}</th>
-          <th class="w-8 px-1 py-2"></th>
+          <th class="w-14 px-1 py-2"></th>
         </tr>
       </thead>
       <tbody>
@@ -427,6 +443,7 @@
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
+            onTouchReorder={handleTouchReorder}
           />
         {/each}
         {#each emptyRows as emptySet, i}

@@ -37,11 +37,15 @@ export async function syncToServer(user: User): Promise<void> {
           } else if (item.operation === 'delete') {
             await apiFetch(`/sets/${item.id}`, user, { method: 'DELETE' });
           }
-        } else if (item.type === 'workout' && item.operation === 'upsert') {
-          await apiFetch('/workouts', user, {
-            method: 'POST',
-            body: JSON.stringify(item.data),
-          });
+        } else if (item.type === 'workout') {
+          if (item.operation === 'upsert') {
+            await apiFetch('/workouts', user, {
+              method: 'POST',
+              body: JSON.stringify(item.data),
+            });
+          } else if (item.operation === 'delete') {
+            await apiFetch(`/workouts/${item.id}`, user, { method: 'DELETE' });
+          }
         }
         await clearPendingSync(item.id);
       } catch {

@@ -1,12 +1,14 @@
 <script lang="ts">
 
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import MuscleMap from '$lib/components/MuscleMap.svelte';
-  import { getWorkout, saveWorkout } from '$lib/db';
+  import { deleteWorkout, getWorkout, saveWorkout } from '$lib/db';
   import { EXERCISE_MAP } from '$lib/exercises';
-  import { unitPreference, initUnitPreference } from '$lib/stores/userStore';
+  import { unitPreference, initUnitPreference, userStore } from '$lib/stores/userStore';
+  import { syncToServer } from '$lib/sync';
   import type { Workout, MuscleActivation } from '$lib/types';
 
   const workoutId = $derived($page.params.id);
@@ -23,6 +25,7 @@
   let editStartTime = $state('');
   let editEndDate = $state('');
   let editEndTime = $state('');
+  let confirmDelete = $state(false);
 
   function toDateInput(ts: number) {
     const d = new Date(ts);
@@ -64,6 +67,14 @@
     workout = { ...workout, startTime: newStart, endTime: newEnd };
     await saveWorkout(workout);
     editingTimes = false;
+  }
+
+  async function handleDeleteWorkout() {
+    if (!workout) return;
+    await deleteWorkout(workout.id);
+    const user = get(userStore);
+    if (user) syncToServer(user).catch(() => {});
+    goto('/history');
   }
 
   onMount(async () => {
@@ -195,7 +206,7 @@
         </div>
       {/if}
 
-      <div class="mt-3 flex gap-4 flex-wrap">
+        <div class="mt-3 flex gap-4 flex-wrap">
         <div class="flex items-center gap-1.5">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--primary))" stroke-width="2" stroke-linecap="round">
             <circle cx="12" cy="12" r="10"/>
@@ -218,8 +229,36 @@
             <span class="text-sm text-[hsl(var(--foreground))]">{workout.location.label ?? 'Location'}</span>
           </div>
         {/if}
+        </div>
+        <div class="mt-4 border-t border-[hsl(var(--border))] pt-3">
+          {#if confirmDelete}
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-xs text-[hsl(var(--muted-foreground))]">Delete this full workout?</p>
+              <div class="flex items-center gap-2">
+                <button
+                  onclick={() => { confirmDelete = false; }}
+                  class="rounded-lg px-3 py-1.5 text-xs font-medium bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onclick={handleDeleteWorkout}
+                  class="rounded-lg px-3 py-1.5 text-xs font-medium bg-red-600 text-white hover:bg-red-500"
+                >
+                  Confirm delete
+                </button>
+              </div>
+            </div>
+          {:else}
+            <button
+              onclick={() => { confirmDelete = true; }}
+              class="text-xs font-medium text-red-500 hover:text-red-400"
+            >
+              Delete workout
+            </button>
+          {/if}
+        </div>
       </div>
-    </div>
 
     <!-- Muscle Map -->
     <div class="mb-5 rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] p-4 shadow-sm">
@@ -258,4 +297,3 @@
     </div>
   {/if}
 </div>
-
