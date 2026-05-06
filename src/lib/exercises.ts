@@ -215,6 +215,49 @@ export const EXERCISES: Exercise[] = [
   { id: 'kettlebell-goblet-squat', name: 'Kettlebell Goblet Squat', category: 'free-weight', muscleActivations: [{ muscle: 'quad', activation: 'primary' }, { muscle: 'glute', activation: 'secondary' }, { muscle: 'adductor', activation: 'tertiary' }] },
   { id: 'dumbbell-clean', name: 'Dumbbell Clean', category: 'free-weight', muscleActivations: [{ muscle: 'glute', activation: 'primary' }, { muscle: 'trap_upper', activation: 'secondary' }, { muscle: 'quad', activation: 'secondary' }] },
   { id: 'dumbbell-snatch', name: 'Dumbbell Snatch', category: 'free-weight', muscleActivations: [{ muscle: 'glute', activation: 'primary' }, { muscle: 'trap_upper', activation: 'secondary' }, { muscle: 'front_delt', activation: 'secondary' }] },
+
+  // ── Cardio / conditioning ────────────────────────────────────────────────
+  { id: 'treadmill-run', name: 'Treadmill Run', category: 'machine', muscleActivations: [{ muscle: 'quad', activation: 'primary' }, { muscle: 'hamstring', activation: 'secondary' }, { muscle: 'glute', activation: 'secondary' }, { muscle: 'calf', activation: 'secondary' }] },
+  { id: 'outdoor-run', name: 'Outdoor Run', category: 'free-weight', muscleActivations: [{ muscle: 'quad', activation: 'primary' }, { muscle: 'hamstring', activation: 'secondary' }, { muscle: 'glute', activation: 'secondary' }, { muscle: 'calf', activation: 'secondary' }] },
+  { id: 'stationary-bike', name: 'Stationary Bike', category: 'machine', muscleActivations: [{ muscle: 'quad', activation: 'primary' }, { muscle: 'glute', activation: 'secondary' }, { muscle: 'hamstring', activation: 'secondary' }, { muscle: 'calf', activation: 'tertiary' }] },
+  { id: 'rowing-machine', name: 'Rowing Machine', category: 'machine', muscleActivations: [{ muscle: 'lat', activation: 'primary' }, { muscle: 'rhomboid', activation: 'secondary' }, { muscle: 'hamstring', activation: 'secondary' }, { muscle: 'glute', activation: 'secondary' }, { muscle: 'bicep', activation: 'tertiary' }] },
+  { id: 'stairmaster', name: 'Stairmaster', category: 'machine', muscleActivations: [{ muscle: 'glute', activation: 'primary' }, { muscle: 'quad', activation: 'primary' }, { muscle: 'calf', activation: 'secondary' }, { muscle: 'hamstring', activation: 'secondary' }] },
+  { id: 'elliptical', name: 'Elliptical', category: 'machine', muscleActivations: [{ muscle: 'quad', activation: 'primary' }, { muscle: 'glute', activation: 'secondary' }, { muscle: 'hamstring', activation: 'secondary' }, { muscle: 'calf', activation: 'tertiary' }] },
+  { id: 'jump-rope', name: 'Jump Rope', category: 'free-weight', muscleActivations: [{ muscle: 'calf', activation: 'primary' }, { muscle: 'quad', activation: 'secondary' }, { muscle: 'abs', activation: 'secondary' }] },
+  { id: 'burpee', name: 'Burpee', category: 'free-weight', muscleActivations: [{ muscle: 'quad', activation: 'primary' }, { muscle: 'chest_mid', activation: 'secondary' }, { muscle: 'glute', activation: 'secondary' }, { muscle: 'abs', activation: 'secondary' }] },
+  { id: 'box-jump', name: 'Box Jump', category: 'free-weight', muscleActivations: [{ muscle: 'quad', activation: 'primary' }, { muscle: 'glute', activation: 'primary' }, { muscle: 'calf', activation: 'secondary' }, { muscle: 'hamstring', activation: 'secondary' }] },
+  { id: 'battle-ropes', name: 'Battle Ropes', category: 'free-weight', muscleActivations: [{ muscle: 'front_delt', activation: 'primary' }, { muscle: 'abs', activation: 'secondary' }, { muscle: 'forearm', activation: 'secondary' }] },
+  { id: 'sled-push', name: 'Sled Push', category: 'free-weight', muscleActivations: [{ muscle: 'quad', activation: 'primary' }, { muscle: 'glute', activation: 'primary' }, { muscle: 'calf', activation: 'secondary' }, { muscle: 'abs', activation: 'tertiary' }] },
+  { id: 'sled-pull', name: 'Sled Pull', category: 'free-weight', muscleActivations: [{ muscle: 'hamstring', activation: 'primary' }, { muscle: 'glute', activation: 'primary' }, { muscle: 'lat', activation: 'secondary' } ] },
+
+  // ── Calisthenics / bodyweight ────────────────────────────────────────────
+  { id: 'muscle-up', name: 'Muscle Up', category: 'free-weight', muscleActivations: [{ muscle: 'lat', activation: 'primary' }, { muscle: 'tricep', activation: 'primary' }, { muscle: 'bicep', activation: 'secondary' }, { muscle: 'chest_lower', activation: 'secondary' }] },
+  { id: 'ring-dip', name: 'Ring Dip', category: 'free-weight', muscleActivations: [{ muscle: 'tricep', activation: 'primary' }, { muscle: 'chest_lower', activation: 'secondary' }, { muscle: 'front_delt', activation: 'secondary' }] },
+  { id: 'handstand-pushup', name: 'Handstand Push-Up', category: 'free-weight', muscleActivations: [{ muscle: 'front_delt', activation: 'primary' }, { muscle: 'side_delt', activation: 'secondary' }, { muscle: 'tricep', activation: 'secondary' }] },
+  { id: 'pistol-squat', name: 'Pistol Squat', category: 'free-weight', muscleActivations: [{ muscle: 'quad', activation: 'primary' }, { muscle: 'glute', activation: 'secondary' }, { muscle: 'hamstring', activation: 'secondary' }, { muscle: 'abs', activation: 'tertiary' }] },
+  { id: 'inverted-row', name: 'Inverted Row', category: 'free-weight', muscleActivations: [{ muscle: 'rhomboid', activation: 'primary' }, { muscle: 'lat', activation: 'secondary' }, { muscle: 'bicep', activation: 'secondary' }, { muscle: 'rear_delt', activation: 'secondary' }] },
+  { id: 'pike-pushup', name: 'Pike Push-Up', category: 'free-weight', muscleActivations: [{ muscle: 'front_delt', activation: 'primary' }, { muscle: 'side_delt', activation: 'secondary' }, { muscle: 'tricep', activation: 'secondary' }] },
+  { id: 'archer-pushup', name: 'Archer Push-Up', category: 'free-weight', muscleActivations: [{ muscle: 'chest_mid', activation: 'primary' }, { muscle: 'front_delt', activation: 'secondary' }, { muscle: 'tricep', activation: 'secondary' }] },
+
+  // ── Forearm / grip ───────────────────────────────────────────────────────
+  { id: 'wrist-curl-barbell', name: 'Barbell Wrist Curl', category: 'free-weight', muscleActivations: [{ muscle: 'forearm', activation: 'primary' }] },
+  { id: 'wrist-curl-dumbbell', name: 'Dumbbell Wrist Curl', category: 'free-weight', muscleActivations: [{ muscle: 'forearm', activation: 'primary' }] },
+  { id: 'reverse-wrist-curl', name: 'Reverse Wrist Curl', category: 'free-weight', muscleActivations: [{ muscle: 'forearm', activation: 'primary' }] },
+  { id: 'plate-pinch', name: 'Plate Pinch', category: 'free-weight', muscleActivations: [{ muscle: 'forearm', activation: 'primary' }] },
+
+  // ── Landmine ─────────────────────────────────────────────────────────────
+  { id: 'landmine-press', name: 'Landmine Press', category: 'free-weight', muscleActivations: [{ muscle: 'front_delt', activation: 'primary' }, { muscle: 'side_delt', activation: 'secondary' }, { muscle: 'tricep', activation: 'secondary' }, { muscle: 'chest_upper', activation: 'tertiary' }] },
+  { id: 'landmine-row', name: 'Landmine Row', category: 'free-weight', muscleActivations: [{ muscle: 'lat', activation: 'primary' }, { muscle: 'rhomboid', activation: 'secondary' }, { muscle: 'bicep', activation: 'secondary' }, { muscle: 'rear_delt', activation: 'secondary' }] },
+  { id: 'landmine-squat', name: 'Landmine Squat', category: 'free-weight', muscleActivations: [{ muscle: 'quad', activation: 'primary' }, { muscle: 'glute', activation: 'secondary' }, { muscle: 'hamstring', activation: 'secondary' }] },
+  { id: 'landmine-rotation', name: 'Landmine Rotation', category: 'free-weight', muscleActivations: [{ muscle: 'oblique', activation: 'primary' }, { muscle: 'abs', activation: 'secondary' }, { muscle: 'side_delt', activation: 'secondary' }] },
+
+  // ── More shoulder / upper-back ───────────────────────────────────────────
+  { id: 'bradford-press', name: 'Bradford Press', category: 'free-weight', muscleActivations: [{ muscle: 'front_delt', activation: 'primary' }, { muscle: 'side_delt', activation: 'primary' }, { muscle: 'tricep', activation: 'secondary' }, { muscle: 'rear_delt', activation: 'tertiary' }] },
+  { id: 'y-raise', name: 'Y Raise', category: 'free-weight', muscleActivations: [{ muscle: 'trap_lower', activation: 'primary' }, { muscle: 'rear_delt', activation: 'secondary' }, { muscle: 'rhomboid', activation: 'secondary' }] },
+  { id: 'w-raise', name: 'W Raise', category: 'free-weight', muscleActivations: [{ muscle: 'rhomboid', activation: 'primary' }, { muscle: 'rear_delt', activation: 'primary' }, { muscle: 'trap_mid', activation: 'secondary' }] },
+  { id: 'band-pull-apart', name: 'Band Pull-Apart', category: 'free-weight', muscleActivations: [{ muscle: 'rear_delt', activation: 'primary' }, { muscle: 'rhomboid', activation: 'secondary' }, { muscle: 'trap_mid', activation: 'secondary' }] },
+  { id: 'cable-external-rotation', name: 'Cable External Rotation', category: 'machine', muscleActivations: [{ muscle: 'rear_delt', activation: 'primary' }, { muscle: 'rhomboid', activation: 'secondary' }] },
+  { id: 'seal-row', name: 'Seal Row', category: 'free-weight', muscleActivations: [{ muscle: 'rhomboid', activation: 'primary' }, { muscle: 'lat', activation: 'secondary' }, { muscle: 'bicep', activation: 'secondary' }, { muscle: 'rear_delt', activation: 'secondary' }] },
 ];
 
 export const EXERCISE_MAP = new Map<string, Exercise>(

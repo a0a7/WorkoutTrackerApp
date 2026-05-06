@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
   import SetRow from '$lib/components/SetRow.svelte';
+  import NumericKeypad from '$lib/components/NumericKeypad.svelte';
   import { setsStore, selectedIds, pushUndo, undo, redo, hasUndo, hasRedo } from '$lib/stores/workoutStore';
   import { getTodaySets, saveSets, deleteSet as dbDeleteSet, saveWorkout } from '$lib/db';
   import { unitPreference, initUnitPreference, userStore } from '$lib/stores/userStore';
@@ -401,3 +402,6 @@
     </p>
   {/if}
 </div>
+
+<!-- Custom numeric keypad — rendered at root so it sits above all row content -->
+<NumericKeypad />

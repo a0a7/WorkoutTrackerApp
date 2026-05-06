@@ -3,6 +3,7 @@
   import type { WorkoutSet } from '../types';
   import ExerciseAutocomplete from './ExerciseAutocomplete.svelte';
   import type { Exercise } from '../types';
+  import { openKeypad, closeKeypad } from '$lib/stores/keypadStore';
 
   const TOUCH_MOVEMENT_THRESHOLD_PX = 10;
 
@@ -73,8 +74,8 @@
   let commitTimer: ReturnType<typeof setTimeout> | undefined;
 
   // ── Input refs ───────────────────────────────────────────────────────────
-  let repsInput = $state<HTMLInputElement | undefined>(undefined);
-  let weightInput = $state<HTMLInputElement | undefined>(undefined);
+  let repsBtnEl = $state<HTMLButtonElement | undefined>(undefined);
+  let weightBtnEl = $state<HTMLButtonElement | undefined>(undefined);
   let trEl = $state<HTMLTableRowElement | undefined>(undefined);
 
   // ── Exercise ─────────────────────────────────────────────────────────────
@@ -88,80 +89,90 @@
       editingExercise = false;
     }
     // Move focus to reps after a brief pause (allows dropdown to close cleanly)
-    setTimeout(() => repsInput?.focus(), 15);
+    setTimeout(() => doOpenRepsKeypad(), 15);
   }
 
   // ── Reps ─────────────────────────────────────────────────────────────────
 
-  function handleRepsInput(e: Event) {
-    const val = (e.target as HTMLInputElement).value;
+  function handleRepsInput(v: string) {
     if (isEmpty) {
-      draftReps = val;
+      draftReps = v;
     } else {
-      localReps = val;
+      localReps = v;
       // If this looks like a shorthand (contains separator), don't save as a number yet —
-      // wait until the user commits with Enter/Tab (handled in handleRepsKeydown).
-      if (!/[xX×*]/.test(val)) {
-        onUpdate?.(set.id, 'reps', val !== '' ? (parseInt(val, 10) || null) : null);
+      // wait until the user commits with Done (handled in onDone callback).
+      if (!/[xX×*]/.test(v)) {
+        onUpdate?.(set.id, 'reps', v !== '' ? (parseInt(v, 10) || null) : null);
       }
     }
   }
 
-  function handleRepsKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter' || e.key === 'Tab') {
-      e.preventDefault();
-      // On non-empty rows, check for shorthand expand before moving to weight
-      if (!isEmpty && onExpandSet) {
-        const multi = localReps.match(MULTI_SET_RE);
-        if (multi) {
-          const count = parseInt(multi[1], 10);
-          const reps = parseInt(multi[2], 10);
-          const weight = multi[3]
-            ? parseFloat(multi[3])
-            : localWeight !== ''
-              ? parseFloat(localWeight) || null
-              : null;
-          if (count >= 1 && count <= MAX_MULTI_SET_COUNT) {
-            const now = Date.now();
-            const newSets: WorkoutSet[] = Array.from({ length: count }, (_, i) => ({
-              id: crypto.randomUUID(),
-              localWorkoutId: set.localWorkoutId,
-              exerciseId: set.exerciseId,
-              exerciseName: set.exerciseName,
-              reps,
-              weight,
-              order: set.order + i,
-              createdAt: now + i,
-            }));
-            onExpandSet(set.id, newSets);
-            return;
+  function doOpenWeightKeypad() {
+    openKeypad({
+      value: isEmpty ? draftWeight : localWeight,
+      allowDecimal: true,
+      allowShorthand: false,
+      label: 'Weight',
+      onInput: (v) => {
+        if (isEmpty) {
+          draftWeight = v;
+        } else {
+          localWeight = v;
+          onUpdate?.(set.id, 'weight', v !== '' ? (parseFloat(v) || null) : null);
+        }
+      },
+      onDone: () => {
+        if (isEmpty) {
+          flushEmptyRow();
+        }
+      },
+    });
+  }
+
+  function doOpenRepsKeypad() {
+    openKeypad({
+      value: isEmpty ? draftReps : localReps,
+      allowDecimal: false,
+      allowShorthand: true,
+      label: 'Reps',
+      onInput: handleRepsInput,
+      onNext: doOpenWeightKeypad,
+      onDone: () => {
+        // On non-empty rows, check for shorthand expand
+        if (!isEmpty && onExpandSet) {
+          const multi = (isEmpty ? draftReps : localReps).match(MULTI_SET_RE);
+          if (multi) {
+            const count = parseInt(multi[1], 10);
+            const reps = parseInt(multi[2], 10);
+            const weight = multi[3]
+              ? parseFloat(multi[3])
+              : localWeight !== ''
+                ? parseFloat(localWeight) || null
+                : null;
+            if (count >= 1 && count <= MAX_MULTI_SET_COUNT) {
+              const now = Date.now();
+              const newSets: WorkoutSet[] = Array.from({ length: count }, (_, i) => ({
+                id: crypto.randomUUID(),
+                localWorkoutId: set.localWorkoutId,
+                exerciseId: set.exerciseId,
+                exerciseName: set.exerciseName,
+                reps,
+                weight,
+                order: set.order + i,
+                createdAt: now + i,
+              }));
+              onExpandSet(set.id, newSets);
+              return;
+            }
           }
         }
-      }
-      weightInput?.focus();
-    }
+        // Move to weight
+        doOpenWeightKeypad();
+      },
+    });
   }
 
   // ── Weight ────────────────────────────────────────────────────────────────
-
-  function handleWeightInput(e: Event) {
-    const val = (e.target as HTMLInputElement).value;
-    if (isEmpty) {
-      draftWeight = val;
-    } else {
-      localWeight = val;
-      // Save on every keystroke
-      onUpdate?.(set.id, 'weight', val !== '' ? (parseFloat(val) || null) : null);
-    }
-  }
-
-  function handleWeightKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter' || e.key === 'Tab') {
-      e.preventDefault();
-      if (isEmpty) flushEmptyRow();
-      focusNextRow();
-    }
-  }
 
   // ── Empty-row commit ──────────────────────────────────────────────────────
 
@@ -243,29 +254,18 @@
   function handleRowFocusOut(e: FocusEvent) {
     const tr = e.currentTarget as HTMLElement;
     if (!tr.contains(e.relatedTarget as Node)) {
-      // Focus has left the row – but wait briefly in case it's a transient
-      // departure (e.g. autocomplete dropdown button unmounting)
       isEditing = false;
+      // Empty rows flush when focus truly leaves the row
+      // (e.g. user taps another row's exercise field)
       if (isEmpty) {
         commitTimer = setTimeout(() => {
           commitTimer = undefined;
-          // Only commit if focus truly hasn't returned
           if (trEl && !trEl.contains(document.activeElement)) {
             flushEmptyRow();
           }
         }, 200);
       }
     }
-  }
-
-  // ── Cross-row Enter navigation ────────────────────────────────────────────
-
-  function focusNextRow() {
-    const tr = weightInput?.closest('tr') ?? repsInput?.closest('tr');
-    const nextTr = tr?.nextElementSibling as HTMLElement | null;
-    if (!nextTr) return;
-    const firstInput = nextTr.querySelector('input') as HTMLInputElement | null;
-    firstInput?.focus();
   }
 
   // ── Drag / touch ──────────────────────────────────────────────────────────
@@ -356,44 +356,46 @@
     {/if}
   </td>
 
-  <!-- Reps – always-editable, looks like plain text -->
+  <!-- Reps – tap to open custom keypad -->
   <td class="w-16 py-0.5 px-0.5">
-    <input
-      bind:this={repsInput}
-      type="text"
-      inputmode={isEmpty ? 'text' : 'numeric'}
-      enterkeyhint="next"
-      value={isEmpty ? draftReps : localReps}
-      placeholder="—"
-      oninput={handleRepsInput}
-      onkeydown={handleRepsKeydown}
-      class="w-full bg-transparent text-center py-1.5 px-0 rounded outline-none
+    <button
+      bind:this={repsBtnEl}
+      type="button"
+      onclick={doOpenRepsKeypad}
+      class="w-full bg-transparent text-center py-1.5 px-0 rounded
+             text-[hsl(var(--foreground))]
              focus:bg-[hsl(var(--muted)/0.5)]
-             placeholder:text-[hsl(var(--muted-foreground)/0.35)]
-             transition-colors"
-      style="font-size:16px"
-      autocomplete="off"
-    />
+             transition-colors select-none touch-manipulation"
+      style="font-size:16px; min-height: 2.25rem;"
+      aria-label="Reps"
+    >
+      {#if (isEmpty ? draftReps : localReps)}
+        {isEmpty ? draftReps : localReps}
+      {:else}
+        <span class="text-[hsl(var(--muted-foreground)/0.35)]">—</span>
+      {/if}
+    </button>
   </td>
 
-  <!-- Weight – always-editable, looks like plain text -->
+  <!-- Weight – tap to open custom keypad -->
   <td class="w-16 py-0.5 px-0.5">
-    <input
-      bind:this={weightInput}
-      type="text"
-      inputmode="decimal"
-      enterkeyhint="done"
-      value={isEmpty ? draftWeight : localWeight}
-      placeholder="—"
-      oninput={handleWeightInput}
-      onkeydown={handleWeightKeydown}
-      class="w-full bg-transparent text-center py-1.5 px-0 rounded outline-none
+    <button
+      bind:this={weightBtnEl}
+      type="button"
+      onclick={doOpenWeightKeypad}
+      class="w-full bg-transparent text-center py-1.5 px-0 rounded
+             text-[hsl(var(--foreground))]
              focus:bg-[hsl(var(--muted)/0.5)]
-             placeholder:text-[hsl(var(--muted-foreground)/0.35)]
-             transition-colors"
-      style="font-size:16px"
-      autocomplete="off"
-    />
+             transition-colors select-none touch-manipulation"
+      style="font-size:16px; min-height: 2.25rem;"
+      aria-label="Weight"
+    >
+      {#if (isEmpty ? draftWeight : localWeight)}
+        {isEmpty ? draftWeight : localWeight}
+      {:else}
+        <span class="text-[hsl(var(--muted-foreground)/0.35)]">—</span>
+      {/if}
+    </button>
   </td>
 
   <!-- Delete / commit -->

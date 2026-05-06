@@ -1,0 +1,30 @@
+import { writable } from 'svelte/store';
+
+export interface KeypadConfig {
+  /** Current value string (digits, decimal point, and/or 'x' for shorthand) */
+  value: string;
+  /** Whether a decimal point is allowed (weight fields) */
+  allowDecimal: boolean;
+  /** Whether the 'x' shorthand key is shown (reps fields) */
+  allowShorthand: boolean;
+  /** Display label shown above the value e.g. "Reps" */
+  label?: string;
+  /** Called on every keypress with the updated value */
+  onInput: (v: string) => void;
+  /** Called when the user taps "Done" (last field) */
+  onDone: () => void;
+  /** Called when the user taps "Next →" (moves to the next field) */
+  onNext?: () => void;
+  /** Called when the user cancels (backdrop tap or Cancel button) */
+  onCancel?: () => void;
+}
+
+export const keypadConfig = writable<KeypadConfig | null>(null);
+
+export function openKeypad(config: KeypadConfig): void {
+  keypadConfig.set(config);
+}
+
+export function closeKeypad(): void {
+  keypadConfig.set(null);
+}

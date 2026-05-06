@@ -38,9 +38,31 @@ export const isLoggedIn = derived(userStore, ($u) => $u !== null);
 
 export const unitPreference = writable<'lbs' | 'kg'>('lbs');
 
+// Locales/regions that use lbs by convention (US, Liberia, Myanmar)
+const LBS_LOCALE_PREFIXES = ['en-US', 'en-LR', 'my'];
+
+function detectRegionUnit(): 'lbs' | 'kg' {
+  try {
+    const lang = navigator.language || 'en-US';
+    for (const prefix of LBS_LOCALE_PREFIXES) {
+      if (lang.startsWith(prefix)) return 'lbs';
+    }
+  } catch {
+    // navigator unavailable (SSR)
+  }
+  return 'kg';
+}
+
 export function initUnitPreference() {
   if (typeof localStorage !== 'undefined') {
     const saved = localStorage.getItem('unit_preference') as 'lbs' | 'kg' | null;
-    if (saved) unitPreference.set(saved);
+    if (saved) {
+      unitPreference.set(saved);
+    } else {
+      // First launch — auto-detect based on browser locale
+      const detected = detectRegionUnit();
+      unitPreference.set(detected);
+      localStorage.setItem('unit_preference', detected);
+    }
   }
 }
