@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import { getPendingSync, clearPendingSync, getAllSets, saveWorkout } from './db';
+import { getPendingSync, clearPendingSync, saveWorkout, getDB } from './db';
 import type { User, WorkoutSet, Workout } from './types';
 
 export const syncStore = writable<{ syncing: boolean; lastSync: number | null; error: string | null }>({
@@ -67,14 +67,17 @@ export async function syncFromServer(user: User): Promise<void> {
     if (setsRes.ok) {
       const { sets }: { sets: WorkoutSet[] } = await setsRes.json();
       if (sets?.length) {
-        const { saveSets } = await import('./db');
-        await saveSets(sets);
+        // saveSetsLocal skips pendingSync to avoid re-uploading what we just downloaded
+        const db = await (await import('./db')).getDB();
+        const tx = db.transaction('sets', 'readwrite');
+        await Promise.all([...sets.map((s) => tx.objectStore('sets').put(s)), tx.done]);
       }
     }
     if (workoutsRes.ok) {
       const { workouts }: { workouts: Workout[] } = await workoutsRes.json();
       if (workouts?.length) {
-        for (const w of workouts) await saveWorkout(w);
+        // queueSync=false — don't re-queue data we just downloaded
+        for (const w of workouts) await saveWorkout(w, false);
       }
     }
     syncStore.update((s) => ({ ...s, lastSync: Date.now() }));

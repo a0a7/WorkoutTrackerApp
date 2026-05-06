@@ -135,9 +135,18 @@ export async function getAllWorkoutGroups(): Promise<Workout[]> {
   return groupSetsIntoWorkouts(sets);
 }
 
-export async function saveWorkout(workout: Workout): Promise<void> {
+export async function saveWorkout(workout: Workout, queueSync = true): Promise<void> {
   const db = await getDB();
-  await db.put('workouts', workout);
+  if (queueSync) {
+    const tx = db.transaction(['workouts', 'pendingSync'], 'readwrite');
+    await Promise.all([
+      tx.objectStore('workouts').put(workout),
+      tx.objectStore('pendingSync').put({ id: workout.id, type: 'workout', operation: 'upsert', data: workout, timestamp: Date.now() }),
+      tx.done,
+    ]);
+  } else {
+    await db.put('workouts', workout);
+  }
 }
 
 export async function getWorkout(id: string): Promise<Workout | undefined> {

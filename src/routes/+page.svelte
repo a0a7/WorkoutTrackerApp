@@ -1,10 +1,12 @@
 <script lang="ts">
 
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import SetRow from '$lib/components/SetRow.svelte';
   import { setsStore, selectedIds, pushUndo, undo, redo, hasUndo, hasRedo } from '$lib/stores/workoutStore';
   import { getTodaySets, saveSets, deleteSet as dbDeleteSet, saveWorkout } from '$lib/db';
-  import { unitPreference, initUnitPreference } from '$lib/stores/userStore';
+  import { unitPreference, initUnitPreference, userStore } from '$lib/stores/userStore';
+  import { syncToServer } from '$lib/sync';
   import type { WorkoutSet } from '$lib/types';
 
   let sets = $state<WorkoutSet[]>([]);
@@ -27,6 +29,17 @@
   // Geolocation options
   const GEOLOCATION_CACHE_MS = 5 * 60_000;  // allow cached position up to 5 minutes old
   const GEOLOCATION_TIMEOUT_MS = 10_000;     // give up after 10 seconds
+
+  // Time editing state for today's workout
+  let editingTimes = $state(false);
+  let editStartDate = $state('');
+  let editStartTime = $state('');
+  let editEndDate = $state('');
+  let editEndTime = $state('');
+  let timeEditError = $state('');
+  // Custom times override the auto-derived times
+  let customStartTime = $state<number | null>(null);
+  let customEndTime = $state<number | null>(null);
 
   const dateLabel = $derived(
     new Date().toLocaleDateString('en-US', {
@@ -75,13 +88,57 @@
     );
   }
 
+  function toDateInput(ts: number) {
+    return new Date(ts).toISOString().slice(0, 10);
+  }
+  function toTimeInput(ts: number) {
+    return new Date(ts).toTimeString().slice(0, 5);
+  }
+  function fromDateTimeInputs(date: string, time: string): number {
+    return new Date(`${date}T${time}:00`).getTime();
+  }
+
+  function beginEditTimes() {
+    if (sets.length === 0) return;
+    const sorted = [...sets].sort((a, b) => a.createdAt - b.createdAt);
+    const startTs = customStartTime ?? (sorted[0].createdAt - WORKOUT_START_OFFSET_MS);
+    const endTs = customEndTime ?? sorted[sorted.length - 1].createdAt;
+    editStartDate = toDateInput(startTs);
+    editStartTime = toTimeInput(startTs);
+    editEndDate = toDateInput(endTs);
+    editEndTime = toTimeInput(endTs);
+    editingTimes = true;
+  }
+
+  function cancelEditTimes() {
+    editingTimes = false;
+    timeEditError = '';
+  }
+
+  async function saveEditedTimes() {
+    const newStart = fromDateTimeInputs(editStartDate, editStartTime);
+    const newEnd = fromDateTimeInputs(editEndDate, editEndTime);
+    if (isNaN(newStart)) { timeEditError = 'Invalid start date or time.'; return; }
+    if (isNaN(newEnd)) { timeEditError = 'Invalid end date or time.'; return; }
+    if (newEnd <= newStart) { timeEditError = 'End time must be after start time.'; return; }
+    timeEditError = '';
+    customStartTime = newStart;
+    customEndTime = newEnd;
+    await persistWorkoutMeta();
+    editingTimes = false;
+    const user = get(userStore);
+    if (user) syncToServer(user).catch(() => {});
+  }
+
   async function persistWorkoutMeta() {
     if (sets.length === 0) return;
     const sorted = [...sets].sort((a, b) => a.createdAt - b.createdAt);
+    const startTime = customStartTime ?? (sorted[0].createdAt - WORKOUT_START_OFFSET_MS);
+    const endTime = customEndTime ?? sorted[sorted.length - 1].createdAt;
     await saveWorkout({
       id: sessionId,
-      startTime: sorted[0].createdAt - WORKOUT_START_OFFSET_MS,
-      endTime: sorted[sorted.length - 1].createdAt,
+      startTime,
+      endTime,
       sets: sorted,
       synced: false,
       ...(sessionLocation ? { location: sessionLocation } : {}),
@@ -93,6 +150,9 @@
     setsStore.set(newSets);
     await saveSets(newSets);
     await persistWorkoutMeta();
+    // Push any queued changes to the server
+    const user = get(userStore);
+    if (user) syncToServer(user).catch(() => {});
   }
 
   async function handleAdd(newSet: WorkoutSet) {
@@ -161,6 +221,16 @@
     if (next) await persistSets(next);
   }
 
+  async function handleExpandSet(id: string, newSets: WorkoutSet[]) {
+    pushUndo('Expand set', sets);
+    const idx = sets.findIndex((s) => s.id === id);
+    const before = sets.slice(0, idx);
+    const after = sets.slice(idx + 1);
+    const reordered = [...before, ...newSets, ...after].map((s, i) => ({ ...s, order: i }));
+    await persistSets(reordered);
+    await dbDeleteSet(id);
+  }
+
   // Drag reorder
   function handleDragStart(index: number) {
     dragFromIndex = index;
@@ -191,7 +261,21 @@
 <div class="px-4 pt-safe-top">
   <!-- Header -->
   <div class="sticky top-0 z-10 bg-[hsl(var(--background)/0.9)] backdrop-blur-sm py-3 flex items-center justify-between">
-    <p class="text-sm font-semibold text-[hsl(var(--muted-foreground))]">{dateLabel}</p>
+    <div class="flex flex-col min-w-0">
+      <p class="text-sm font-semibold text-[hsl(var(--muted-foreground))]">{dateLabel}</p>
+      {#if sets.length > 0 && !editingTimes}
+        <button
+          onclick={beginEditTimes}
+          class="text-left text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] transition-colors"
+        >
+          {#if customStartTime || customEndTime}
+            {new Date(customStartTime ?? (sets[0]?.createdAt - WORKOUT_START_OFFSET_MS)).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} – {new Date(customEndTime ?? sets[sets.length - 1]?.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} · Edit times
+          {:else}
+            Edit times
+          {/if}
+        </button>
+      {/if}
+    </div>
     <div class="flex items-center gap-2">
       {#if selected.size > 0}
         <span class="text-sm font-medium text-[hsl(var(--primary))]">{selected.size} selected</span>
@@ -230,6 +314,33 @@
     </div>
   </div>
 
+  <!-- Time editing panel -->
+  {#if editingTimes}
+    <div class="mb-3 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 shadow-sm flex flex-col gap-2">
+      <div>
+        <p class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">Start</p>
+        <div class="flex gap-2">
+          <input type="date" bind:value={editStartDate} class="flex-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+          <input type="time" bind:value={editStartTime} class="w-28 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+        </div>
+      </div>
+      <div>
+        <p class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">End</p>
+        <div class="flex gap-2">
+          <input type="date" bind:value={editEndDate} class="flex-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+          <input type="time" bind:value={editEndTime} class="w-28 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+        </div>
+      </div>
+      {#if timeEditError}
+        <p class="text-xs text-red-500">{timeEditError}</p>
+      {/if}
+      <div class="flex gap-2">
+        <button onclick={saveEditedTimes} class="flex-1 rounded-xl bg-[hsl(var(--primary))] text-white py-2 text-sm font-medium transition-colors">Save</button>
+        <button onclick={cancelEditTimes} class="flex-1 rounded-xl bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] py-2 text-sm font-medium transition-colors">Cancel</button>
+      </div>
+    </div>
+  {/if}
+
   <!-- Sets table -->
   <div class="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm min-h-[200px]">
     <table class="w-full border-collapse">
@@ -254,6 +365,7 @@
             onExerciseUpdate={handleExerciseUpdate}
             onDelete={handleDelete}
             onSelect={handleSelect}
+            onExpandSet={handleExpandSet}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDrop={handleDrop}

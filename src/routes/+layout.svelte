@@ -7,7 +7,7 @@
   import ThemeToggle from '$lib/components/ThemeToggle.svelte';
   import { initDB } from '$lib/db';
   import { userStore } from '$lib/stores/userStore';
-  import { setupSyncListeners } from '$lib/sync';
+  import { setupSyncListeners, syncFromServer, syncToServer } from '$lib/sync';
 
   let { children } = $props();
 
@@ -48,6 +48,9 @@
       cleanup?.();
       if (u) {
         cleanup = setupSyncListeners(u);
+        // Initial two-way sync: pull from server then push any queued local changes
+        syncFromServer(u).catch(() => {});
+        syncToServer(u).catch(() => {});
       }
     });
     return () => { unsub(); cleanup?.(); };

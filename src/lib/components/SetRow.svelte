@@ -17,6 +17,7 @@
     onExerciseUpdate,
     onDelete,
     onSelect,
+    onExpandSet,
     onDragStart,
     onDragOver,
     onDrop,
@@ -32,6 +33,7 @@
     onExerciseUpdate?: (id: string, exerciseId: string, exerciseName: string) => void;
     onDelete?: (id: string) => void;
     onSelect?: (id: string, shiftKey?: boolean) => void;
+    onExpandSet?: (id: string, newSets: WorkoutSet[]) => void;
     onDragStart?: (index: number) => void;
     onDragOver?: (index: number) => void;
     onDrop?: () => void;
@@ -97,14 +99,45 @@
       draftReps = val;
     } else {
       localReps = val;
-      // Save on every keystroke so tab-switching never loses data
-      onUpdate?.(set.id, 'reps', val !== '' ? (parseInt(val, 10) || null) : null);
+      // If this looks like a shorthand (contains separator), don't save as a number yet —
+      // wait until the user commits with Enter/Tab (handled in handleRepsKeydown).
+      if (!/[xX×*]/.test(val)) {
+        onUpdate?.(set.id, 'reps', val !== '' ? (parseInt(val, 10) || null) : null);
+      }
     }
   }
 
   function handleRepsKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
+      // On non-empty rows, check for shorthand expand before moving to weight
+      if (!isEmpty && onExpandSet) {
+        const multi = localReps.match(/^(\d+)[xX×*](\d+)(?:[xX×*]([\d.]+))?$/);
+        if (multi) {
+          const count = parseInt(multi[1], 10);
+          const reps = parseInt(multi[2], 10);
+          const weight = multi[3]
+            ? parseFloat(multi[3])
+            : localWeight !== ''
+              ? parseFloat(localWeight) || null
+              : null;
+          if (count >= 1 && count <= MAX_MULTI_SET_COUNT) {
+            const now = Date.now();
+            const newSets: WorkoutSet[] = Array.from({ length: count }, (_, i) => ({
+              id: crypto.randomUUID(),
+              localWorkoutId: set.localWorkoutId,
+              exerciseId: set.exerciseId,
+              exerciseName: set.exerciseName,
+              reps,
+              weight,
+              order: set.order + i,
+              createdAt: now + i,
+            }));
+            onExpandSet(set.id, newSets);
+            return;
+          }
+        }
+      }
       weightInput?.focus();
     }
   }
@@ -325,6 +358,7 @@
     <input
       bind:this={repsInput}
       type="text"
+      inputmode={isEmpty ? 'text' : 'numeric'}
       enterkeyhint="next"
       value={isEmpty ? draftReps : localReps}
       placeholder="—"
