@@ -39,7 +39,11 @@ export const isLoggedIn = derived(userStore, ($u) => $u !== null);
 export const unitPreference = writable<'lbs' | 'kg'>('lbs');
 
 // Locales/regions that use lbs by convention (US, Liberia, Myanmar)
-const LBS_LOCALE_PREFIXES = ['en-US', 'en-LR', 'my'];
+const LBS_LOCALE_PREFIXES = [
+  'en-US', // United States
+  'en-LR', // Liberia
+  'my',    // Myanmar (Burma)
+];
 
 function detectRegionUnit(): 'lbs' | 'kg' {
   try {

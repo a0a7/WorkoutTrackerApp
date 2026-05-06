@@ -112,6 +112,7 @@
                  transition-transform select-none touch-manipulation disabled:opacity-25"
         >.</button>
       {:else if $keypadConfig.allowShorthand}
+        <!-- Disabled once 2 separators are already in place (format: "NxRxW") -->
         <button
           onclick={() => handleKey('x')}
           disabled={localValue.startsWith('x') || localValue.split('x').length > 2}
