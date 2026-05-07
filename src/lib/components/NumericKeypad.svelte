@@ -60,16 +60,17 @@
   }
 </script>
 
-{#if $keypadConfig}
-  <svelte:window
-    onkeydown={(e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        handleEnter();
-      }
-    }}
-  />
+<svelte:window
+  onkeydown={(e) => {
+    if (!$keypadConfig) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleEnter();
+    }
+  }}
+/>
 
+{#if $keypadConfig}
   <!-- Backdrop — tap anywhere outside to dismiss -->
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
   <div class="fixed inset-0 z-[59]" onclick={handleCancel}></div>
