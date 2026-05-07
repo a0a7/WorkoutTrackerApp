@@ -47,9 +47,11 @@
       cleanup?.();
       if (u) {
         cleanup = setupSyncListeners(u);
-        // Initial two-way sync: pull from server then push any queued local changes
-        syncFromServer(u).catch(() => {});
-        syncToServer(u).catch(() => {});
+        // Initial two-way sync: push queued local changes first, then pull latest server state
+        (async () => {
+          await syncToServer(u);
+          await syncFromServer(u);
+        })().catch(() => {});
       }
     });
     return () => { unsub(); cleanup?.(); };
