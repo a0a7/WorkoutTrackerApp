@@ -219,8 +219,8 @@
     if (id.startsWith('empty-')) return;
     pushUndo('Delete set', sets);
     const newSets = sets.filter((s) => s.id !== id);
-    await persistSets(newSets);
     await dbDeleteSet(id);
+    await persistSets(newSets);
     selected.delete(id);
     selected = new Set(selected);
   }
@@ -258,8 +258,8 @@
     const before = sets.slice(0, idx);
     const after = sets.slice(idx + 1);
     const reordered = [...before, ...newSets, ...after].map((s, i) => ({ ...s, order: i }));
-    await persistSets(reordered);
     await dbDeleteSet(id);
+    await persistSets(reordered);
   }
 
   // Drag reorder

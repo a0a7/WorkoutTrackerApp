@@ -322,7 +322,8 @@
       if (isEmpty) {
         commitTimer = setTimeout(() => {
           commitTimer = undefined;
-          if (trEl && !trEl.contains(document.activeElement)) {
+          const rowKeypadOpen = $keypadConfig?.id?.startsWith(`${set.id}:`) ?? false;
+          if (trEl && !trEl.contains(document.activeElement) && !rowKeypadOpen) {
             flushEmptyRow();
           }
         }, 200);
