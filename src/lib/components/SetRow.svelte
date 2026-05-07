@@ -133,6 +133,13 @@
           await flushEmptyRow();
         }
       },
+      onCancel: () => {
+        if (isEmpty) {
+          draftWeight = captured;
+          return;
+        }
+        localWeight = set.weight !== null ? String(set.weight) : '';
+      },
     });
     scrollRowIntoView();
   }
@@ -142,6 +149,7 @@
     const commitRepsValue = async () => {
       if (isEmpty) {
         await flushEmptyRow();
+        captured = '';
         return true;
       }
 
@@ -202,6 +210,14 @@
       },
       onDone: async () => {
         if (!await commitRepsValue()) doOpenWeightKeypad();
+      },
+      onCancel: () => {
+        if (isEmpty) {
+          draftReps = captured;
+          return;
+        }
+        localReps = set.reps !== null ? String(set.reps) : '';
+        localWeight = set.weight !== null ? String(set.weight) : '';
       },
     });
     scrollRowIntoView();
@@ -340,6 +356,8 @@
   let dragStartIndex = $state<number | null>(null);
   let dragCurrentIndex = $state<number | null>(null);
   let dragPointerId = $state<number | null>(null);
+  let dragStartY = $state(0);
+  let dragOffsetY = $state(0);
 
   let swipeStartX = $state<number | null>(null);
   let swipeStartY = $state<number | null>(null);
@@ -367,12 +385,15 @@
     dragPointerId = e.pointerId;
     dragStartIndex = index;
     dragCurrentIndex = index;
+    dragStartY = e.clientY;
+    dragOffsetY = 0;
     handleDragging = true;
     onDragStart?.(index);
   }
 
   function handleDragHandlePointerMove(e: PointerEvent) {
     if (!handleDragging || dragPointerId === null || e.pointerId !== dragPointerId) return;
+    dragOffsetY = e.clientY - dragStartY;
     const targetEl = document.elementFromPoint(e.clientX, e.clientY)?.closest('tr[data-set-row-index]');
     const targetIndex = targetEl ? Number((targetEl as HTMLElement).dataset.setRowIndex) : NaN;
     if (!Number.isNaN(targetIndex)) {
@@ -395,11 +416,12 @@
     dragStartIndex = null;
     dragCurrentIndex = null;
     dragPointerId = null;
+    dragOffsetY = 0;
   }
 
   function isInteractiveTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
-    return Boolean(target.closest('button, input, textarea, select, a, [role="button"], [data-no-swipe]'));
+    return Boolean(target.closest('input, textarea, select, a, [data-no-swipe]'));
   }
 
   function handleRowSwipeStart(e: TouchEvent) {
@@ -440,7 +462,7 @@
     {dragOver ? 'outline outline-2 outline-[hsl(var(--primary))] outline-offset-[-1px]' : ''}
     {handleDragging ? 'z-20 bg-[hsl(var(--card))] shadow-2xl ring-2 ring-[hsl(var(--primary)/0.45)] scale-[1.01]' : ''}"
   draggable="false"
-  style="transform: translateX({handleDragging ? 0 : swipeOffsetX}px) translateZ({handleDragging ? 16 : 0}px);"
+  style="transform: translateX({handleDragging ? 0 : swipeOffsetX}px) translateY({handleDragging ? dragOffsetY : 0}px) translateZ({handleDragging ? 16 : 0}px);"
   onfocusin={handleRowFocusIn}
   onfocusout={handleRowFocusOut}
   ondragover={(e) => { e.preventDefault(); dragOver = true; onDragOver?.(index); }}
