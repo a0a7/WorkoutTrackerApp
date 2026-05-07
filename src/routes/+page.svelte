@@ -314,12 +314,14 @@
       {/if}
     </div>
     <div class="flex items-center gap-2">
-      <div
-        class="flex h-8 w-8 items-center justify-center rounded-full
-               {syncError ? 'text-red-500' : 'text-[hsl(var(--muted-foreground))]'}"
-        aria-label="Sync status"
+      <button
+        onclick={handleSyncTap}
+        class="flex h-8 items-center gap-1 rounded-full px-2 text-xs font-medium transition-colors bg-[hsl(var(--muted))] hover:bg-[hsl(var(--border))] touch-manipulation
+               {syncError ? 'text-red-500' : 'text-[hsl(var(--foreground))]'}"
+        aria-label="Sync now"
         title={syncError ?? (lastSync ? `Last synced ${formatLastSync(lastSync)}` : 'Not synced yet')}
       >
+        <span>Sync</span>
         {#if isSyncing}
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                class="animate-spin" style="animation-duration:1.2s">
@@ -342,14 +344,6 @@
             <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
           </svg>
         {/if}
-      </div>
-      <button
-        onclick={handleSyncTap}
-        class="h-8 rounded-full px-3 text-xs font-medium transition-colors bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--border))]"
-        aria-label="Sync now"
-        title="Sync now"
-      >
-        Sync
       </button>
       {#if selected.size > 0}
         <span class="text-sm font-medium text-[hsl(var(--primary))]">{selected.size} selected</span>

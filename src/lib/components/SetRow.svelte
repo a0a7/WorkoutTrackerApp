@@ -139,6 +139,54 @@
 
   function doOpenRepsKeypad() {
     let captured = isEmpty ? draftReps : localReps;
+    const commitRepsValue = () => {
+      if (isEmpty) {
+        flushEmptyRow();
+        return true;
+      }
+
+      // 3-part NxRxW → expand to N sets
+      const multi = captured.match(MULTI_SET_RE);
+      if (multi && onExpandSet) {
+        const count = parseInt(multi[1], 10);
+        const reps = parseInt(multi[2], 10);
+        const weight = parseFloat(multi[3]);
+        if (count >= 1 && count <= MAX_MULTI_SET_COUNT) {
+          const now = Date.now();
+          const newSets: WorkoutSet[] = Array.from({ length: count }, (_, i) => ({
+            id: crypto.randomUUID(),
+            localWorkoutId: set.localWorkoutId,
+            exerciseId: set.exerciseId,
+            exerciseName: set.exerciseName,
+            reps,
+            weight,
+            order: set.order + i,
+            createdAt: now + i,
+          }));
+          onExpandSet(set.id, newSets);
+          return true;
+        }
+      }
+
+      // 2-part RxW → update this set's reps and weight together
+      const pair = captured.match(SINGLE_PAIR_RE);
+      if (pair) {
+        const reps = parseInt(pair[1], 10) || null;
+        const weight = parseFloat(pair[2]) || null;
+        if (onUpdateMultiple) {
+          onUpdateMultiple(set.id, { reps, weight });
+        } else {
+          onUpdate?.(set.id, 'reps', reps);
+          onUpdate?.(set.id, 'weight', weight);
+        }
+        localReps = reps !== null ? String(reps) : '';
+        localWeight = weight !== null ? String(weight) : '';
+        return true;
+      }
+
+      return false;
+    };
+
     openKeypad({
       id: `${set.id}:reps`,
       value: captured,
@@ -149,54 +197,11 @@
         captured = v;
         handleRepsInput(v);
       },
-      onNext: doOpenWeightKeypad,
+      onNext: () => {
+        if (!commitRepsValue()) doOpenWeightKeypad();
+      },
       onDone: () => {
-        if (isEmpty) {
-          flushEmptyRow();
-          return;
-        }
-
-        // 3-part NxRxW → expand to N sets
-        const multi = captured.match(MULTI_SET_RE);
-        if (multi && onExpandSet) {
-          const count = parseInt(multi[1], 10);
-          const reps = parseInt(multi[2], 10);
-          const weight = parseFloat(multi[3]);
-          if (count >= 1 && count <= MAX_MULTI_SET_COUNT) {
-            const now = Date.now();
-            const newSets: WorkoutSet[] = Array.from({ length: count }, (_, i) => ({
-              id: crypto.randomUUID(),
-              localWorkoutId: set.localWorkoutId,
-              exerciseId: set.exerciseId,
-              exerciseName: set.exerciseName,
-              reps,
-              weight,
-              order: set.order + i,
-              createdAt: now + i,
-            }));
-            onExpandSet(set.id, newSets);
-            return;
-          }
-        }
-
-        // 2-part RxW → update this set's reps and weight together
-        const pair = captured.match(SINGLE_PAIR_RE);
-        if (pair) {
-          const reps = parseInt(pair[1], 10) || null;
-          const weight = parseFloat(pair[2]) || null;
-          if (onUpdateMultiple) {
-            onUpdateMultiple(set.id, { reps, weight });
-          } else {
-            onUpdate?.(set.id, 'reps', reps);
-            onUpdate?.(set.id, 'weight', weight);
-          }
-          localReps = reps !== null ? String(reps) : '';
-          localWeight = weight !== null ? String(weight) : '';
-          return;
-        }
-
-        // Plain reps — move to weight keypad
-        doOpenWeightKeypad();
+        if (!commitRepsValue()) doOpenWeightKeypad();
       },
     });
     scrollRowIntoView();

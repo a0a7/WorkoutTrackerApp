@@ -61,6 +61,7 @@
 
   html {
     font-family: var(--font-sans);
+    touch-action: manipulation;
   }
 
   body {
@@ -68,6 +69,7 @@
     color: hsl(var(--foreground));
     -webkit-font-smoothing: antialiased;
     overscroll-behavior: none;
+    touch-action: manipulation;
   }
 
   input[type='number']::-webkit-inner-spin-button,

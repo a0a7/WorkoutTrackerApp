@@ -51,9 +51,25 @@
     closeKeypad();
     cfg?.onCancel?.();
   }
+
+  function handleEnter() {
+    const cfg = $keypadConfig;
+    if (!cfg) return;
+    if (cfg.onNext) handleNext();
+    else handleDone();
+  }
 </script>
 
 {#if $keypadConfig}
+  <svelte:window
+    onkeydown={(e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleEnter();
+      }
+    }}
+  />
+
   <!-- Backdrop — tap anywhere outside to dismiss -->
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
   <div class="fixed inset-0 z-[59]" onclick={handleCancel}></div>
@@ -70,51 +86,53 @@
       {#each ['7','8','9','4','5','6','1','2','3'] as key (key)}
         <button
           onclick={() => handleKey(key)}
-          class="h-11 rounded-xl bg-[hsl(var(--muted))] text-lg font-medium
-                 text-[hsl(var(--foreground))] active:scale-95 active:bg-[hsl(var(--border))]
-                 transition-transform select-none touch-manipulation"
-        >{key}</button>
+          class="h-12 rounded-2xl p-1 transition-transform select-none touch-manipulation active:scale-95"
+        >
+          <span class="flex h-full w-full items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-lg font-medium text-[hsl(var(--foreground))] active:bg-[hsl(var(--border))]">
+            {key}
+          </span>
+        </button>
       {/each}
 
       {#if $keypadConfig.allowDecimal}
         <button
           onclick={() => handleKey('.')}
           disabled={localValue.includes('.')}
-          class="h-11 rounded-xl bg-[hsl(var(--muted))] text-lg font-medium
-                 text-[hsl(var(--foreground))] active:scale-95 active:bg-[hsl(var(--border))]
-                 transition-transform select-none touch-manipulation disabled:opacity-25"
-        >.</button>
+          class="h-12 rounded-2xl p-1 transition-transform select-none touch-manipulation active:scale-95 disabled:opacity-25"
+        >
+          <span class="flex h-full w-full items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-lg font-medium text-[hsl(var(--foreground))] active:bg-[hsl(var(--border))]">.</span>
+        </button>
       {:else if $keypadConfig.allowShorthand}
         <button
           onclick={() => handleKey('x')}
-          disabled={localValue.startsWith('x') || localValue.split('x').length > 2}
-          class="h-11 rounded-xl bg-[hsl(var(--muted))] text-lg font-medium
-                 text-[hsl(var(--foreground))] active:scale-95 active:bg-[hsl(var(--border))]
-                 transition-transform select-none touch-manipulation disabled:opacity-25"
-        >x</button>
+          disabled={localValue.startsWith('x') || (localValue.match(/[xX×*]/g)?.length ?? 0) >= 2}
+          class="h-12 rounded-2xl p-1 transition-transform select-none touch-manipulation active:scale-95 disabled:opacity-25"
+        >
+          <span class="flex h-full w-full items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-lg font-medium text-[hsl(var(--foreground))] active:bg-[hsl(var(--border))]">x</span>
+        </button>
       {:else}
-        <div class="h-11"></div>
+        <div class="h-12"></div>
       {/if}
 
       <button
         onclick={() => handleKey('0')}
-        class="h-11 rounded-xl bg-[hsl(var(--muted))] text-lg font-medium
-               text-[hsl(var(--foreground))] active:scale-95 active:bg-[hsl(var(--border))]
-               transition-transform select-none touch-manipulation"
-      >0</button>
+        class="h-12 rounded-2xl p-1 transition-transform select-none touch-manipulation active:scale-95"
+      >
+        <span class="flex h-full w-full items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-lg font-medium text-[hsl(var(--foreground))] active:bg-[hsl(var(--border))]">0</span>
+      </button>
 
       <button
         onclick={() => handleKey('⌫')}
-        class="h-11 rounded-xl bg-[hsl(var(--muted))] text-lg font-medium
-               text-[hsl(var(--foreground))] active:scale-95 active:bg-[hsl(var(--border))]
-               transition-transform select-none touch-manipulation"
+        class="h-12 rounded-2xl p-1 transition-transform select-none touch-manipulation active:scale-95"
         aria-label="Backspace"
       >
-        <svg class="mx-auto" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/>
-          <line x1="18" y1="9" x2="12" y2="15"/>
-          <line x1="12" y1="9" x2="18" y2="15"/>
-        </svg>
+        <span class="flex h-full w-full items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] active:bg-[hsl(var(--border))]">
+          <svg class="mx-auto" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/>
+            <line x1="18" y1="9" x2="12" y2="15"/>
+            <line x1="12" y1="9" x2="18" y2="15"/>
+          </svg>
+        </span>
       </button>
     </div>
 
