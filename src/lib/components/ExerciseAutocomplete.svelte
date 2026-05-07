@@ -22,7 +22,7 @@
   // Sync internal query when external value prop changes (e.g. after row commit/reset)
   $effect(() => {
     const v = value;
-    if (!focused) query = v;
+    if (v !== query) query = v;
   });
 
   /**
@@ -97,7 +97,7 @@
   }
 </script>
 
-<div class="relative w-full">
+<div class="relative z-20 w-full">
   <input
     bind:this={inputEl}
     type="text"
@@ -118,7 +118,7 @@
   />
 
   {#if showDropdown}
-    <div class="absolute left-0 right-0 top-full z-50 mt-1 max-h-56 overflow-y-auto rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-xl">
+    <div class="absolute left-0 right-0 top-full z-[80] mt-1 max-h-56 overflow-y-auto rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-xl">
       {#each filtered() as ex, i}
         <button
           type="button"

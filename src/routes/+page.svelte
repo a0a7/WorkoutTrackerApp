@@ -74,8 +74,8 @@
     })
   );
 
-  // 3 empty trailing rows always shown
-  const EMPTY_COUNT = 3;
+  // Keep a single trailing empty row for quick entry
+  const EMPTY_COUNT = 1;
   const emptyRows = $derived(
     Array.from({ length: EMPTY_COUNT }, (_, i) => ({
       id: `empty-${i}`,
@@ -494,6 +494,10 @@
       </tbody>
     </table>
   </div>
+
+  <p class="mt-2 text-center text-[11px] text-[hsl(var(--muted-foreground))]">
+    tap a set number to select • swipe to delete set • drag to reorder
+  </p>
 
   {#if locationDenied}
     <p class="mt-2 mb-1 text-center text-xs text-[hsl(var(--muted-foreground))]">

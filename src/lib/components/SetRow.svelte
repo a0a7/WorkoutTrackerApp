@@ -92,8 +92,11 @@
       onExerciseUpdate?.(set.id, ex.id, ex.name);
       editingExercise = false;
     }
-    // Move focus to reps after a brief pause (allows dropdown to close cleanly)
-    setTimeout(() => doOpenRepsKeypad(), 15);
+    const repsValue = isEmpty ? draftReps : localReps;
+    // Move focus to reps only if reps is currently empty.
+    if (!repsValue) {
+      setTimeout(() => doOpenRepsKeypad(), 15);
+    }
   }
 
   // ── Reps ─────────────────────────────────────────────────────────────────
@@ -363,6 +366,7 @@
   let swipeStartY = $state<number | null>(null);
   let swipeOffsetX = $state(0);
   let swipingToDelete = $state(false);
+  let swipeActive = $state(false);
   function handleTouchStart(e: TouchEvent) {
     touchStartY = e.touches[0].clientY;
     touchDragging = false;
@@ -425,42 +429,53 @@
   }
 
   function handleRowSwipeStart(e: TouchEvent) {
-    if (isEmpty || handleDragging || isInteractiveTarget(e.target)) return;
+    if (isEmpty || handleDragging || isInteractiveTarget(e.target) || e.touches.length !== 1) return;
     swipeStartX = e.touches[0].clientX;
     swipeStartY = e.touches[0].clientY;
     swipeOffsetX = 0;
     swipingToDelete = false;
+    swipeActive = false;
   }
 
   function handleRowSwipeMove(e: TouchEvent) {
     if (swipeStartX === null || swipeStartY === null) return;
     const dx = e.touches[0].clientX - swipeStartX;
     const dy = e.touches[0].clientY - swipeStartY;
-    if (Math.abs(dx) > Math.abs(dy) * 1.2 && Math.abs(dx) > 10) {
-      e.preventDefault();
-      swipeOffsetX = dx;
-      swipingToDelete = Math.abs(dx) >= 96;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+    if (!swipeActive) {
+      if (absDx < 10 && absDy < 10) return;
+      if (absDy > absDx) {
+        handleRowSwipeEnd();
+        return;
+      }
+      swipeActive = true;
     }
+    e.preventDefault();
+    swipeOffsetX = Math.max(-160, Math.min(160, dx));
+    swipingToDelete = Math.abs(swipeOffsetX) >= 96;
   }
 
   function handleRowSwipeEnd() {
-    if (swipeStartX !== null && swipingToDelete && !isEmpty) {
+    if (swipeStartX !== null && swipeActive && swipingToDelete && !isEmpty) {
       onDelete?.(set.id);
     }
     swipeStartX = null;
     swipeStartY = null;
     swipeOffsetX = 0;
     swipingToDelete = false;
+    swipeActive = false;
   }
 </script>
 
 <tr
   bind:this={trEl}
   data-set-row-index={index}
-  class="group border-b border-[hsl(var(--border)/0.5)] last:border-b-0 transition-[background-color,transform,box-shadow] duration-150
+  class="group relative border-b border-[hsl(var(--border)/0.5)] last:border-b-0 transition-[background-color,transform,box-shadow] duration-150
     {selected ? 'bg-[hsl(var(--primary)/0.06)]' : 'hover:bg-[hsl(var(--muted)/0.25)]'}
     {dragOver ? 'outline outline-2 outline-[hsl(var(--primary))] outline-offset-[-1px]' : ''}
-    {handleDragging ? 'z-20 bg-[hsl(var(--card))] shadow-2xl ring-2 ring-[hsl(var(--primary)/0.45)] scale-[1.01]' : ''}"
+    {handleDragging ? 'z-20 bg-[hsl(var(--card))] shadow-2xl ring-2 ring-[hsl(var(--primary)/0.45)] scale-[1.01]' : ''}
+    {isEmpty || editingExercise ? 'z-10' : ''}"
   draggable="false"
   style="transform: translateX({handleDragging ? 0 : swipeOffsetX}px) translateY({handleDragging ? dragOffsetY : 0}px) translateZ({handleDragging ? 16 : 0}px);"
   onfocusin={handleRowFocusIn}
