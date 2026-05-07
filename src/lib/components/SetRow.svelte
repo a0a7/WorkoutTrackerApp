@@ -82,6 +82,13 @@
   let weightBtnEl = $state<HTMLButtonElement | undefined>(undefined);
   let trEl = $state<HTMLTableRowElement | undefined>(undefined);
 
+  function dismissNativeKeyboard() {
+    const activeEl = document.activeElement;
+    if (activeEl instanceof HTMLElement) {
+      activeEl.blur();
+    }
+  }
+
   // ── Exercise ─────────────────────────────────────────────────────────────
 
   function handleExerciseSelected(ex: Exercise) {
@@ -115,6 +122,7 @@
   }
 
   function doOpenWeightKeypad() {
+    dismissNativeKeyboard();
     let captured = isEmpty ? draftWeight : localWeight;
     openKeypad({
       id: `${set.id}:weight`,
@@ -148,6 +156,7 @@
   }
 
   function doOpenRepsKeypad() {
+    dismissNativeKeyboard();
     let captured = isEmpty ? draftReps : localReps;
     const commitRepsValue = async () => {
       if (isEmpty) {
@@ -243,82 +252,117 @@
   // 2-part shorthand: RepsxWeight — updates a single set
   const SINGLE_PAIR_RE = /^(\d+)[xX×*]([\d.]+)$/;
 
+  function clearDraftRow() {
+    draftExerciseId = '';
+    draftExerciseName = '';
+    draftReps = '';
+    draftWeight = '';
+  }
+
   async function flushEmptyRow() {
     if (!isEmpty) return;
 
+    const nextDraft = {
+      exerciseId: draftExerciseId,
+      exerciseName: draftExerciseName,
+      repsText: draftReps,
+      weightText: draftWeight,
+    };
+
     // Parse "NxRepxWeight" shorthand — e.g. "3x12x200" creates 3 sets of 12 reps @ 200 lbs.
-    const multi = draftReps.match(MULTI_SET_RE);
+    const multi = nextDraft.repsText.match(MULTI_SET_RE);
     if (multi) {
       const count = parseInt(multi[1], 10);
       const reps = parseInt(multi[2], 10);
       const weight = parseFloat(multi[3]);
-      if (count >= 1 && count <= MAX_MULTI_SET_COUNT && (draftExerciseName || reps > 0 || weight > 0)) {
+      if (count >= 1 && count <= MAX_MULTI_SET_COUNT && (nextDraft.exerciseName || reps > 0 || weight > 0)) {
         const now = Date.now();
         const newSets: WorkoutSet[] = Array.from({ length: count }, (_, i) => ({
           id: crypto.randomUUID(),
           localWorkoutId: set.localWorkoutId,
-          exerciseId: draftExerciseId,
-          exerciseName: draftExerciseName,
+          exerciseId: nextDraft.exerciseId,
+          exerciseName: nextDraft.exerciseName,
           reps,
           weight,
           order: set.order + i,
           createdAt: now + i,
         }));
-        if (onAddMultiple) {
-          await onAddMultiple(newSets);
-        } else {
-          for (const s of newSets) await onAdd?.(s);
+        clearDraftRow();
+        try {
+          if (onAddMultiple) {
+            await onAddMultiple(newSets);
+          } else {
+            for (const s of newSets) await onAdd?.(s);
+          }
+        } catch (error) {
+          draftExerciseId = nextDraft.exerciseId;
+          draftExerciseName = nextDraft.exerciseName;
+          draftReps = nextDraft.repsText;
+          draftWeight = nextDraft.weightText;
+          throw error;
         }
-        draftExerciseId = '';
-        draftExerciseName = '';
-        draftReps = '';
-        draftWeight = '';
         return;
       }
     }
 
     // 2-part RxW shorthand — "12x150" creates one set with reps=12 and weight=150
-    const pair = draftReps.match(SINGLE_PAIR_RE);
+    const pair = nextDraft.repsText.match(SINGLE_PAIR_RE);
     if (pair) {
       const reps = parseInt(pair[1], 10) || null;
       const weight = parseFloat(pair[2]) || null;
-      if (draftExerciseName || reps !== null || weight !== null) {
-        await onAdd?.({
+      if (nextDraft.exerciseName || reps !== null || weight !== null) {
+        const newSet = {
           id: crypto.randomUUID(),
           localWorkoutId: set.localWorkoutId,
-          exerciseId: draftExerciseId,
-          exerciseName: draftExerciseName,
+          exerciseId: nextDraft.exerciseId,
+          exerciseName: nextDraft.exerciseName,
           reps,
           weight,
           order: set.order,
           createdAt: Date.now(),
-        });
+        };
+        clearDraftRow();
+        try {
+          await onAdd?.(newSet);
+        } catch (error) {
+          draftExerciseId = nextDraft.exerciseId;
+          draftExerciseName = nextDraft.exerciseName;
+          draftReps = nextDraft.repsText;
+          draftWeight = nextDraft.weightText;
+          throw error;
+        }
+        return;
       }
-      draftExerciseId = '';
-      draftExerciseName = '';
-      draftReps = '';
-      draftWeight = '';
+      clearDraftRow();
       return;
     }
 
-    const reps = draftReps !== '' ? (parseInt(draftReps, 10) || null) : null;
-    const weight = draftWeight !== '' ? (parseFloat(draftWeight) || null) : null;
-    if (draftExerciseName || reps !== null || weight !== null) {
-      await onAdd?.({
+    const reps = nextDraft.repsText !== '' ? (parseInt(nextDraft.repsText, 10) || null) : null;
+    const weight = nextDraft.weightText !== '' ? (parseFloat(nextDraft.weightText) || null) : null;
+    if (nextDraft.exerciseName || reps !== null || weight !== null) {
+      const newSet = {
         id: crypto.randomUUID(),
         localWorkoutId: set.localWorkoutId,
-        exerciseId: draftExerciseId,
-        exerciseName: draftExerciseName,
+        exerciseId: nextDraft.exerciseId,
+        exerciseName: nextDraft.exerciseName,
         reps,
         weight,
         order: set.order,
         createdAt: Date.now(),
-      });
+      };
+      clearDraftRow();
+      try {
+        await onAdd?.(newSet);
+      } catch (error) {
+        draftExerciseId = nextDraft.exerciseId;
+        draftExerciseName = nextDraft.exerciseName;
+        draftReps = nextDraft.repsText;
+        draftWeight = nextDraft.weightText;
+        throw error;
+      }
+      return;
     }
-    draftExerciseId = '';
-    draftExerciseName = '';
-    draftReps = '';
-    draftWeight = '';
+    clearDraftRow();
   }
 
   // ── Row focus tracking ────────────────────────────────────────────────────
@@ -361,6 +405,7 @@
   let dragPointerId = $state<number | null>(null);
   let dragStartY = $state(0);
   let dragOffsetY = $state(0);
+  const DRAG_ACTIVATION_THRESHOLD_PX = 6;
 
   let swipeStartX = $state<number | null>(null);
   let swipeStartY = $state<number | null>(null);
@@ -385,21 +430,27 @@
 
   function handleDragHandlePointerDown(e: PointerEvent) {
     if (isEmpty) return;
+    e.preventDefault();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     dragPointerId = e.pointerId;
     dragStartIndex = index;
     dragCurrentIndex = index;
     dragStartY = e.clientY;
     dragOffsetY = 0;
-    handleDragging = true;
-    onDragStart?.(index);
+    handleDragging = false;
   }
 
   function handleDragHandlePointerMove(e: PointerEvent) {
-    if (!handleDragging || dragPointerId === null || e.pointerId !== dragPointerId) return;
-    dragOffsetY = e.clientY - dragStartY;
-    const targetEl = document.elementFromPoint(e.clientX, e.clientY)?.closest('tr[data-set-row-index]');
-    const targetIndex = targetEl ? Number((targetEl as HTMLElement).dataset.setRowIndex) : NaN;
+    if (!maybeActivateDrag(e)) return;
+    const targetEl = document
+      .elementsFromPoint(e.clientX, e.clientY)
+      .map((el) => el.closest('tr[data-set-row-index]'))
+      .find((row): row is HTMLElement =>
+        row instanceof HTMLElement
+          && row.dataset.emptyRow !== 'true'
+          && row.dataset.setRowIndex !== String(dragStartIndex)
+      );
+    const targetIndex = targetEl ? Number(targetEl.dataset.setRowIndex) : NaN;
     if (!Number.isNaN(targetIndex)) {
       dragCurrentIndex = targetIndex;
       onDragOver?.(targetIndex);
@@ -407,13 +458,14 @@
   }
 
   async function handleDragHandlePointerEnd(e: PointerEvent) {
-    if (!handleDragging || dragStartIndex === null) return;
+    if (dragPointerId === null || dragStartIndex === null) return;
     if ((e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) {
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     }
+    const didDrag = handleDragging;
     const fromIndex = dragStartIndex;
     const toIndex = dragCurrentIndex ?? fromIndex;
-    if (toIndex !== fromIndex) {
+    if (didDrag && toIndex !== fromIndex) {
       await onTouchReorder?.(fromIndex, toIndex);
     }
     handleDragging = false;
@@ -421,6 +473,18 @@
     dragCurrentIndex = null;
     dragPointerId = null;
     dragOffsetY = 0;
+  }
+
+  function maybeActivateDrag(e: PointerEvent) {
+    if (dragPointerId === null || e.pointerId !== dragPointerId || dragStartIndex === null) return false;
+    const nextOffsetY = e.clientY - dragStartY;
+    if (!handleDragging) {
+      if (Math.abs(nextOffsetY) < DRAG_ACTIVATION_THRESHOLD_PX) return false;
+      handleDragging = true;
+      onDragStart?.(dragStartIndex);
+    }
+    dragOffsetY = nextOffsetY;
+    return true;
   }
 
   function isInteractiveTarget(target: EventTarget | null): boolean {
@@ -471,12 +535,14 @@
 <tr
   bind:this={trEl}
   data-set-row-index={index}
+  data-empty-row={isEmpty ? 'true' : 'false'}
   class="group relative border-b border-[hsl(var(--border)/0.5)] last:border-b-0 transition-[background-color,transform,box-shadow] duration-150
     {selected ? 'bg-[hsl(var(--primary)/0.06)]' : 'hover:bg-[hsl(var(--muted)/0.25)]'}
     {dragOver ? 'outline outline-2 outline-[hsl(var(--primary))] outline-offset-[-1px]' : ''}
     {handleDragging ? 'z-20 bg-[hsl(var(--card))] shadow-2xl ring-2 ring-[hsl(var(--primary)/0.45)] scale-[1.01]' : ''}
     {isEmpty || editingExercise ? 'z-10' : ''}"
   draggable="false"
+  style:transition-duration={handleDragging ? '0ms' : undefined}
   style="transform: translateX({handleDragging ? 0 : swipeOffsetX}px) translateY({handleDragging ? dragOffsetY : 0}px) translateZ({handleDragging ? 16 : 0}px);"
   onfocusin={handleRowFocusIn}
   onfocusout={handleRowFocusOut}
