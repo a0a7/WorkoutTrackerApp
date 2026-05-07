@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import type { WorkoutSet } from '../types';
   import ExerciseAutocomplete from './ExerciseAutocomplete.svelte';
   import type { Exercise } from '../types';
@@ -338,6 +338,11 @@
   let touchDragging = $state(false);
   let handleTouchDragging = $state(false);
   let touchDragStartIndex = $state<number | null>(null);
+  let isTouchDevice = $state(false);
+
+  onMount(() => {
+    isTouchDevice = navigator.maxTouchPoints > 0;
+  });
 
   function handleTouchStart(e: TouchEvent) {
     touchStartY = e.touches[0].clientY;
@@ -522,7 +527,7 @@
         </button>
         <button
           type="button"
-          draggable="true"
+          draggable={!isTouchDevice}
           ondragstart={() => onDragStart?.(index)}
           ontouchstart={handleDragHandleTouchStart}
           ontouchmove={handleDragHandleTouchMove}

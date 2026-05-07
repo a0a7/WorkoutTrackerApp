@@ -10,11 +10,21 @@
   let filterQuery = $state('');
   let fromDate = $state('');
   let toDate = $state('');
+  let compactness = $state<'card' | 'compact'>('card');
 
   onMount(async () => {
+    const savedCompactness = localStorage.getItem('history-compactness');
+    if (savedCompactness === 'card' || savedCompactness === 'compact') {
+      compactness = savedCompactness;
+    }
     workouts = await getAllWorkouts();
     loading = false;
   });
+
+  function setCompactness(mode: 'card' | 'compact') {
+    compactness = mode;
+    localStorage.setItem('history-compactness', mode);
+  }
 
   const filtered = $derived(() => {
     let result = workouts;
@@ -32,7 +42,7 @@
       const to = new Date(toDate).getTime() + 86400000;
       result = result.filter((w) => w.startTime <= to);
     }
-    return result;
+    return [...result].sort((a, b) => b.startTime - a.startTime);
   });
 
   // Group by date
@@ -77,6 +87,22 @@
         class="flex-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]"
       />
     </div>
+    <div class="inline-flex w-fit rounded-xl bg-[hsl(var(--muted))] p-1">
+      <button
+        type="button"
+        onclick={() => setCompactness('card')}
+        class="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors {compactness === 'card' ? 'bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-sm' : 'text-[hsl(var(--muted-foreground))]'}"
+      >
+        Card
+      </button>
+      <button
+        type="button"
+        onclick={() => setCompactness('compact')}
+        class="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors {compactness === 'compact' ? 'bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-sm' : 'text-[hsl(var(--muted-foreground))]'}"
+      >
+        Compact
+      </button>
+    </div>
   </div>
 
   {#if loading}
@@ -99,7 +125,29 @@
         <h2 class="mb-2 text-sm font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide">{dateLabel}</h2>
         <div class="flex flex-col gap-3">
           {#each dayWorkouts as workout (workout.id)}
-            <WorkoutCard {workout} />
+            {#if compactness === 'card'}
+              <WorkoutCard {workout} />
+            {:else}
+              <a
+                href="/workout/{workout.id}"
+                class="flex items-center justify-between rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2 active:scale-[0.99] transition-transform"
+              >
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-semibold text-[hsl(var(--foreground))]">
+                    {new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                  </p>
+                  <p class="truncate text-xs text-[hsl(var(--muted-foreground))]">
+                    {workout.sets.length} sets
+                  </p>
+                </div>
+                <p class="shrink-0 text-xs font-medium text-[hsl(var(--primary))]">
+                  {(() => {
+                    const mins = Math.round((workout.endTime - workout.startTime) / 60000);
+                    return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+                  })()}
+                </p>
+              </a>
+            {/if}
           {/each}
         </div>
       </div>

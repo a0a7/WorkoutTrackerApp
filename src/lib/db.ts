@@ -189,7 +189,8 @@ export async function getAllWorkouts(): Promise<Workout[]> {
   if (stored.length > 0) {
     return stored.sort((a, b) => b.startTime - a.startTime);
   }
-  return getAllWorkoutGroups();
+  const grouped = await getAllWorkoutGroups();
+  return grouped.sort((a, b) => b.startTime - a.startTime);
 }
 
 export async function addPendingSync(

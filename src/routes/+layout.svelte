@@ -6,9 +6,14 @@
   import { get } from 'svelte/store';
   import { initDB } from '$lib/db';
   import { userStore } from '$lib/stores/userStore';
-  import { setupSyncListeners, syncFromServer, syncToServer } from '$lib/sync';
+  import { refreshSyncStatus, setupSyncListeners, syncFromServer, syncToServer } from '$lib/sync';
 
   let { children } = $props();
+  let mainEl = $state<HTMLElement | null>(null);
+  let pullStartY = $state<number | null>(null);
+  let pullDistance = $state(0);
+  let pullSyncing = $state(false);
+  const PULL_SYNC_THRESHOLD_PX = 84;
 
   const navItems = [
     { href: '/', label: 'Today', icon: 'today' },
@@ -63,11 +68,48 @@
     if (href === '/') return currentPath === '/';
     return currentPath.startsWith(href);
   }
+
+  function handlePullStart(e: TouchEvent) {
+    if (currentPath === '/login' || pullSyncing || !mainEl) return;
+    if (mainEl.scrollTop > 0) return;
+    pullStartY = e.touches[0]?.clientY ?? null;
+    pullDistance = 0;
+  }
+
+  function handlePullMove(e: TouchEvent) {
+    if (pullStartY === null) return;
+    pullDistance = Math.max(0, (e.touches[0]?.clientY ?? pullStartY) - pullStartY);
+  }
+
+  async function handlePullEnd() {
+    const shouldSync = pullDistance >= PULL_SYNC_THRESHOLD_PX;
+    pullStartY = null;
+    pullDistance = 0;
+    if (!shouldSync || pullSyncing) return;
+    const u = get(userStore);
+    if (!u) return;
+    pullSyncing = true;
+    try {
+      await syncToServer(u);
+      await syncFromServer(u);
+      await refreshSyncStatus();
+    } catch {
+      // ignored
+    } finally {
+      pullSyncing = false;
+    }
+  }
 </script>
 
 <div class="flex min-h-screen flex-col bg-[hsl(var(--background))]">
   <!-- Main content area: no bottom padding on login page -->
-  <main class="flex-1 overflow-y-auto {currentPath !== '/login' ? 'pb-[calc(4rem+env(safe-area-inset-bottom,0px))]' : ''}">
+  <main
+    bind:this={mainEl}
+    ontouchstart={handlePullStart}
+    ontouchmove={handlePullMove}
+    ontouchend={handlePullEnd}
+    class="flex-1 overflow-y-auto {currentPath !== '/login' ? 'pb-[calc(4rem+env(safe-area-inset-bottom,0px))]' : ''}"
+  >
     {@render children()}
   </main>
 

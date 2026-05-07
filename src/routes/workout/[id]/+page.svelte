@@ -169,15 +169,23 @@
         <div>
           <h1 class="text-xl font-bold text-[hsl(var(--foreground))]">{dateLabel}</h1>
           {#if !editingTimes}
-            <p class="text-sm text-[hsl(var(--muted-foreground))] mt-0.5">{timeLabel}</p>
+            <button
+              type="button"
+              onclick={beginEditTimes}
+              class="mt-0.5 text-left text-sm text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] transition-colors"
+            >
+              {timeLabel}
+            </button>
           {/if}
         </div>
-        <button
-          onclick={editingTimes ? saveEditedTimes : beginEditTimes}
-          class="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors {editingTimes ? 'bg-[hsl(var(--primary))] text-white' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'}"
-        >
-          {editingTimes ? 'Save' : 'Edit times'}
-        </button>
+        {#if editingTimes}
+          <button
+            onclick={saveEditedTimes}
+            class="shrink-0 rounded-lg bg-[hsl(var(--primary))] px-3 py-1.5 text-xs font-medium text-white transition-colors"
+          >
+            Save
+          </button>
+        {/if}
       </div>
 
       {#if editingTimes}
