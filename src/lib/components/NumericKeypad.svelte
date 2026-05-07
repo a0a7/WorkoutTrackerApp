@@ -34,29 +34,29 @@
     cfg.onInput(v);
   }
 
-  function handleDone() {
+  async function handleDone() {
     const cfg = $keypadConfig;
     closeKeypad();
-    cfg?.onDone();
+    await cfg?.onDone();
   }
 
-  function handleNext() {
+  async function handleNext() {
     const cfg = $keypadConfig;
     closeKeypad();
-    cfg?.onNext?.();
+    await cfg?.onNext?.();
   }
 
-  function handleCancel() {
+  async function handleCancel() {
     const cfg = $keypadConfig;
     closeKeypad();
-    cfg?.onCancel?.();
+    await cfg?.onCancel?.();
   }
 
-  function handleEnter() {
+  async function handleEnter() {
     const cfg = $keypadConfig;
     if (!cfg) return;
-    if (cfg.onNext) handleNext();
-    else handleDone();
+    if (cfg.onNext) await handleNext();
+    else await handleDone();
   }
 </script>
 
@@ -65,7 +65,7 @@
     if (!$keypadConfig) return;
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleEnter();
+      handleEnter().catch(() => {});
     }
   }}
 />

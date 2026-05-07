@@ -12,13 +12,13 @@ export interface KeypadConfig {
   /** Display label shown above the value e.g. "Reps" */
   label?: string;
   /** Called on every keypress with the updated value */
-  onInput: (v: string) => void;
+  onInput: (v: string) => void | Promise<void>;
   /** Called when the user taps "Done" (last field) */
-  onDone: () => void;
+  onDone: () => void | Promise<void>;
   /** Called when the user taps "Next →" (moves to the next field) */
-  onNext?: () => void;
+  onNext?: () => void | Promise<void>;
   /** Called when the user cancels (backdrop tap or Cancel button) */
-  onCancel?: () => void;
+  onCancel?: () => void | Promise<void>;
 }
 
 export const keypadConfig = writable<KeypadConfig | null>(null);

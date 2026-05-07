@@ -30,14 +30,14 @@
     selected?: boolean;
     isEmpty?: boolean;
     setNumber?: number | null;
-    onUpdate?: (id: string, field: keyof WorkoutSet, value: unknown) => void;
-    onUpdateMultiple?: (id: string, updates: Partial<WorkoutSet>) => void;
-    onAdd?: (set: WorkoutSet) => void;
-    onAddMultiple?: (sets: WorkoutSet[]) => void;
-    onExerciseUpdate?: (id: string, exerciseId: string, exerciseName: string) => void;
-    onDelete?: (id: string) => void;
+    onUpdate?: (id: string, field: keyof WorkoutSet, value: unknown) => void | Promise<void>;
+    onUpdateMultiple?: (id: string, updates: Partial<WorkoutSet>) => void | Promise<void>;
+    onAdd?: (set: WorkoutSet) => void | Promise<void>;
+    onAddMultiple?: (sets: WorkoutSet[]) => void | Promise<void>;
+    onExerciseUpdate?: (id: string, exerciseId: string, exerciseName: string) => void | Promise<void>;
+    onDelete?: (id: string) => void | Promise<void>;
     onSelect?: (id: string, shiftKey?: boolean) => void;
-    onExpandSet?: (id: string, newSets: WorkoutSet[]) => void;
+    onExpandSet?: (id: string, newSets: WorkoutSet[]) => void | Promise<void>;
     onDragStart?: (index: number) => void;
     onDragOver?: (index: number) => void;
     onDrop?: () => void;
@@ -128,9 +128,9 @@
           onUpdate?.(set.id, 'weight', v !== '' ? (parseFloat(v) || null) : null);
         }
       },
-      onDone: () => {
+      onDone: async () => {
         if (isEmpty) {
-          flushEmptyRow();
+          await flushEmptyRow();
         }
       },
     });
@@ -139,9 +139,9 @@
 
   function doOpenRepsKeypad() {
     let captured = isEmpty ? draftReps : localReps;
-    const commitRepsValue = () => {
+    const commitRepsValue = async () => {
       if (isEmpty) {
-        flushEmptyRow();
+        await flushEmptyRow();
         return true;
       }
 
@@ -163,7 +163,7 @@
             order: set.order + i,
             createdAt: now + i,
           }));
-          onExpandSet(set.id, newSets);
+          await onExpandSet(set.id, newSets);
           return true;
         }
       }
@@ -174,10 +174,10 @@
         const reps = parseInt(pair[1], 10) || null;
         const weight = parseFloat(pair[2]) || null;
         if (onUpdateMultiple) {
-          onUpdateMultiple(set.id, { reps, weight });
+          await onUpdateMultiple(set.id, { reps, weight });
         } else {
-          onUpdate?.(set.id, 'reps', reps);
-          onUpdate?.(set.id, 'weight', weight);
+          await onUpdate?.(set.id, 'reps', reps);
+          await onUpdate?.(set.id, 'weight', weight);
         }
         localReps = reps !== null ? String(reps) : '';
         localWeight = weight !== null ? String(weight) : '';
@@ -197,11 +197,11 @@
         captured = v;
         handleRepsInput(v);
       },
-      onNext: () => {
-        if (!commitRepsValue()) doOpenWeightKeypad();
+      onNext: async () => {
+        if (!await commitRepsValue()) doOpenWeightKeypad();
       },
-      onDone: () => {
-        if (!commitRepsValue()) doOpenWeightKeypad();
+      onDone: async () => {
+        if (!await commitRepsValue()) doOpenWeightKeypad();
       },
     });
     scrollRowIntoView();
@@ -224,7 +224,7 @@
   // 2-part shorthand: RepsxWeight — updates a single set
   const SINGLE_PAIR_RE = /^(\d+)[xX×*]([\d.]+)$/;
 
-  function flushEmptyRow() {
+  async function flushEmptyRow() {
     if (!isEmpty) return;
 
     // Parse "NxRepxWeight" shorthand — e.g. "3x12x200" creates 3 sets of 12 reps @ 200 lbs.
@@ -246,9 +246,9 @@
           createdAt: now + i,
         }));
         if (onAddMultiple) {
-          onAddMultiple(newSets);
+          await onAddMultiple(newSets);
         } else {
-          newSets.forEach((s) => onAdd?.(s));
+          for (const s of newSets) await onAdd?.(s);
         }
         draftExerciseId = '';
         draftExerciseName = '';
@@ -264,7 +264,7 @@
       const reps = parseInt(pair[1], 10) || null;
       const weight = parseFloat(pair[2]) || null;
       if (draftExerciseName || reps !== null || weight !== null) {
-        onAdd?.({
+        await onAdd?.({
           id: crypto.randomUUID(),
           localWorkoutId: set.localWorkoutId,
           exerciseId: draftExerciseId,
@@ -285,7 +285,7 @@
     const reps = draftReps !== '' ? (parseInt(draftReps, 10) || null) : null;
     const weight = draftWeight !== '' ? (parseFloat(draftWeight) || null) : null;
     if (draftExerciseName || reps !== null || weight !== null) {
-      onAdd?.({
+      await onAdd?.({
         id: crypto.randomUUID(),
         localWorkoutId: set.localWorkoutId,
         exerciseId: draftExerciseId,
@@ -355,14 +355,18 @@
     touchDragging = false;
   }
 
-  function handleDragHandleTouchStart(_e: TouchEvent) {
+  function handleDragHandleTouchStart(e: TouchEvent) {
     if (isEmpty) return;
+    e.preventDefault();
+    e.stopPropagation();
     handleTouchDragging = true;
     touchDragStartIndex = index;
   }
 
   function handleDragHandleTouchMove(e: TouchEvent) {
     if (!handleTouchDragging) return;
+    e.preventDefault();
+    e.stopPropagation();
     const touch = e.touches[0];
     const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('tr[data-set-row-index]');
     const targetIndex = targetEl ? Number((targetEl as HTMLElement).dataset.setRowIndex) : NaN;
@@ -373,6 +377,8 @@
 
   function handleDragHandleTouchEnd(e: TouchEvent) {
     if (!handleTouchDragging || touchDragStartIndex === null) return;
+    e.preventDefault();
+    e.stopPropagation();
     const touch = e.changedTouches[0];
     const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('tr[data-set-row-index]');
     const targetIndex = targetEl ? Number((targetEl as HTMLElement).dataset.setRowIndex) : NaN;
@@ -521,7 +527,8 @@
           ontouchstart={handleDragHandleTouchStart}
           ontouchmove={handleDragHandleTouchMove}
           ontouchend={handleDragHandleTouchEnd}
-          class="flex h-6 w-6 items-center justify-center rounded text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] transition-colors cursor-grab active:cursor-grabbing touch-none"
+          oncontextmenu={(e) => e.preventDefault()}
+          class="flex h-6 w-6 items-center justify-center rounded text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] transition-colors cursor-grab active:cursor-grabbing touch-none select-none"
           title="Drag to reorder"
           aria-label="Drag to reorder set"
         >
