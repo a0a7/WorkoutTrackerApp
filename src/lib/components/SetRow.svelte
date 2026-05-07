@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, untrack } from 'svelte';
+  import { untrack } from 'svelte';
   import type { WorkoutSet } from '../types';
   import ExerciseAutocomplete from './ExerciseAutocomplete.svelte';
   import type { Exercise } from '../types';
@@ -41,7 +41,7 @@
     onDragStart?: (index: number) => void;
     onDragOver?: (index: number) => void;
     onDrop?: () => void;
-    onTouchReorder?: (fromIndex: number, toIndex: number) => void;
+    onTouchReorder?: (fromIndex: number, toIndex: number) => void | Promise<void>;
     index: number;
   } = $props();
 
@@ -336,14 +336,15 @@
   let dragOver = $state(false);
   let touchStartY = $state(0);
   let touchDragging = $state(false);
-  let handleTouchDragging = $state(false);
-  let touchDragStartIndex = $state<number | null>(null);
-  let isTouchDevice = $state(false);
+  let handleDragging = $state(false);
+  let dragStartIndex = $state<number | null>(null);
+  let dragCurrentIndex = $state<number | null>(null);
+  let dragPointerId = $state<number | null>(null);
 
-  onMount(() => {
-    isTouchDevice = navigator.maxTouchPoints > 0;
-  });
-
+  let swipeStartX = $state<number | null>(null);
+  let swipeStartY = $state<number | null>(null);
+  let swipeOffsetX = $state(0);
+  let swipingToDelete = $state(false);
   function handleTouchStart(e: TouchEvent) {
     touchStartY = e.touches[0].clientY;
     touchDragging = false;
@@ -360,56 +361,98 @@
     touchDragging = false;
   }
 
-  function handleDragHandleTouchStart(e: TouchEvent) {
+  function handleDragHandlePointerDown(e: PointerEvent) {
     if (isEmpty) return;
-    e.preventDefault();
-    e.stopPropagation();
-    handleTouchDragging = true;
-    touchDragStartIndex = index;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    dragPointerId = e.pointerId;
+    dragStartIndex = index;
+    dragCurrentIndex = index;
+    handleDragging = true;
+    onDragStart?.(index);
   }
 
-  function handleDragHandleTouchMove(e: TouchEvent) {
-    if (!handleTouchDragging) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const touch = e.touches[0];
-    const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('tr[data-set-row-index]');
+  function handleDragHandlePointerMove(e: PointerEvent) {
+    if (!handleDragging || dragPointerId === null || e.pointerId !== dragPointerId) return;
+    const targetEl = document.elementFromPoint(e.clientX, e.clientY)?.closest('tr[data-set-row-index]');
     const targetIndex = targetEl ? Number((targetEl as HTMLElement).dataset.setRowIndex) : NaN;
     if (!Number.isNaN(targetIndex)) {
+      dragCurrentIndex = targetIndex;
       onDragOver?.(targetIndex);
     }
   }
 
-  function handleDragHandleTouchEnd(e: TouchEvent) {
-    if (!handleTouchDragging || touchDragStartIndex === null) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const touch = e.changedTouches[0];
-    const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('tr[data-set-row-index]');
-    const targetIndex = targetEl ? Number((targetEl as HTMLElement).dataset.setRowIndex) : NaN;
-    if (!Number.isNaN(targetIndex)) {
-      onTouchReorder?.(touchDragStartIndex, targetIndex);
+  async function handleDragHandlePointerEnd(e: PointerEvent) {
+    if (!handleDragging || dragStartIndex === null) return;
+    if ((e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     }
-    handleTouchDragging = false;
-    touchDragStartIndex = null;
+    const fromIndex = dragStartIndex;
+    const toIndex = dragCurrentIndex ?? fromIndex;
+    if (toIndex !== fromIndex) {
+      await onTouchReorder?.(fromIndex, toIndex);
+    }
+    handleDragging = false;
+    dragStartIndex = null;
+    dragCurrentIndex = null;
+    dragPointerId = null;
+  }
+
+  function isInteractiveTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    return Boolean(target.closest('button, input, textarea, select, a, [role="button"], [data-no-swipe]'));
+  }
+
+  function handleRowSwipeStart(e: TouchEvent) {
+    if (isEmpty || handleDragging || isInteractiveTarget(e.target)) return;
+    swipeStartX = e.touches[0].clientX;
+    swipeStartY = e.touches[0].clientY;
+    swipeOffsetX = 0;
+    swipingToDelete = false;
+  }
+
+  function handleRowSwipeMove(e: TouchEvent) {
+    if (swipeStartX === null || swipeStartY === null) return;
+    const dx = e.touches[0].clientX - swipeStartX;
+    const dy = e.touches[0].clientY - swipeStartY;
+    if (Math.abs(dx) > Math.abs(dy) * 1.2 && Math.abs(dx) > 10) {
+      e.preventDefault();
+      swipeOffsetX = dx;
+      swipingToDelete = Math.abs(dx) >= 96;
+    }
+  }
+
+  function handleRowSwipeEnd() {
+    if (swipeStartX !== null && swipingToDelete && !isEmpty) {
+      onDelete?.(set.id);
+    }
+    swipeStartX = null;
+    swipeStartY = null;
+    swipeOffsetX = 0;
+    swipingToDelete = false;
   }
 </script>
 
 <tr
   bind:this={trEl}
   data-set-row-index={index}
-  class="group border-b border-[hsl(var(--border)/0.5)] last:border-b-0 transition-colors
+  class="group border-b border-[hsl(var(--border)/0.5)] last:border-b-0 transition-[background-color,transform,box-shadow] duration-150
     {selected ? 'bg-[hsl(var(--primary)/0.06)]' : 'hover:bg-[hsl(var(--muted)/0.25)]'}
-    {dragOver ? 'outline outline-2 outline-[hsl(var(--primary))] outline-offset-[-1px]' : ''}"
+    {dragOver ? 'outline outline-2 outline-[hsl(var(--primary))] outline-offset-[-1px]' : ''}
+    {handleDragging ? 'z-20 bg-[hsl(var(--card))] shadow-2xl ring-2 ring-[hsl(var(--primary)/0.45)] scale-[1.01]' : ''}"
   draggable="false"
+  style="transform: translateX({handleDragging ? 0 : swipeOffsetX}px) translateZ({handleDragging ? 16 : 0}px);"
   onfocusin={handleRowFocusIn}
   onfocusout={handleRowFocusOut}
   ondragover={(e) => { e.preventDefault(); dragOver = true; onDragOver?.(index); }}
   ondragleave={() => { dragOver = false; }}
   ondrop={(e) => { e.preventDefault(); dragOver = false; onDrop?.(); }}
+  ontouchstart={handleRowSwipeStart}
+  ontouchmove={handleRowSwipeMove}
+  ontouchend={handleRowSwipeEnd}
+  ontouchcancel={handleRowSwipeEnd}
 >
   <!-- Set number / select -->
-  <td class="w-8 text-center py-0 px-0.5">
+  <td class="w-7 text-center py-0 px-0.5">
     {#if isEmpty}
       <span class="block h-5 w-5 mx-auto"></span>
     {:else if selected}
@@ -462,7 +505,7 @@
   </td>
 
   <!-- Reps – tap to open custom keypad -->
-  <td class="w-16 py-0.5 px-0.5">
+  <td class="w-12 py-0.5 px-0.5">
     <button
       bind:this={repsBtnEl}
       type="button"
@@ -485,7 +528,7 @@
   </td>
 
   <!-- Weight – tap to open custom keypad -->
-  <td class="w-16 py-0.5 px-0.5">
+  <td class="w-14 py-0.5 px-0.5">
     <button
       bind:this={weightBtnEl}
       type="button"
@@ -508,32 +551,18 @@
   </td>
 
   <!-- Delete / commit -->
-  <td class="w-14 py-0.5 px-0.5">
+  <td class="w-10 py-0.5 px-0.5">
     {#if !isEmpty}
-      <div class="flex items-center justify-center gap-1">
+      <div class="flex items-center justify-center">
         <button
           type="button"
-          onclick={() => onDelete?.(set.id)}
-          class="flex h-6 w-6 items-center justify-center rounded
-                 text-[hsl(var(--muted-foreground))]
-                 hover:text-red-500 dark:hover:text-red-400
-                 transition-colors"
-          title="Delete set"
-          aria-label="Delete set"
-        >
-          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5M3 4l1 9a1 1 0 001 1h6a1 1 0 001-1l1-9"/>
-          </svg>
-        </button>
-        <button
-          type="button"
-          draggable={!isTouchDevice}
-          ondragstart={() => onDragStart?.(index)}
-          ontouchstart={handleDragHandleTouchStart}
-          ontouchmove={handleDragHandleTouchMove}
-          ontouchend={handleDragHandleTouchEnd}
+          data-no-swipe
+          onpointerdown={handleDragHandlePointerDown}
+          onpointermove={handleDragHandlePointerMove}
+          onpointerup={handleDragHandlePointerEnd}
+          onpointercancel={handleDragHandlePointerEnd}
           oncontextmenu={(e) => e.preventDefault()}
-          class="flex h-6 w-6 items-center justify-center rounded text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] transition-colors cursor-grab active:cursor-grabbing touch-none select-none"
+          class="flex h-9 w-9 items-center justify-center rounded-lg text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] transition-colors cursor-grab active:cursor-grabbing touch-none select-none"
           title="Drag to reorder"
           aria-label="Drag to reorder set"
         >

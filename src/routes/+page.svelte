@@ -217,10 +217,31 @@
 
   async function handleUpdate(id: string, field: keyof WorkoutSet, value: unknown) {
     pushUndo('Edit set', sets);
+    const normalizeValue = (f: keyof WorkoutSet, v: unknown) => {
+      if (f === 'reps') {
+        if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+        if (typeof v === 'string') {
+          if (/[xX×*]/.test(v)) return null;
+          const parsed = parseInt(v, 10);
+          return Number.isFinite(parsed) ? parsed : null;
+        }
+        return null;
+      }
+      if (f === 'weight') {
+        if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+        if (typeof v === 'string') {
+          const parsed = parseFloat(v);
+          return Number.isFinite(parsed) ? parsed : null;
+        }
+        return null;
+      }
+      return v;
+    };
+    const normalizedValue = normalizeValue(field, value);
     // Apply to all selected sets if multiple are selected and this one is among them
     const targetIds = selected.has(id) && selected.size > 1 ? [...selected] : [id];
     const newSets = sets.map((s) =>
-      targetIds.includes(s.id) ? { ...s, [field]: value } : s
+      targetIds.includes(s.id) ? { ...s, [field]: normalizedValue } : s
     );
     await persistSets(newSets);
   }
@@ -430,11 +451,11 @@
     <table class="w-full border-collapse">
       <thead>
         <tr class="border-b border-[hsl(var(--border))]">
-          <th class="w-8 px-1 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">#</th>
+          <th class="w-7 px-0.5 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">#</th>
           <th class="px-1 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Exercise</th>
-          <th class="w-16 px-1 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Reps</th>
-          <th class="w-16 px-1 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">{unit}</th>
-          <th class="w-14 px-1 py-2"></th>
+          <th class="w-12 px-0.5 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Reps</th>
+          <th class="w-14 px-0.5 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">{unit}</th>
+          <th class="w-10 px-0.5 py-2"></th>
         </tr>
       </thead>
       <tbody>

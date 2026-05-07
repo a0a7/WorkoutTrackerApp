@@ -84,7 +84,7 @@
     aria-label="Number keypad"
   >
     <div class="grid grid-cols-3 gap-1 px-2 pt-2 pb-1">
-      {#each ['7','8','9','4','5','6','1','2','3'] as key (key)}
+      {#each ['1','2','3','4','5','6','7','8','9'] as key (key)}
         <button
           onclick={() => handleKey(key)}
           class="h-12 rounded-2xl p-1 transition-transform select-none touch-manipulation active:scale-95"
