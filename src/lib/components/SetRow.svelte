@@ -70,6 +70,7 @@
   let draftExerciseName = $state('');
   let draftReps = $state('');
   let draftWeight = $state('');
+  let draftRevision = $state(0);
 
   // Delayed commit timer: necessary because clicking an autocomplete dropdown
   // briefly moves focus to the dropdown button (inside the row) then to body
@@ -157,6 +158,7 @@
   function doOpenWeightKeypad() {
     dismissNativeKeyboard();
     let captured = isEmpty ? draftWeight : localWeight;
+    const revisionAtOpen = draftRevision;
     openKeypad({
       id: `${set.id}:weight`,
       value: captured,
@@ -184,6 +186,7 @@
       },
       onCancel: () => {
         if (isEmpty) {
+          if (revisionAtOpen !== draftRevision) return;
           draftWeight = captured;
           return;
         }
@@ -196,6 +199,7 @@
   function doOpenRepsKeypad() {
     dismissNativeKeyboard();
     let captured = isEmpty ? draftReps : localReps;
+    const revisionAtOpen = draftRevision;
     const commitRepsValue = async () => {
       if (isEmpty) {
         await flushEmptyRow();
@@ -263,6 +267,7 @@
       },
       onCancel: () => {
         if (isEmpty) {
+          if (revisionAtOpen !== draftRevision) return;
           draftReps = captured;
           return;
         }
@@ -295,6 +300,16 @@
     draftExerciseName = '';
     draftReps = '';
     draftWeight = '';
+    draftRevision += 1;
+  }
+
+  function hasDraftContent() {
+    return Boolean(draftExerciseName || draftReps || draftWeight);
+  }
+
+  function isBodyweightExercise(exerciseId: string) {
+    const exercise = EXERCISE_MAP.get(exerciseId);
+    return exercise?.category === 'bodyweight';
   }
 
   async function flushEmptyRow() {
@@ -608,7 +623,21 @@
   <!-- Set number / select -->
   <td class="w-7 text-center py-0 px-0.5">
     {#if isEmpty}
-      <span class="block h-5 w-5 mx-auto"></span>
+      {#if hasDraftContent()}
+        <button
+          type="button"
+          class="flex h-5 w-5 mx-auto items-center justify-center rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] transition-colors"
+          onclick={clearDraftRow}
+          aria-label="Clear draft set row"
+          title="Clear"
+        >
+          <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M4 4l8 8M12 4l-8 8"/>
+          </svg>
+        </button>
+      {:else}
+        <span class="block h-5 w-5 mx-auto"></span>
+      {/if}
     {:else if selected}
       <button
         type="button"
@@ -698,6 +727,8 @@
     >
       {#if (isEmpty ? draftWeight : localWeight)}
         {isEmpty ? draftWeight : localWeight}
+      {:else if isBodyweightExercise(isEmpty ? draftExerciseId : set.exerciseId)}
+        <span class="text-[hsl(var(--muted-foreground)/0.55)]">body</span>
       {:else}
         <span class="text-[hsl(var(--muted-foreground)/0.35)]">—</span>
       {/if}
@@ -725,7 +756,7 @@
           </svg>
         </button>
       </div>
-    {:else if draftExerciseName || draftReps || draftWeight}
+    {:else if hasDraftContent()}
       <button
         type="button"
         onclick={() => flushEmptyRow()}
