@@ -458,21 +458,22 @@
   }
 
   async function handleDragHandlePointerEnd(e: PointerEvent) {
-    if (dragPointerId === null || dragStartIndex === null) return;
-    if ((e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) {
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    if (dragPointerId === null || dragStartIndex === null || e.pointerId !== dragPointerId) return;
+    const handleEl = e.currentTarget as HTMLElement;
+    if (handleEl.hasPointerCapture(dragPointerId)) {
+      handleEl.releasePointerCapture(dragPointerId);
     }
     const didDrag = handleDragging;
     const fromIndex = dragStartIndex;
     const toIndex = dragCurrentIndex ?? fromIndex;
-    if (didDrag && toIndex !== fromIndex) {
-      await onTouchReorder?.(fromIndex, toIndex);
-    }
     handleDragging = false;
     dragStartIndex = null;
     dragCurrentIndex = null;
     dragPointerId = null;
     dragOffsetY = 0;
+    if (didDrag && toIndex !== fromIndex) {
+      await onTouchReorder?.(fromIndex, toIndex);
+    }
   }
 
   function maybeActivateDrag(e: PointerEvent) {

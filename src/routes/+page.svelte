@@ -102,12 +102,11 @@
     return `${s} – ${e}`;
   });
   onMount(async () => {
-    // Use a full UUID for session IDs — sufficient entropy for local workout session tracking
-    sessionId = crypto.randomUUID();
     initUnitPreference();
 
     const loaded = await getTodaySets();
     sets = loaded.sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
+    sessionId = sets[sets.length - 1]?.localWorkoutId ?? crypto.randomUUID();
     setsStore.set(sets);
     await refreshSyncStatus();
   });

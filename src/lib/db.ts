@@ -23,6 +23,7 @@ interface WorkoutDB {
 }
 
 let dbInstance: IDBPDatabase<WorkoutDB> | null = null;
+export const WORKOUT_GAP_MS = 90 * 60 * 1000; // 1h 30m
 
 export async function initDB(): Promise<IDBPDatabase<WorkoutDB>> {
   if (dbInstance) return dbInstance;
@@ -96,19 +97,24 @@ export async function getTodaySets(): Promise<WorkoutSet[]> {
   startOfDay.setHours(0, 0, 0, 0);
   // Include sets from last 24h to catch late-night sessions
   const windowStart = Math.min(startOfDay.getTime(), now - 24 * 60 * 60 * 1000);
-  return getSetsCreatedBetween(windowStart, now + 1000);
+  const inWindow = await getSetsCreatedBetween(windowStart, now + 1000);
+  const groups = groupSetsIntoWorkouts(inWindow);
+  if (groups.length === 0) return [];
+  const latest = groups[groups.length - 1];
+  const latestSetTime = latest.sets[latest.sets.length - 1]?.createdAt ?? 0;
+  if (now - latestSetTime > WORKOUT_GAP_MS) return [];
+  return [...latest.sets].sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
 }
 
 export function groupSetsIntoWorkouts(sets: WorkoutSet[]): Workout[] {
   if (sets.length === 0) return [];
   const sorted = [...sets].sort((a, b) => a.createdAt - b.createdAt);
-  const GAP = 2 * 60 * 60 * 1000; // 2 hours
   const groups: WorkoutSet[][] = [];
   let current: WorkoutSet[] = [sorted[0]];
 
   for (let i = 1; i < sorted.length; i++) {
     const gap = sorted[i].createdAt - sorted[i - 1].createdAt;
-    if (gap < GAP) {
+    if (gap <= WORKOUT_GAP_MS) {
       current.push(sorted[i]);
     } else {
       groups.push(current);
