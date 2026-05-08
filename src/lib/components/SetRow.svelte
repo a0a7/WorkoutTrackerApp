@@ -3,6 +3,7 @@
   import type { WorkoutSet } from '../types';
   import ExerciseAutocomplete from './ExerciseAutocomplete.svelte';
   import type { Exercise } from '../types';
+  import { EXERCISE_MAP } from '../exercises';
   import { openKeypad, closeKeypad, keypadConfig } from '$lib/stores/keypadStore';
 
   const TOUCH_MOVEMENT_THRESHOLD_PX = 10;
@@ -106,6 +107,38 @@
     }
   }
 
+  function getWeightedVariant(exerciseId: string, exerciseName: string): Exercise | null {
+    const byId = EXERCISE_MAP.get(`weighted-${exerciseId}`);
+    if (byId) return byId;
+    const weightedName = `Weighted ${exerciseName.trim()}`.toLowerCase();
+    for (const ex of EXERCISE_MAP.values()) {
+      if (ex.name.toLowerCase() === weightedName) return ex;
+    }
+    return null;
+  }
+
+  function maybeConvertBodyweightToWeighted(weightText: string, emptyRow: boolean) {
+    const parsed = parseFloat(weightText);
+    if (!Number.isFinite(parsed) || parsed <= 0) return;
+
+    const currentExerciseId = emptyRow ? draftExerciseId : set.exerciseId;
+    const currentExerciseName = emptyRow ? draftExerciseName : set.exerciseName;
+    if (!currentExerciseId || !currentExerciseName) return;
+
+    const currentExercise = EXERCISE_MAP.get(currentExerciseId);
+    if (!currentExercise || currentExercise.category !== 'bodyweight') return;
+
+    const weightedVariant = getWeightedVariant(currentExerciseId, currentExerciseName);
+    if (!weightedVariant) return;
+
+    if (emptyRow) {
+      draftExerciseId = weightedVariant.id;
+      draftExerciseName = weightedVariant.name;
+    } else {
+      onExerciseUpdate?.(set.id, weightedVariant.id, weightedVariant.name);
+    }
+  }
+
   // ── Reps ─────────────────────────────────────────────────────────────────
 
   function handleRepsInput(v: string) {
@@ -131,12 +164,17 @@
       allowShorthand: false,
       label: 'Weight',
       onInput: (v) => {
+        const previousWeight = parseFloat(captured);
         captured = v;
+        const nextWeight = parseFloat(v);
         if (isEmpty) {
           draftWeight = v;
         } else {
           localWeight = v;
           onUpdate?.(set.id, 'weight', v !== '' ? (parseFloat(v) || null) : null);
+        }
+        if ((!Number.isFinite(previousWeight) || previousWeight <= 0) && Number.isFinite(nextWeight) && nextWeight > 0) {
+          maybeConvertBodyweightToWeighted(v, isEmpty);
         }
       },
       onDone: async () => {
@@ -269,6 +307,15 @@
       weightText: draftWeight,
     };
 
+    const resolveExerciseForWeight = (exerciseId: string, exerciseName: string, weight: number | null) => {
+      if (weight === null || weight <= 0) return { exerciseId, exerciseName };
+      const currentExercise = EXERCISE_MAP.get(exerciseId);
+      if (!currentExercise || currentExercise.category !== 'bodyweight') return { exerciseId, exerciseName };
+      const weightedVariant = getWeightedVariant(exerciseId, exerciseName);
+      if (!weightedVariant) return { exerciseId, exerciseName };
+      return { exerciseId: weightedVariant.id, exerciseName: weightedVariant.name };
+    };
+
     // Parse "NxRepxWeight" shorthand — e.g. "3x12x200" creates 3 sets of 12 reps @ 200 lbs.
     const multi = nextDraft.repsText.match(MULTI_SET_RE);
     if (multi) {
@@ -276,12 +323,13 @@
       const reps = parseInt(multi[2], 10);
       const weight = parseFloat(multi[3]);
       if (count >= 1 && count <= MAX_MULTI_SET_COUNT && (nextDraft.exerciseName || reps > 0 || weight > 0)) {
+        const resolvedExercise = resolveExerciseForWeight(nextDraft.exerciseId, nextDraft.exerciseName, weight);
         const now = Date.now();
         const newSets: WorkoutSet[] = Array.from({ length: count }, (_, i) => ({
           id: crypto.randomUUID(),
           localWorkoutId: set.localWorkoutId,
-          exerciseId: nextDraft.exerciseId,
-          exerciseName: nextDraft.exerciseName,
+          exerciseId: resolvedExercise.exerciseId,
+          exerciseName: resolvedExercise.exerciseName,
           reps,
           weight,
           order: set.order + i,
@@ -311,11 +359,12 @@
       const reps = parseInt(pair[1], 10) || null;
       const weight = parseFloat(pair[2]) || null;
       if (nextDraft.exerciseName || reps !== null || weight !== null) {
+        const resolvedExercise = resolveExerciseForWeight(nextDraft.exerciseId, nextDraft.exerciseName, weight);
         const newSet = {
           id: crypto.randomUUID(),
           localWorkoutId: set.localWorkoutId,
-          exerciseId: nextDraft.exerciseId,
-          exerciseName: nextDraft.exerciseName,
+          exerciseId: resolvedExercise.exerciseId,
+          exerciseName: resolvedExercise.exerciseName,
           reps,
           weight,
           order: set.order,
@@ -340,11 +389,12 @@
     const reps = nextDraft.repsText !== '' ? (parseInt(nextDraft.repsText, 10) || null) : null;
     const weight = nextDraft.weightText !== '' ? (parseFloat(nextDraft.weightText) || null) : null;
     if (nextDraft.exerciseName || reps !== null || weight !== null) {
+      const resolvedExercise = resolveExerciseForWeight(nextDraft.exerciseId, nextDraft.exerciseName, weight);
       const newSet = {
         id: crypto.randomUUID(),
         localWorkoutId: set.localWorkoutId,
-        exerciseId: nextDraft.exerciseId,
-        exerciseName: nextDraft.exerciseName,
+        exerciseId: resolvedExercise.exerciseId,
+        exerciseName: resolvedExercise.exerciseName,
         reps,
         weight,
         order: set.order,
