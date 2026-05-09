@@ -108,7 +108,7 @@
     sets = loaded.sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
     sessionId = sets[sets.length - 1]?.localWorkoutId ?? crypto.randomUUID();
     setsStore.set(sets);
-    await refreshSyncStatus();
+    refreshSyncStatus().catch(() => {});
   });
 
   // Capture geolocation once when the first real set is added
@@ -255,6 +255,20 @@
     selected = new Set(selected);
   }
 
+  async function handleDeleteSelected() {
+    if (selected.size === 0) return;
+    pushUndo('Delete selected sets', sets);
+    const idsToDelete = [...selected].filter((id) => !id.startsWith('empty-'));
+    if (idsToDelete.length === 0) return;
+    for (const id of idsToDelete) {
+      await dbDeleteSet(id);
+    }
+    const idSet = new Set(idsToDelete);
+    const newSets = sets.filter((s) => !idSet.has(s.id));
+    await persistSets(newSets);
+    clearSelection();
+  }
+
   function handleSelect(id: string, shiftKey = false) {
     if (id.startsWith('empty-')) return;
     const newSelected = new Set(selected);
@@ -381,18 +395,6 @@
           </svg>
         {/if}
       </button>
-      {#if selected.size > 0}
-        <span class="text-sm font-medium text-[hsl(var(--primary))]">{selected.size} selected</span>
-        <button
-          onclick={clearSelection}
-          class="flex h-8 w-8 items-center justify-center rounded-full bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--border))]"
-          aria-label="Clear selection"
-        >
-          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 4l8 8M12 4l-8 8"/>
-          </svg>
-        </button>
-      {/if}
       <button
         onclick={handleUndo}
         disabled={!$hasUndo}
@@ -493,6 +495,34 @@
       </tbody>
     </table>
   </div>
+
+  {#if selected.size > 0}
+    <div class="mt-2 flex items-center justify-between rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2">
+      <span class="text-sm font-medium text-[hsl(var(--primary))]">{selected.size} selected</span>
+      <div class="flex items-center gap-2">
+        <button
+          onclick={clearSelection}
+          class="rounded-lg px-3 py-1.5 text-xs font-medium text-[hsl(var(--muted-foreground))] bg-[hsl(var(--muted))] hover:bg-[hsl(var(--border))]"
+          aria-label="Clear selection"
+        >
+          Deselect
+        </button>
+        <button
+          onclick={handleDeleteSelected}
+          class="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(var(--destructive)/0.12)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.2)]"
+          aria-label="Delete selected sets"
+          title="Delete selected"
+        >
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2.5 4h11"/>
+            <path d="M6 2.5h4"/>
+            <path d="M5 4v8.5a1 1 0 001 1h4a1 1 0 001-1V4"/>
+            <path d="M7 6.5v5M9 6.5v5"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  {/if}
 
   <p class="mt-2 text-center text-[11px] text-[hsl(var(--muted-foreground))]">
     tap a set number to select • swipe to delete set • drag to reorder

@@ -157,11 +157,12 @@
 
   function doOpenWeightKeypad() {
     dismissNativeKeyboard();
-    let captured = isEmpty ? draftWeight : localWeight;
+    const initialValue = isEmpty ? draftWeight : localWeight;
+    let captured = '';
     const revisionAtOpen = draftRevision;
     openKeypad({
       id: `${set.id}:weight`,
-      value: captured,
+      value: '',
       allowDecimal: true,
       allowShorthand: false,
       label: 'Weight',
@@ -187,7 +188,7 @@
       onCancel: () => {
         if (isEmpty) {
           if (revisionAtOpen !== draftRevision) return;
-          draftWeight = captured;
+          draftWeight = initialValue;
           return;
         }
         localWeight = set.weight !== null ? String(set.weight) : '';
@@ -198,7 +199,8 @@
 
   function doOpenRepsKeypad() {
     dismissNativeKeyboard();
-    let captured = isEmpty ? draftReps : localReps;
+    const initialValue = isEmpty ? draftReps : localReps;
+    let captured = '';
     const revisionAtOpen = draftRevision;
     const commitRepsValue = async () => {
       if (isEmpty) {
@@ -251,7 +253,7 @@
 
     openKeypad({
       id: `${set.id}:reps`,
-      value: captured,
+      value: '',
       allowDecimal: false,
       allowShorthand: true,
       label: 'Reps',
@@ -268,7 +270,7 @@
       onCancel: () => {
         if (isEmpty) {
           if (revisionAtOpen !== draftRevision) return;
-          draftReps = captured;
+          draftReps = initialValue;
           return;
         }
         localReps = set.reps !== null ? String(set.reps) : '';

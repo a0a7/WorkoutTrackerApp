@@ -137,33 +137,32 @@
       </button>
     </div>
 
-    <div class="flex gap-1 px-2 pb-2">
-      <!-- Close keyboard button -->
+    <div class="grid grid-cols-3 gap-1 px-2 pb-2">
       <button
         onclick={handleCancel}
-        class="h-10 w-12 flex-none rounded-xl bg-[hsl(var(--muted))]
-               text-[hsl(var(--muted-foreground))]
-               active:scale-95 transition-transform select-none touch-manipulation"
+        class="h-12 rounded-2xl p-1 transition-transform select-none touch-manipulation active:scale-95"
         aria-label="Close keyboard"
       >
-        <svg class="mx-auto" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
+        <span class="flex h-full w-full items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] active:bg-[hsl(var(--border))]">
+          <svg class="mx-auto" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </span>
       </button>
 
       {#if $keypadConfig.onNext}
         <button
           onclick={handleNext}
-          class="h-10 flex-1 rounded-xl bg-[hsl(var(--primary))]
+          class="col-span-2 h-12 rounded-xl bg-[hsl(var(--primary))]
                  text-sm font-semibold text-white
-                 active:scale-95 transition-transform select-none touch-manipulation"
+                  active:scale-95 transition-transform select-none touch-manipulation"
         >Next &#8594;</button>
       {:else}
         <button
           onclick={handleDone}
-          class="h-10 flex-1 rounded-xl bg-[hsl(var(--primary))]
+          class="col-span-2 h-12 rounded-xl bg-[hsl(var(--primary))]
                  text-sm font-semibold text-white
-                 active:scale-95 transition-transform select-none touch-manipulation"
+                  active:scale-95 transition-transform select-none touch-manipulation"
         >Done &#10003;</button>
       {/if}
     </div>
