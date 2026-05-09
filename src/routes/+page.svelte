@@ -351,7 +351,7 @@
       {#if sets.length > 0 && !editingTimes}
         <button
           onclick={beginEditTimes}
-          class="text-left text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] transition-colors"
+          class="-ml-1 mt-0.5 w-fit rounded-md px-1 py-1 text-left text-sm text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] transition-colors"
         >
           {timesLabel()}
         </button>
@@ -360,8 +360,8 @@
     <div class="flex items-center gap-2">
       <button
         onclick={handleSyncTap}
-        class="flex h-8 items-center gap-1 rounded-full px-2 text-xs font-medium transition-colors bg-[hsl(var(--muted))] hover:bg-[hsl(var(--border))] touch-manipulation
-               {syncError ? 'text-red-500' : 'text-[hsl(var(--foreground))]'}"
+        class="flex items-center gap-1 px-0 text-xs font-medium transition-opacity hover:opacity-70 touch-manipulation
+               {syncError ? 'text-red-500' : 'text-[hsl(var(--muted-foreground))]'}"
         aria-label="Sync now"
         title={syncError
           ?? (hasPendingSync ? 'Changes pending sync' : (lastSync ? `Last synced ${formatLastSync(lastSync)}` : 'Not synced yet'))}
@@ -448,15 +448,15 @@
   {/if}
 
   <!-- Sets table -->
-  <div class="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm min-h-[200px]">
+  <div class="-mx-4 border-y border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm min-h-[200px]">
     <table class="w-full border-collapse">
       <thead>
         <tr class="border-b border-[hsl(var(--border))]">
-          <th class="w-7 px-0.5 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">#</th>
+          <th class="w-7 px-0 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">#</th>
           <th class="px-1 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Exercise</th>
           <th class="w-12 px-0.5 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Reps</th>
           <th class="w-14 px-0.5 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">{unit}</th>
-          <th class="w-10 px-0.5 py-2"></th>
+          <th class="w-10 px-0 py-2"></th>
         </tr>
       </thead>
       <tbody>

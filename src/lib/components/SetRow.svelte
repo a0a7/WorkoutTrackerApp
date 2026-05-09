@@ -623,12 +623,12 @@
   ontouchcancel={handleRowSwipeEnd}
 >
   <!-- Set number / select -->
-  <td class="w-7 text-center py-0 px-0.5">
+  <td class="w-7 p-0 text-center">
     {#if isEmpty}
       {#if hasDraftContent()}
         <button
           type="button"
-          class="flex h-5 w-5 mx-auto items-center justify-center rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] transition-colors"
+          class="flex h-full min-h-10 w-full items-center justify-center text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] transition-colors"
           onclick={clearDraftRow}
           aria-label="Clear draft set row"
           title="Clear"
@@ -638,12 +638,12 @@
           </svg>
         </button>
       {:else}
-        <span class="block h-5 w-5 mx-auto"></span>
+        <span class="block h-full min-h-10 w-full"></span>
       {/if}
     {:else if selected}
       <button
         type="button"
-        class="flex h-5 w-5 mx-auto items-center justify-center rounded-full bg-[hsl(var(--primary))]"
+        class="flex h-full min-h-10 w-full items-center justify-center bg-[hsl(var(--primary)/0.1)]"
         onclick={(e) => onSelect?.(set.id, e.shiftKey)}
         ontouchstart={handleTouchStart}
         ontouchmove={handleTouchMove}
@@ -657,7 +657,7 @@
     {:else}
       <button
         type="button"
-        class="flex h-5 w-5 mx-auto items-center justify-center rounded-full text-xs font-semibold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--primary)/0.1)] hover:text-[hsl(var(--primary))] transition-colors"
+        class="flex h-full min-h-10 w-full items-center justify-center text-xs font-semibold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--primary)/0.1)] hover:text-[hsl(var(--primary))] transition-colors"
         onclick={(e) => onSelect?.(set.id, e.shiftKey)}
         ontouchstart={handleTouchStart}
         ontouchmove={handleTouchMove}
@@ -738,9 +738,9 @@
   </td>
 
   <!-- Delete / commit -->
-  <td class="w-10 py-0.5 px-0.5">
+  <td class="w-10 p-0">
     {#if !isEmpty}
-      <div class="flex items-center justify-center">
+      <div class="flex h-full items-center justify-center">
         <button
           type="button"
           data-no-swipe
@@ -749,7 +749,7 @@
           onpointerup={handleDragHandlePointerEnd}
           onpointercancel={handleDragHandlePointerEnd}
           oncontextmenu={(e) => e.preventDefault()}
-          class="flex h-9 w-9 items-center justify-center rounded-lg text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] transition-colors cursor-grab active:cursor-grabbing touch-none select-none"
+          class="flex h-full min-h-10 w-full items-center justify-center text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] transition-colors cursor-grab active:cursor-grabbing touch-none select-none"
           title="Drag to reorder"
           aria-label="Drag to reorder set"
         >
