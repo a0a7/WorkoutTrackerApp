@@ -60,21 +60,25 @@ export async function syncToServer(user: User): Promise<void> {
         try {
           if (item.type === 'set') {
             if (item.operation === 'upsert') {
-              await apiFetch('/sets', user, {
+              const res = await apiFetch('/sets', user, {
                 method: 'POST',
                 body: JSON.stringify({ sets: [item.data] }),
               });
+              if (!res.ok) throw new Error(`Sync failed (${res.status})`);
             } else if (item.operation === 'delete') {
-              await apiFetch(`/sets/${item.id}`, user, { method: 'DELETE' });
+              const res = await apiFetch(`/sets/${item.id}`, user, { method: 'DELETE' });
+              if (!res.ok) throw new Error(`Sync failed (${res.status})`);
             }
           } else if (item.type === 'workout') {
             if (item.operation === 'upsert') {
-              await apiFetch('/workouts', user, {
+              const res = await apiFetch('/workouts', user, {
                 method: 'POST',
                 body: JSON.stringify(item.data),
               });
+              if (!res.ok) throw new Error(`Sync failed (${res.status})`);
             } else if (item.operation === 'delete') {
-              await apiFetch(`/workouts/${item.id}`, user, { method: 'DELETE' });
+              const res = await apiFetch(`/workouts/${item.id}`, user, { method: 'DELETE' });
+              if (!res.ok) throw new Error(`Sync failed (${res.status})`);
             }
           }
           await clearPendingSync(item.id);

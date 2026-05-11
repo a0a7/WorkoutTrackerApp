@@ -175,9 +175,12 @@ export async function deleteWorkout(id: string): Promise<void> {
 export async function getWorkout(id: string): Promise<Workout | undefined> {
   const db = await getDB();
   const stored = await db.get('workouts', id);
-  if (stored) return stored;
-  // Try to reconstruct from sets
   const sets = await getSetsByWorkoutId(id);
+  if (stored) {
+    const sortedSets = [...sets].sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
+    return { ...stored, sets: sortedSets };
+  }
+  // Try to reconstruct from sets
   if (sets.length === 0) return undefined;
   const sorted = sets.sort((a, b) => a.createdAt - b.createdAt);
   return {
@@ -193,7 +196,16 @@ export async function getAllWorkouts(): Promise<Workout[]> {
   const db = await getDB();
   const stored = await db.getAllFromIndex('workouts', 'by_start_time');
   if (stored.length > 0) {
-    return stored.sort((a, b) => b.startTime - a.startTime);
+    const workoutsWithSets = await Promise.all(
+      stored.map(async (w) => {
+        const sets = await getSetsByWorkoutId(w.id);
+        return {
+          ...w,
+          sets: sets.sort((a, b) => a.order - b.order || a.createdAt - b.createdAt),
+        };
+      })
+    );
+    return workoutsWithSets.sort((a, b) => b.startTime - a.startTime);
   }
   const grouped = await getAllWorkoutGroups();
   return grouped.sort((a, b) => b.startTime - a.startTime);
