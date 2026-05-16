@@ -50,7 +50,7 @@
   </div>
 
   <div class="flex flex-wrap gap-1.5 mt-3">
-    {#each exerciseNames().slice(0, 4) as name}
+    {#each exerciseNames().slice(0, 4) as name (name)}
       <span class="inline-flex items-center rounded-full bg-[hsl(var(--secondary))] px-2.5 py-0.5 text-xs font-medium text-[hsl(var(--secondary-foreground))]">
         {name}
       </span>
