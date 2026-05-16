@@ -71,12 +71,16 @@
 />
 
 {#if $keypadConfig}
-  <!-- Backdrop — tap anywhere outside to dismiss -->
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="fixed inset-0 z-[59]" onclick={handleCancel}></div>
+  <!-- Backdrop — tap anywhere outside to dismiss. Use a full-screen button so it's keyboard-focusable -->
+  <button
+    type="button"
+    aria-label="Close keypad"
+    class="fixed inset-0 z-59 bg-transparent border-0 p-0 m-0"
+    onclick={handleCancel}
+  ></button>
 
   <div
-    class="fixed bottom-0 left-0 right-0 z-[60]
+    class="fixed bottom-0 left-0 right-0 z-60
            bg-[hsl(var(--card))] border-t border-[hsl(var(--border))] shadow-lg"
     style="padding-bottom: env(safe-area-inset-bottom, 0px)"
     transition:fly={{ y: 280, duration: 180, opacity: 1 }}

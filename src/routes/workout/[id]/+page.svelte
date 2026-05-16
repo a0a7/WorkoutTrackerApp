@@ -443,7 +443,7 @@
         <section class="order-2 lg:order-1 min-w-0">
           <div class="flex items-center justify-between gap-3">
             <div class="min-w-0">
-              <h1 class="text-lg font-bold text-[hsl(var(--foreground))] truncate">{workout.name ?? 'Workout'}</h1>
+              <h1 class="text-lg font-bold text-[hsl(var(--foreground))] truncate">{new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} · {new Date(workout.startTime).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</h1>
               <p class="text-sm text-[hsl(var(--muted-foreground))] mt-0.5">at {new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</p>
               <p class="text-sm text-[hsl(var(--foreground))] mt-1">
                 {(() => {
@@ -451,7 +451,9 @@
                   const setsCount = workout.sets.length;
                   const vol = computeTotalVolume();
                   const minsLabel = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
-                  return `${minsLabel} · ${setsCount} sets · ${vol} total`;
+                  const unitLabel = $unitPreference === 'kg' ? 'kg' : 'lbs';
+                  const formatted = new Intl.NumberFormat('en-US').format(vol);
+                  return `${minsLabel} · ${setsCount} sets · ${formatted} ${unitLabel}`;
                 })()}
               </p>
             </div>
@@ -507,6 +509,11 @@
     </div>
   {/if}
 </div>
+
+<!-- Divider between workout info and sets table (editing mode) -->
+{#if editingWorkout}
+  <hr class="my-4 border-[hsl(var(--border))]" />
+{/if}
 
 <!-- Custom numeric keypad — rendered at root so it sits above all row content -->
 <NumericKeypad />
