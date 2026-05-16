@@ -114,7 +114,8 @@ export function groupSetsIntoWorkouts(sets: WorkoutSet[]): Workout[] {
 
   for (let i = 1; i < sorted.length; i++) {
     const gap = sorted[i].createdAt - sorted[i - 1].createdAt;
-    if (gap <= WORKOUT_GAP_MS) {
+    // Group them if they are close in time OR if they explicitly share the same localWorkoutId
+    if (gap <= WORKOUT_GAP_MS || (sorted[i].localWorkoutId && sorted[i].localWorkoutId === sorted[i - 1].localWorkoutId)) {
       current.push(sorted[i]);
     } else {
       groups.push(current);
@@ -127,7 +128,8 @@ export function groupSetsIntoWorkouts(sets: WorkoutSet[]): Workout[] {
     const first = group[0];
     const last = group[group.length - 1];
     return {
-      id: first.localWorkoutId,
+      // Ensure completely unique ID for Svelte's #each by appending the start time
+      id: first.localWorkoutId ? `${first.localWorkoutId}-${first.createdAt}` : `orphan-${first.createdAt}`,
       startTime: first.createdAt - 10 * 60 * 1000,
       endTime: last.createdAt,
       sets: group,
