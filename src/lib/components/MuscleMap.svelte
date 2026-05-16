@@ -136,15 +136,15 @@
 {#if activations.length > 0}
   <div class="mt-3 flex items-center gap-3 justify-center flex-wrap">
     <div class="flex items-center gap-1.5">
-      <div class="h-3 w-3 rounded-full" style="background: #6366f1"></div>
+      <div class="h-3 w-3 rounded-full" style="background: #c73e36"></div>
       <span class="text-xs text-[hsl(var(--muted-foreground))]">Primary</span>
     </div>
     <div class="flex items-center gap-1.5">
-      <div class="h-3 w-3 rounded-full" style="background: #a5b4fc"></div>
+      <div class="h-3 w-3 rounded-full" style="background: #ebc050"></div>
       <span class="text-xs text-[hsl(var(--muted-foreground))]">Secondary</span>
     </div>
     <div class="flex items-center gap-1.5">
-      <div class="h-3 w-3 rounded-full" style="background: #e0e7ff"></div>
+      <div class="h-3 w-3 rounded-full" style="background: #F4E6A1"></div>
       <span class="text-xs text-[hsl(var(--muted-foreground))]">Tertiary</span>
     </div>
   </div>
