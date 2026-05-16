@@ -28,7 +28,6 @@
 </script>
 
 <div class="flex justify-center w-full max-w-lg mx-auto">
-<?xml version="1.0" encoding="UTF-8"?>
 <svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 768.41 607.66">
   <defs>
     
