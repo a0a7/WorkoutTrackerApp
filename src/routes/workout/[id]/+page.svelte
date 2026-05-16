@@ -456,12 +456,37 @@
               </p>
             </div>
             <div class="flex items-center gap-3">
-              <button class="text-sm text-[hsl(var(--primary))]" onclick={beginEditWorkout}>Edit</button>
+              <button class="text-sm text-[hsl(var(--primary))]" onclick={() => { beginEditWorkout(); beginEditTimes(); }}>Edit</button>
               <button class="text-sm text-red-500" onclick={() => { confirmDelete = true; }}>Delete</button>
             </div>
           </div>
 
-          <hr class="my-3 border-[hsl(var(--border))]" />
+          {#if editingTimes}
+            <div class="mt-3 flex flex-col gap-2">
+              <div>
+                <p class="text-xs font-medium text-[hsl(var(--muted-foreground))]">Start</p>
+                <div class="flex gap-2">
+                  <input type="date" bind:value={editStartDate} class="flex-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+                  <input type="time" bind:value={editStartTime} class="w-28 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+                </div>
+              </div>
+              <div>
+                <p class="text-xs font-medium text-[hsl(var(--muted-foreground))]">End</p>
+                <div class="flex gap-2">
+                  <input type="date" bind:value={editEndDate} class="flex-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+                  <input type="time" bind:value={editEndTime} class="w-28 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <button onclick={saveEditedTimes} class="flex-1 rounded-xl bg-[hsl(var(--primary))] text-white py-2 text-sm font-medium">Save</button>
+                <button onclick={cancelEditTimes} class="flex-1 rounded-xl bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] py-2 text-sm font-medium">Cancel</button>
+              </div>
+              {#if timeEditError}
+                <p class="text-xs text-red-500">{timeEditError}</p>
+              {/if}
+            </div>
+            <hr class="my-3 border-[hsl(var(--border))]" />
+          {/if}
 
           <!-- Compact exercises list -->
           <div class="flex flex-col gap-3">
