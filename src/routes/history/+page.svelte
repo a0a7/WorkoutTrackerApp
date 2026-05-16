@@ -120,7 +120,7 @@
       <p class="text-sm text-[hsl(var(--muted-foreground))]">Start tracking on the Today tab</p>
     </div>
   {:else}
-    {#each grouped() as [dateLabel, dayWorkouts]}
+    {#each grouped() as [dateLabel, dayWorkouts] (dateLabel)}
       <div class="mb-5">
         <h2 class="mb-2 text-sm font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide">{dateLabel}</h2>
         <div class="flex flex-col gap-3">
