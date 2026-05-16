@@ -114,8 +114,12 @@ export function groupSetsIntoWorkouts(sets: WorkoutSet[]): Workout[] {
 
   for (let i = 1; i < sorted.length; i++) {
     const gap = sorted[i].createdAt - sorted[i - 1].createdAt;
-    // Group them if they are close in time OR if they explicitly share the same localWorkoutId
-    if (gap <= WORKOUT_GAP_MS || (sorted[i].localWorkoutId && sorted[i].localWorkoutId === sorted[i - 1].localWorkoutId)) {
+    const prevWorkoutId = sorted[i - 1].localWorkoutId;
+    const currWorkoutId = sorted[i].localWorkoutId;
+    const sameWorkoutId = !!prevWorkoutId && !!currWorkoutId && prevWorkoutId === currWorkoutId;
+    const eitherWorkoutIdMissing = !prevWorkoutId || !currWorkoutId;
+    // Keep explicit localWorkoutId sessions isolated; only use time-gap grouping when IDs are missing.
+    if (sameWorkoutId || (eitherWorkoutIdMissing && gap <= WORKOUT_GAP_MS)) {
       current.push(sorted[i]);
     } else {
       groups.push(current);
