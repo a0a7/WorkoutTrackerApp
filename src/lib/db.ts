@@ -128,8 +128,7 @@ export function groupSetsIntoWorkouts(sets: WorkoutSet[]): Workout[] {
     const first = group[0];
     const last = group[group.length - 1];
     return {
-      // Ensure completely unique ID for Svelte's #each by appending the start time
-      id: first.localWorkoutId ? `${first.localWorkoutId}-${first.createdAt}` : `orphan-${first.createdAt}`,
+      id: first.localWorkoutId || `orphan-${first.createdAt}`,
       startTime: first.createdAt - 10 * 60 * 1000,
       endTime: last.createdAt,
       sets: group,
