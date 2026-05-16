@@ -193,159 +193,161 @@
       <p class="text-[hsl(var(--muted-foreground))]">Workout not found.</p>
     </div>
   {:else}
-    <!-- Workout metadata -->
-    <div class="mb-5 rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] p-4 shadow-sm">
-      <div class="flex items-start justify-between gap-2">
-        <div>
-          <h1 class="text-xl font-bold text-[hsl(var(--foreground))]">{dateLabel}</h1>
-          {#if !editingTimes}
-            <button
-              type="button"
-              onclick={beginEditTimes}
-              class="mt-0.5 text-left text-sm text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] transition-colors"
-            >
-              {timeLabel}
-            </button>
-          {/if}
-        </div>
-        {#if editingTimes}
-          <button
-            onclick={saveEditedTimes}
-            class="shrink-0 rounded-lg bg-[hsl(var(--primary))] px-3 py-1.5 text-xs font-medium text-white transition-colors"
-          >
-            Save
-          </button>
-        {/if}
-      </div>
+    <div class="mb-5 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-sm lg:p-5">
+      <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+        <section class="lg:order-2">
+          <h2 class="mb-3 text-base font-semibold text-[hsl(var(--foreground))]">Muscles Worked</h2>
+          <MuscleMap activations={allActivations()} />
+        </section>
 
-      {#if editingTimes}
-        <div class="mt-3 flex flex-col gap-2">
-          <div>
-            <p class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">Start</p>
-            <div class="flex gap-2">
-              <input type="date" bind:value={editStartDate} class="flex-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
-              <input type="time" bind:value={editStartTime} class="w-28 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+        <section class="lg:order-1 min-w-0">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <h1 class="text-xl font-bold text-[hsl(var(--foreground))]">{dateLabel}</h1>
+              {#if !editingTimes}
+                <button
+                  type="button"
+                  onclick={beginEditTimes}
+                  class="mt-0.5 text-left text-sm text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] transition-colors"
+                >
+                  {timeLabel}
+                </button>
+              {/if}
             </div>
+            {#if editingTimes}
+              <button
+                onclick={saveEditedTimes}
+                class="shrink-0 rounded-lg bg-[hsl(var(--primary))] px-3 py-1.5 text-xs font-medium text-white transition-colors"
+              >
+                Save
+              </button>
+            {/if}
           </div>
-          <div>
-            <p class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">End</p>
-            <div class="flex gap-2">
-              <input type="date" bind:value={editEndDate} class="flex-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
-              <input type="time" bind:value={editEndTime} class="w-28 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
-            </div>
-          </div>
-          <button
-            onclick={cancelEditTimes}
-            class="mt-1 text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-          >Cancel</button>
-          {#if timeEditError}
-            <p class="text-xs text-red-500 mt-1">{timeEditError}</p>
-          {/if}
-        </div>
-      {/if}
 
-        <div class="mt-3 flex gap-4 flex-wrap">
-        <div class="flex items-center gap-1.5">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--primary))" stroke-width="2" stroke-linecap="round">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12 6 12 12 16 14"/>
-          </svg>
-          <span class="text-sm font-medium text-[hsl(var(--foreground))]">{durationLabel()}</span>
-        </div>
-        <div class="flex items-center gap-1.5">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--primary))" stroke-width="2" stroke-linecap="round">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-          </svg>
-          <span class="text-sm font-medium text-[hsl(var(--foreground))]">{workout.sets.length} sets</span>
-        </div>
-        {#if workout.location}
-          <div class="flex items-center gap-1.5">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--primary))" stroke-width="2" stroke-linecap="round">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
-              <circle cx="12" cy="10" r="3"/>
-            </svg>
-            <span class="text-sm text-[hsl(var(--foreground))]">{workout.location.label ?? 'Location'}</span>
-          </div>
-        {/if}
-        </div>
-        <div class="mt-4 border-t border-[hsl(var(--border))] pt-3">
-          {#if confirmDelete}
-            <div class="flex items-center justify-between gap-2">
-              <p class="text-xs text-[hsl(var(--muted-foreground))]">Delete this full workout?</p>
-              <div class="flex items-center gap-2">
-                <button
-                  onclick={() => { confirmDelete = false; }}
-                  class="rounded-lg px-3 py-1.5 text-xs font-medium bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
-                >
-                  Cancel
-                </button>
-                <button
-                  onclick={handleDeleteWorkout}
-                  class="rounded-lg px-3 py-1.5 text-xs font-medium bg-red-600 text-white hover:bg-red-500"
-                >
-                  Confirm delete
-                </button>
+          {#if editingTimes}
+            <div class="mt-3 flex flex-col gap-2">
+              <div>
+                <p class="mb-1 text-xs font-medium text-[hsl(var(--muted-foreground))]">Start</p>
+                <div class="flex gap-2">
+                  <input type="date" bind:value={editStartDate} class="flex-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+                  <input type="time" bind:value={editStartTime} class="w-28 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+                </div>
               </div>
+              <div>
+                <p class="mb-1 text-xs font-medium text-[hsl(var(--muted-foreground))]">End</p>
+                <div class="flex gap-2">
+                  <input type="date" bind:value={editEndDate} class="flex-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+                  <input type="time" bind:value={editEndTime} class="w-28 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+                </div>
+              </div>
+              <button
+                onclick={cancelEditTimes}
+                class="mt-1 text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+              >Cancel</button>
+              {#if timeEditError}
+                <p class="mt-1 text-xs text-red-500">{timeEditError}</p>
+              {/if}
             </div>
-          {:else}
-            <button
-              onclick={() => { confirmDelete = true; }}
-              class="text-xs font-medium text-red-500 hover:text-red-400"
-            >
-              Delete workout
-            </button>
           {/if}
-        </div>
-      </div>
 
-    <!-- Muscle Map -->
-    <div class="mb-5 rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] p-4 shadow-sm">
-      <h2 class="mb-3 text-base font-semibold text-[hsl(var(--foreground))]">Muscles Worked</h2>
-      <MuscleMap activations={allActivations()} />
-    </div>
+          <div class="mt-3 flex flex-wrap gap-4">
+            <div class="flex items-center gap-1.5">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--primary))" stroke-width="2" stroke-linecap="round">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+              <span class="text-sm font-medium text-[hsl(var(--foreground))]">{durationLabel()}</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--primary))" stroke-width="2" stroke-linecap="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+              <span class="text-sm font-medium text-[hsl(var(--foreground))]">{workout.sets.length} sets</span>
+            </div>
+            {#if workout.location}
+              <div class="flex items-center gap-1.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--primary))" stroke-width="2" stroke-linecap="round">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+                  <circle cx="12" cy="10" r="3"/>
+                </svg>
+                <span class="text-sm text-[hsl(var(--foreground))]">{workout.location.label ?? 'Location'}</span>
+              </div>
+            {/if}
+          </div>
 
-    <!-- Sets by exercise -->
-    <div class="mb-5">
-      <h2 class="mb-3 text-base font-semibold text-[hsl(var(--foreground))]">Exercises</h2>       
-      <div class="flex flex-col gap-3">
-        {#each setsByExercise() as [exerciseName, exSets]}
-          <div class="rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] p-4 shadow-sm">
-            <h3 class="mb-2 font-semibold text-[hsl(var(--foreground))]">{exerciseName}</h3>      
-            <div class="flex flex-col gap-1">
-              {#each exSets as s, i}
-                {#if editingSetId === s.id}
-                  <div class="flex items-center gap-2 py-2">
-                    <span class="w-6 text-center text-xs font-medium text-[hsl(var(--muted-foreground))]">{i + 1}</span>
-                    <input type="number" bind:value={editSetWeight} placeholder="Weight" class="w-20 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
-                    <span class="text-xs text-[hsl(var(--muted-foreground))]">{unit}</span>
-                    <input type="number" bind:value={editSetReps} placeholder="Reps" class="w-16 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
-                    <span class="text-xs text-[hsl(var(--muted-foreground))]">reps</span>
-                    <div class="ml-auto flex gap-1">
-                      <button onclick={cancelEditSet} class="rounded-lg bg-[hsl(var(--muted))] px-2 py-1 text-xs font-medium text-[hsl(var(--muted-foreground))]">Cancel</button>
-                      <button onclick={saveEditedSet} class="rounded-lg bg-[hsl(var(--primary))] px-2 py-1 text-xs font-medium text-white">Save</button>
-                    </div>
-                  </div>
-                {:else}
-                  <div class="group flex items-center gap-3 py-1">
-                    <span class="w-6 text-center text-xs font-medium text-[hsl(var(--muted-foreground))]">{i + 1}</span>
-                    <span class="flex-1 text-sm text-[hsl(var(--foreground))]">
-                      {#if s.reps !== null && s.weight !== null}
-                        <span class="font-semibold">{s.reps}</span> reps × <span class="font-semibold">{s.weight}</span> {unit}
-                      {:else if s.reps !== null}
-                        <span class="font-semibold">{s.reps}</span> reps
-                      {:else if s.weight !== null}
-                        <span class="font-semibold">{s.weight}</span> {unit}
+          <div class="mt-4 border-t border-[hsl(var(--border))] pt-3">
+            {#if confirmDelete}
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-xs text-[hsl(var(--muted-foreground))]">Delete this full workout?</p>
+                <div class="flex items-center gap-2">
+                  <button
+                    onclick={() => { confirmDelete = false; }}
+                    class="rounded-lg px-3 py-1.5 text-xs font-medium bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onclick={handleDeleteWorkout}
+                    class="rounded-lg px-3 py-1.5 text-xs font-medium bg-red-600 text-white hover:bg-red-500"
+                  >
+                    Confirm delete
+                  </button>
+                </div>
+              </div>
+            {:else}
+              <button
+                onclick={() => { confirmDelete = true; }}
+                class="text-xs font-medium text-red-500 hover:text-red-400"
+              >
+                Delete workout
+              </button>
+            {/if}
+          </div>
+
+          <div class="mt-5 border-t border-[hsl(var(--border))] pt-4">
+            <h2 class="mb-3 text-base font-semibold text-[hsl(var(--foreground))]">Exercises</h2>
+            <div class="flex flex-col divide-y divide-[hsl(var(--border)/0.7)]">
+              {#each setsByExercise() as [exerciseName, exSets]}
+                <div class="py-3 first:pt-0 last:pb-0">
+                  <h3 class="mb-2 font-semibold text-[hsl(var(--foreground))]">{exerciseName}</h3>
+                  <div class="flex flex-col gap-1">
+                    {#each exSets as s, i}
+                      {#if editingSetId === s.id}
+                        <div class="flex items-center gap-2 py-2">
+                          <span class="w-6 text-center text-xs font-medium text-[hsl(var(--muted-foreground))]">{i + 1}</span>
+                          <input type="number" bind:value={editSetWeight} placeholder="Weight" class="w-20 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+                          <span class="text-xs text-[hsl(var(--muted-foreground))]">{unit}</span>
+                          <input type="number" bind:value={editSetReps} placeholder="Reps" class="w-16 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+                          <span class="text-xs text-[hsl(var(--muted-foreground))]">reps</span>
+                          <div class="ml-auto flex gap-1">
+                            <button onclick={cancelEditSet} class="rounded-lg bg-[hsl(var(--muted))] px-2 py-1 text-xs font-medium text-[hsl(var(--muted-foreground))]">Cancel</button>
+                            <button onclick={saveEditedSet} class="rounded-lg bg-[hsl(var(--primary))] px-2 py-1 text-xs font-medium text-white">Save</button>
+                          </div>
+                        </div>
                       {:else}
-                        —
+                        <div class="group flex items-center gap-3 py-1">
+                          <span class="w-6 text-center text-xs font-medium text-[hsl(var(--muted-foreground))]">{i + 1}</span>
+                          <span class="flex-1 text-sm text-[hsl(var(--foreground))]">
+                            {#if s.reps !== null && s.weight !== null}
+                              <span class="font-semibold">{s.reps}</span> reps × <span class="font-semibold">{s.weight}</span> {unit}
+                            {:else if s.reps !== null}
+                              <span class="font-semibold">{s.reps}</span> reps
+                            {:else if s.weight !== null}
+                              <span class="font-semibold">{s.weight}</span> {unit}
+                            {:else}
+                              —
+                            {/if}
+                          </span>
+                          <button onclick={() => beginEditSet(s)} class="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-medium text-[hsl(var(--primary))] hover:underline px-2 py-1">Edit</button>
+                        </div>
                       {/if}
-                    </span>
-                    <button onclick={() => beginEditSet(s)} class="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-medium text-[hsl(var(--primary))] hover:underline px-2 py-1">Edit</button>
+                    {/each}
                   </div>
-                {/if}
+                </div>
               {/each}
             </div>
           </div>
-        {/each}
+        </section>
       </div>
     </div>
   {/if}

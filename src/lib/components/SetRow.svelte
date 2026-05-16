@@ -670,7 +670,7 @@
   </td>
 
   <!-- Exercise -->
-  <td class="min-w-0 py-0.5 px-1" onfocusin={closeKeypad}>
+  <td class="min-w-0 py-0.5 px-3" onfocusin={closeKeypad}>
     {#if isEmpty || editingExercise}
       <ExerciseAutocomplete
         value={isEmpty ? draftExerciseName : (set.exerciseName ?? '')}
@@ -681,7 +681,7 @@
     {:else}
       <button
         type="button"
-        class="w-full text-left text-sm font-medium text-[hsl(var(--foreground))] hover:text-[hsl(var(--primary))] py-1.5 px-1 transition-colors truncate block"
+        class="w-full text-left text-sm font-medium text-[hsl(var(--foreground))] hover:text-[hsl(var(--primary))] py-1.5 px-0 transition-colors truncate block"
         onclick={() => { closeKeypad(); editingExercise = true; }}
       >
         {set.exerciseName || '—'}

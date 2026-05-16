@@ -57,6 +57,35 @@
     }
     return [...map.entries()];
   });
+
+  function getUniqueExerciseNames(workout: Workout): string[] {
+    const seen = new Set<string>();
+    const names: string[] = [];
+    for (const s of workout.sets) {
+      if (!seen.has(s.exerciseName)) {
+        seen.add(s.exerciseName);
+        names.push(s.exerciseName);
+      }
+    }
+    return names;
+  }
+
+  function getCompactPills(workout: Workout) {
+    const names = getUniqueExerciseNames(workout);
+    const shown = names.slice(0, 2);
+    const remaining = Math.max(0, names.length - shown.length);
+    return { shown, remaining };
+  }
+
+  function formatCompactDateTime(startTime: number): string {
+    return `${new Date(startTime).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    })}, ${new Date(startTime).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+    })}`;
+  }
 </script>
 
 <svelte:head>
@@ -119,7 +148,7 @@
       <p class="font-medium text-[hsl(var(--foreground))]">No workouts yet</p>
       <p class="text-sm text-[hsl(var(--muted-foreground))]">Start tracking on the Today tab</p>
     </div>
-  {:else}
+  {:else if compactness === 'card'}
     {#each grouped() as [dateLabel, dayWorkouts] (dateLabel)}
       <div class="mb-5">
         <h2 class="mb-2 text-sm font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide">{dateLabel}</h2>
@@ -152,5 +181,31 @@
         </div>
       </div>
     {/each}
+  {:else}
+    <div class="flex flex-col divide-y divide-[hsl(var(--border))]">
+      {#each filtered() as workout (workout.id)}
+        <a
+          href="/workout/{workout.id}"
+          class="py-2 active:scale-[0.995] transition-transform"
+        >
+          <div class="flex min-w-0 items-center gap-1.5 text-sm text-[hsl(var(--foreground))]">
+            <span class="shrink-0 font-medium">{formatCompactDateTime(workout.startTime)}</span>
+            {#each getCompactPills(workout).shown as exercise}
+              <span class="max-w-[9rem] truncate rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-2 py-0.5 text-xs text-[hsl(var(--muted-foreground))]">
+                {exercise}
+              </span>
+            {/each}
+            {#if getCompactPills(workout).remaining > 0}
+              <span class="shrink-0 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-2 py-0.5 text-xs text-[hsl(var(--muted-foreground))]">
+                ... and {getCompactPills(workout).remaining} more
+              </span>
+            {/if}
+          </div>
+          <p class="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
+            {workout.sets.length} sets · {Math.round((workout.endTime - workout.startTime) / 60000)} minutes
+          </p>
+        </a>
+      {/each}
+    </div>
   {/if}
 </div>
