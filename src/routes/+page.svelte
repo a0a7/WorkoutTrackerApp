@@ -101,14 +101,27 @@
     const e = fmt(customEndTime ?? sorted[sorted.length - 1].createdAt);
     return `${s} – ${e}`;
   });
-  onMount(async () => {
-    initUnitPreference();
 
+  async function loadSets() {
     const loaded = await getTodaySets();
     sets = loaded.sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
     sessionId = sets[sets.length - 1]?.localWorkoutId ?? crypto.randomUUID();
     setsStore.set(sets);
+  }
+
+  onMount(() => {
+    initUnitPreference();
+
+    loadSets();
     refreshSyncStatus().catch(() => {});
+
+    const interval = setInterval(async () => {
+      if (!editingTimes) {
+        await loadSets();
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
   });
 
   // Capture geolocation once when the first real set is added
