@@ -1,7 +1,13 @@
 <script lang="ts">
   import type { MuscleActivation, MuscleId } from '../types';
 
-  let { activations = [] }: { activations: MuscleActivation[] } = $props();
+  let {
+    activations = [],
+    details = {},
+  }: {
+    activations: MuscleActivation[];
+    details?: Partial<Record<MuscleId, { activation: 'primary' | 'secondary' | 'tertiary'; exercises: string[] }>>;
+  } = $props();
 
   const muscleColors: Record<string, string> = {
     primary: '#c73e36',
@@ -25,10 +31,131 @@
   function fill(id: MuscleId) {
     return getMuscleColor(id);
   }
+
+  const muscleLabels: Record<MuscleId, string> = {
+    chest_upper: 'Upper Chest',
+    chest_lower: 'Lower Chest',
+    chest_mid: 'Chest',
+    front_delt: 'Front Delts',
+    side_delt: 'Side Delts',
+    rear_delt: 'Rear Delts',
+    bicep: 'Biceps',
+    tricep: 'Triceps',
+    forearm: 'Forearms',
+    lat: 'Lats',
+    rhomboid: 'Rhomboids',
+    trap_upper: 'Upper Traps',
+    trap_mid: 'Mid Traps',
+    trap_lower: 'Lower Traps',
+    erector: 'Spinal Erectors',
+    lower_back: 'Lower Back',
+    quad: 'Quads',
+    hamstring: 'Hamstrings',
+    glute: 'Glutes',
+    calf: 'Calves',
+    hip_flexor: 'Hip Flexors',
+    adductor: 'Adductors',
+    abductor: 'Abductors',
+    abs: 'Abs',
+    oblique: 'Obliques',
+    serratus: 'Serratus',
+  };
+
+  const activationLabels = {
+    primary: 'Primary',
+    secondary: 'Secondary',
+    tertiary: 'Tertiary',
+  } as const;
+
+  function normalizeGroupId(value: string): string {
+    return value.toLowerCase().replace(/[^a-z]/g, '');
+  }
+
+  const groupToMuscleId: Record<string, MuscleId> = {
+    calves: 'calf',
+    hamstrings: 'hamstring',
+    glutes: 'glute',
+    adductors: 'adductor',
+    abductors: 'abductor',
+    lowerback: 'lower_back',
+    lats: 'lat',
+    rhomboids: 'rhomboid',
+    traps: 'trap_mid',
+    reardelts: 'rear_delt',
+    forearmswristflexors: 'forearm',
+    triceps: 'tricep',
+    neck: 'trap_upper',
+    quads: 'quad',
+    adductorsabductors: 'adductor',
+    abs: 'abs',
+    obliques: 'oblique',
+    pecs: 'chest_mid',
+    frontsidedelts: 'front_delt',
+    biceps: 'bicep',
+    forearmsbrachioradialis: 'forearm',
+  };
+
+  let wrapperEl = $state<HTMLDivElement | null>(null);
+  let activeMuscle = $state<MuscleId | null>(null);
+  let pinned = $state(false);
+  let tooltipX = $state(0);
+  let tooltipY = $state(0);
+
+  function findMuscleFromEventTarget(target: EventTarget | null): MuscleId | null {
+    const el = target as Element | null;
+    const group = el?.closest('g[id]');
+    const rawId = group?.getAttribute('id');
+    if (!rawId) return null;
+    return groupToMuscleId[normalizeGroupId(rawId)] ?? null;
+  }
+
+  function setTooltipPosition(clientX: number, clientY: number) {
+    if (!wrapperEl) return;
+    const rect = wrapperEl.getBoundingClientRect();
+    tooltipX = clientX - rect.left;
+    tooltipY = clientY - rect.top;
+  }
+
+  function handlePointerMove(event: PointerEvent) {
+    if (pinned) return;
+    const muscle = findMuscleFromEventTarget(event.target);
+    activeMuscle = muscle;
+    if (muscle) setTooltipPosition(event.clientX, event.clientY);
+  }
+
+  function handlePointerLeave() {
+    if (!pinned) activeMuscle = null;
+  }
+
+  function handleTap(event: MouseEvent) {
+    const muscle = findMuscleFromEventTarget(event.target);
+    if (!muscle) {
+      pinned = false;
+      activeMuscle = null;
+      return;
+    }
+    setTooltipPosition(event.clientX, event.clientY);
+    if (pinned && activeMuscle === muscle) {
+      pinned = false;
+      activeMuscle = null;
+      return;
+    }
+    pinned = true;
+    activeMuscle = muscle;
+  }
 </script>
 
-<div class="flex justify-center w-full max-w-lg mx-auto">
-<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 768.41 607.66">
+<div bind:this={wrapperEl} class="relative flex justify-center w-full max-w-lg mx-auto">
+<svg
+  id="Layer_2"
+  data-name="Layer 2"
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 768.41 607.66"
+  class="touch-manipulation"
+  onpointermove={handlePointerMove}
+  onpointerleave={handlePointerLeave}
+  onclick={handleTap}
+>
   <defs>
     
   </defs>
@@ -135,6 +262,22 @@
     </g>
   </g>
 </svg>
+
+{#if activeMuscle}
+  {@const muscleInfo = details?.[activeMuscle]}
+  <div
+    class="pointer-events-none absolute z-20 max-w-[14rem] -translate-x-1/2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-2.5 py-2 text-xs shadow-md"
+    style="left: {tooltipX}px; top: {tooltipY - 12}px;"
+  >
+    <p class="font-semibold text-[hsl(var(--foreground))]">{muscleLabels[activeMuscle]}</p>
+    <p class="mt-0.5 text-[hsl(var(--muted-foreground))]">
+      {activationLabels[muscleInfo?.activation ?? activations.find((a) => a.muscle === activeMuscle)?.activation ?? 'tertiary']} hit
+    </p>
+    <p class="mt-1 text-[hsl(var(--muted-foreground))]">
+      {(muscleInfo?.exercises?.length ?? 0) > 0 ? muscleInfo?.exercises.join(', ') : 'No contributing exercises'}
+    </p>
+  </div>
+{/if}
 
 </div>
 

@@ -623,7 +623,7 @@
   ontouchcancel={handleRowSwipeEnd}
 >
   <!-- Set number / select -->
-  <td class="w-7 p-0 text-center">
+  <td class="w-8 pl-1 pr-0 py-0 text-center">
     {#if isEmpty}
       {#if hasDraftContent()}
         <button
@@ -738,7 +738,7 @@
   </td>
 
   <!-- Delete / commit -->
-  <td class="w-10 p-0">
+  <td class="w-11 pl-0 pr-1 py-0">
     {#if !isEmpty}
       <div class="flex h-full items-center justify-center">
         <button

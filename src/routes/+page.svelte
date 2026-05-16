@@ -452,11 +452,11 @@
     <table class="w-full border-collapse">
       <thead>
         <tr class="border-b border-[hsl(var(--border))]">
-          <th class="w-7 pl-2 pr-0 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">#</th>
+          <th class="w-8 pl-3 pr-0 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">#</th>
           <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Exercise</th>
           <th class="w-12 px-0.5 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Reps</th>
           <th class="w-14 px-0.5 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">{unit}</th>
-          <th class="w-10 pl-0 pr-2 py-2"></th>
+          <th class="w-11 pl-0 pr-3 py-2"></th>
         </tr>
       </thead>
       <tbody>

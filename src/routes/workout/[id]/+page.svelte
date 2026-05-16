@@ -5,7 +5,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import MuscleMap from '$lib/components/MuscleMap.svelte';
-  import { deleteWorkout, getWorkout, saveWorkout } from '$lib/db';
+  import { deleteSet, deleteWorkout, getWorkout, saveSets, saveWorkout } from '$lib/db';
   import { EXERCISE_MAP } from '$lib/exercises';
   import { unitPreference, initUnitPreference, userStore } from '$lib/stores/userStore';
   import { syncToServer } from '$lib/sync';
@@ -26,11 +26,19 @@
   let editEndDate = $state('');
   let editEndTime = $state('');
   let confirmDelete = $state(false);
+  let editingWorkout = $state(false);
+  let draftSets = $state<WorkoutSet[]>([]);
 
   // New Set Editing State
   let editingSetId = $state<string | null>(null);
   let editSetReps = $state<number | null>(null);
   let editSetWeight = $state<number | null>(null);
+
+  function parseNullableNumber(value: string): number | null {
+    if (value.trim() === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
 
   function toDateInput(ts: number) {
     const d = new Date(ts);
@@ -99,6 +107,70 @@
     editSetWeight = null;
   }
 
+  function beginEditWorkout() {
+    if (!workout) return;
+    draftSets = workout.sets.map((s) => ({ ...s }));
+    editingWorkout = true;
+    confirmDelete = false;
+    cancelEditSet();
+  }
+
+  function cancelEditWorkout() {
+    editingWorkout = false;
+    draftSets = [];
+  }
+
+  function updateDraftSetValue(setId: string, field: 'reps' | 'weight', value: string) {
+    const parsed = parseNullableNumber(value);
+    draftSets = draftSets.map((s) => (s.id === setId ? { ...s, [field]: parsed } : s));
+  }
+
+  function removeDraftSet(setId: string) {
+    draftSets = draftSets.filter((s) => s.id !== setId);
+  }
+
+  function addDraftSet(exerciseId: string, exerciseName: string) {
+    if (!workout) return;
+    const now = Date.now();
+    draftSets = [
+      ...draftSets,
+      {
+        id: crypto.randomUUID(),
+        localWorkoutId: workout.id,
+        exerciseId,
+        exerciseName,
+        reps: null,
+        weight: null,
+        order: draftSets.length + 1,
+        createdAt: now,
+      },
+    ];
+  }
+
+  async function saveWorkoutEdits() {
+    if (!workout) return;
+    const normalized = draftSets.map((s, i) => ({
+      ...s,
+      localWorkoutId: workout.id,
+      order: i + 1,
+      createdAt: s.createdAt ?? Date.now(),
+    }));
+    const originalIds = new Set(workout.sets.map((s) => s.id));
+    const nextIds = new Set(normalized.map((s) => s.id));
+    const removedIds = [...originalIds].filter((id) => !nextIds.has(id));
+    for (const id of removedIds) {
+      await deleteSet(id);
+    }
+    if (normalized.length > 0) {
+      await saveSets(normalized);
+    }
+    const updatedWorkout = { ...workout, sets: normalized };
+    await saveWorkout(updatedWorkout);
+    workout = updatedWorkout;
+    editingWorkout = false;
+    draftSets = [];
+  }
+
   async function handleDeleteWorkout() {
     if (!workout) return;
     await deleteWorkout(workout.id);
@@ -126,8 +198,9 @@
 
   const allActivations = $derived(() => {
     if (!workout) return [];
+    const sourceSets = editingWorkout ? draftSets : workout.sets;
     const map = new Map<string, 'primary' | 'secondary' | 'tertiary'>();
-    for (const s of workout.sets) {
+    for (const s of sourceSets) {
       const ex = EXERCISE_MAP.get(s.exerciseId);
       if (!ex) continue;
       for (const ma of ex.muscleActivations) {
@@ -145,11 +218,36 @@
     }));
   });
 
+  const muscleDetails = $derived(() => {
+    if (!workout) return {};
+    const sourceSets = editingWorkout ? draftSets : workout.sets;
+    const details = new Map<string, { activation: 'primary' | 'secondary' | 'tertiary'; exercises: Set<string> }>();
+    for (const s of sourceSets) {
+      const ex = EXERCISE_MAP.get(s.exerciseId);
+      if (!ex) continue;
+      for (const ma of ex.muscleActivations) {
+        const existing = details.get(ma.muscle);
+        const incomingRank = ACTIVATION_RANK[ma.activation] ?? 0;
+        const existingRank = existing ? (ACTIVATION_RANK[existing.activation] ?? 0) : 0;
+        if (!existing) {
+          details.set(ma.muscle, { activation: ma.activation, exercises: new Set([s.exerciseName]) });
+        } else {
+          if (incomingRank > existingRank) existing.activation = ma.activation;
+          existing.exercises.add(s.exerciseName);
+        }
+      }
+    }
+    return Object.fromEntries(
+      [...details.entries()].map(([muscle, value]) => [muscle, { activation: value.activation, exercises: [...value.exercises] }])
+    );
+  });
+
   // Group sets by exercise
   const setsByExercise = $derived(() => {
     if (!workout) return [];
-    const map = new Map<string, typeof workout.sets>();
-    for (const s of workout.sets) {
+    const sourceSets = editingWorkout ? draftSets : workout.sets;
+    const map = new Map<string, typeof sourceSets>();
+    for (const s of sourceSets) {
       if (!map.has(s.exerciseName)) map.set(s.exerciseName, []);
       map.get(s.exerciseName)!.push(s);
     }
@@ -197,7 +295,7 @@
       <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
         <section class="lg:order-2">
           <h2 class="mb-3 text-base font-semibold text-[hsl(var(--foreground))]">Muscles Worked</h2>
-          <MuscleMap activations={allActivations()} />
+          <MuscleMap activations={allActivations()} details={muscleDetails()} />
         </section>
 
         <section class="lg:order-1 min-w-0">
@@ -295,12 +393,35 @@
                 </div>
               </div>
             {:else}
-              <button
-                onclick={() => { confirmDelete = true; }}
-                class="text-xs font-medium text-red-500 hover:text-red-400"
-              >
-                Delete workout
-              </button>
+              <div class="flex items-center gap-3">
+                {#if editingWorkout}
+                  <button
+                    onclick={saveWorkoutEdits}
+                    class="text-xs font-medium text-[hsl(var(--primary))] hover:underline"
+                  >
+                    Save workout edits
+                  </button>
+                  <button
+                    onclick={cancelEditWorkout}
+                    class="text-xs font-medium text-[hsl(var(--muted-foreground))] hover:underline"
+                  >
+                    Cancel
+                  </button>
+                {:else}
+                  <button
+                    onclick={beginEditWorkout}
+                    class="text-xs font-medium text-[hsl(var(--primary))] hover:underline"
+                  >
+                    Edit workout
+                  </button>
+                {/if}
+                <button
+                  onclick={() => { confirmDelete = true; }}
+                  class="text-xs font-medium text-red-500 hover:text-red-400"
+                >
+                  Delete workout
+                </button>
+              </div>
             {/if}
           </div>
 
@@ -311,8 +432,35 @@
                 <div class="py-3 first:pt-0 last:pb-0">
                   <h3 class="mb-2 font-semibold text-[hsl(var(--foreground))]">{exerciseName}</h3>
                   <div class="flex flex-col gap-1">
-                    {#each exSets as s, i}
-                      {#if editingSetId === s.id}
+                     {#each exSets as s, i}
+                      {#if editingWorkout}
+                        <div class="flex items-center gap-2 py-2">
+                          <span class="w-6 text-center text-xs font-medium text-[hsl(var(--muted-foreground))]">{i + 1}</span>
+                          <input
+                            type="number"
+                            value={s.weight ?? ''}
+                            oninput={(e) => updateDraftSetValue(s.id, 'weight', (e.currentTarget as HTMLInputElement).value)}
+                            placeholder="Weight"
+                            class="w-20 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]"
+                          />
+                          <span class="text-xs text-[hsl(var(--muted-foreground))]">{unit}</span>
+                          <input
+                            type="number"
+                            value={s.reps ?? ''}
+                            oninput={(e) => updateDraftSetValue(s.id, 'reps', (e.currentTarget as HTMLInputElement).value)}
+                            placeholder="Reps"
+                            class="w-16 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]"
+                          />
+                          <span class="text-xs text-[hsl(var(--muted-foreground))]">reps</span>
+                          <button
+                            type="button"
+                            onclick={() => removeDraftSet(s.id)}
+                            class="ml-auto rounded-lg bg-[hsl(var(--destructive)/0.12)] px-2 py-1 text-xs font-medium text-[hsl(var(--destructive))]"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      {:else if editingSetId === s.id}
                         <div class="flex items-center gap-2 py-2">
                           <span class="w-6 text-center text-xs font-medium text-[hsl(var(--muted-foreground))]">{i + 1}</span>
                           <input type="number" bind:value={editSetWeight} placeholder="Weight" class="w-20 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
@@ -341,10 +489,31 @@
                           <button onclick={() => beginEditSet(s)} class="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-medium text-[hsl(var(--primary))] hover:underline px-2 py-1">Edit</button>
                         </div>
                       {/if}
-                    {/each}
-                  </div>
-                </div>
+                     {/each}
+                    {#if editingWorkout}
+                      <button
+                        type="button"
+                        onclick={() => {
+                          const first = exSets[0];
+                          if (first) addDraftSet(first.exerciseId, first.exerciseName);
+                        }}
+                        class="mt-1 w-fit rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1 text-xs font-medium text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+                      >
+                        + Add set
+                      </button>
+                    {/if}
+                   </div>
+                 </div>
               {/each}
+              {#if editingWorkout && setsByExercise().length === 0}
+                <button
+                  type="button"
+                  onclick={() => addDraftSet('', 'New Exercise')}
+                  class="mt-2 w-fit rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1 text-xs font-medium text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+                >
+                  + Add set
+                </button>
+              {/if}
             </div>
           </div>
         </section>
