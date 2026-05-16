@@ -670,7 +670,8 @@
   </td>
 
   <!-- Exercise -->
-  <td class="min-w-0 py-0.5 px-4" onfocusin={closeKeypad}>
+  <td class="min-w-0 py-0.5 px-0" onfocusin={closeKeypad}>
+    <div class={isEmpty ? 'px-4' : ''}>
     {#if isEmpty || editingExercise}
       <ExerciseAutocomplete
         value={isEmpty ? draftExerciseName : (set.exerciseName ?? '')}
@@ -687,10 +688,12 @@
         {set.exerciseName || '—'}
       </button>
     {/if}
+    </div>
   </td>
 
   <!-- Reps – tap to open custom keypad -->
   <td class="w-12 py-0.5 px-0.5">
+    <div class={isEmpty ? 'px-4' : ''}>
     <button
       bind:this={repsBtnEl}
       type="button"
@@ -710,10 +713,12 @@
         <span class="text-[hsl(var(--muted-foreground)/0.35)]">—</span>
       {/if}
     </button>
+    </div>
   </td>
 
   <!-- Weight – tap to open custom keypad -->
   <td class="w-14 py-0.5 px-0.5">
+    <div class={isEmpty ? 'px-4' : ''}>
     <button
       bind:this={weightBtnEl}
       type="button"
@@ -735,10 +740,12 @@
         <span class="text-[hsl(var(--muted-foreground)/0.35)]">—</span>
       {/if}
     </button>
+    </div>
   </td>
 
   <!-- Delete / commit -->
   <td class="w-12 pl-0 pr-3 py-0">
+    <div class={isEmpty ? 'px-4' : ''}>
     {#if !isEmpty}
       <div class="flex h-full items-center justify-center">
         <button
@@ -774,6 +781,7 @@
         </svg>
       </button>
     {/if}
+    </div>
   </td>
 </tr>
 
