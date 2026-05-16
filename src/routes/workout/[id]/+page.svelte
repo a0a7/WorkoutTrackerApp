@@ -5,6 +5,8 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import MuscleMap from '$lib/components/MuscleMap.svelte';
+  import SetRow from '$lib/components/SetRow.svelte';
+  import NumericKeypad from '$lib/components/NumericKeypad.svelte';
   import { deleteSet, deleteWorkout, getWorkout, saveSets, saveWorkout } from '$lib/db';
   import { EXERCISE_MAP } from '$lib/exercises';
   import { unitPreference, initUnitPreference, userStore } from '$lib/stores/userStore';
@@ -28,17 +30,9 @@
   let confirmDelete = $state(false);
   let editingWorkout = $state(false);
   let draftSets = $state<WorkoutSet[]>([]);
-
-  // New Set Editing State
-  let editingSetId = $state<string | null>(null);
-  let editSetReps = $state<number | null>(null);
-  let editSetWeight = $state<number | null>(null);
-
-  function parseNullableNumber(value: string): number | null {
-    if (value.trim() === '') return null;
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
+  let draftSelected = $state<Set<string>>(new Set());
+  let draftDragFromIndex = $state<number | null>(null);
+  let draftDragToIndex = $state<number | null>(null);
 
   function toDateInput(ts: number) {
     const d = new Date(ts);
@@ -82,69 +76,145 @@
     editingTimes = false;
   }
 
-  function beginEditSet(set: WorkoutSet) {
-    editingSetId = set.id;
-    editSetReps = set.reps;
-    editSetWeight = set.weight;
-  }
-
-  function cancelEditSet() {
-    editingSetId = null;
-    editSetReps = null;
-    editSetWeight = null;
-  }
-
-  async function saveEditedSet() {
-    if (!workout || !editingSetId) return;
-    const idx = workout.sets.findIndex(s => s.id === editingSetId);
-    if (idx !== -1) {
-      workout.sets[idx] = { ...workout.sets[idx], reps: editSetReps ?? 0, weight: editSetWeight ?? 0 };
-    }
-    // We update the local workout
-    await saveWorkout(workout);
-    editingSetId = null;
-    editSetReps = null;
-    editSetWeight = null;
-  }
-
   function beginEditWorkout() {
     if (!workout) return;
-    draftSets = workout.sets.map((s) => ({ ...s }));
+    draftSets = workout.sets
+      .map((s) => ({ ...s }))
+      .sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
+    draftSelected = new Set();
     editingWorkout = true;
     confirmDelete = false;
-    cancelEditSet();
   }
 
   function cancelEditWorkout() {
     editingWorkout = false;
     draftSets = [];
+    draftSelected = new Set();
   }
 
-  function updateDraftSetValue(setId: string, field: 'reps' | 'weight', value: string) {
-    const parsed = parseNullableNumber(value);
-    draftSets = draftSets.map((s) => (s.id === setId ? { ...s, [field]: parsed } : s));
+  function persistDraftSets(newSets: WorkoutSet[]) {
+    draftSets = newSets.map((s, i) => ({ ...s, order: i }));
   }
 
-  function removeDraftSet(setId: string) {
-    draftSets = draftSets.filter((s) => s.id !== setId);
-  }
-
-  function addDraftSet(exerciseId: string, exerciseName: string) {
+  function handleDraftAdd(newSet: WorkoutSet) {
     if (!workout) return;
-    const now = Date.now();
-    draftSets = [
+    persistDraftSets([...draftSets, { ...newSet, localWorkoutId: workout.id }]);
+  }
+
+  function handleDraftAddMultiple(newSets: WorkoutSet[]) {
+    if (!workout) return;
+    if (newSets.length === 0) return;
+    const workoutLocalId = workout.id;
+    persistDraftSets([
       ...draftSets,
-      {
-        id: crypto.randomUUID(),
-        localWorkoutId: workout.id,
-        exerciseId,
-        exerciseName,
-        reps: null,
-        weight: null,
-        order: draftSets.length + 1,
-        createdAt: now,
-      },
-    ];
+      ...newSets.map((s) => ({ ...s, localWorkoutId: workoutLocalId })),
+    ]);
+  }
+
+  function handleDraftExerciseUpdate(id: string, exerciseId: string, exerciseName: string) {
+    persistDraftSets(draftSets.map((s) => (s.id === id ? { ...s, exerciseId, exerciseName } : s)));
+  }
+
+  function handleDraftUpdate(id: string, field: keyof WorkoutSet, value: unknown) {
+    const normalizeValue = (f: keyof WorkoutSet, v: unknown) => {
+      if (f === 'reps') {
+        if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+        if (typeof v === 'string') {
+          if (/[xX×*]/.test(v)) return null;
+          const parsed = parseInt(v, 10);
+          return Number.isFinite(parsed) ? parsed : null;
+        }
+        return null;
+      }
+      if (f === 'weight') {
+        if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+        if (typeof v === 'string') {
+          const parsed = parseFloat(v);
+          return Number.isFinite(parsed) ? parsed : null;
+        }
+        return null;
+      }
+      return v;
+    };
+    const normalizedValue = normalizeValue(field, value);
+    const targetIds = draftSelected.has(id) && draftSelected.size > 1 ? [...draftSelected] : [id];
+    persistDraftSets(
+      draftSets.map((s) => (targetIds.includes(s.id) ? { ...s, [field]: normalizedValue } : s))
+    );
+  }
+
+  function handleDraftDelete(id: string) {
+    if (id.startsWith('empty-')) return;
+    persistDraftSets(draftSets.filter((s) => s.id !== id));
+    draftSelected.delete(id);
+    draftSelected = new Set(draftSelected);
+  }
+
+  function handleDraftDeleteSelected() {
+    if (draftSelected.size === 0) return;
+    const idSet = new Set([...draftSelected].filter((id) => !id.startsWith('empty-')));
+    if (idSet.size === 0) return;
+    persistDraftSets(draftSets.filter((s) => !idSet.has(s.id)));
+    clearDraftSelection();
+  }
+
+  function handleDraftSelect(id: string) {
+    if (id.startsWith('empty-')) return;
+    const next = new Set(draftSelected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    draftSelected = next;
+  }
+
+  function clearDraftSelection() {
+    draftSelected = new Set();
+  }
+
+  function handleDraftExpandSet(id: string, newSets: WorkoutSet[]) {
+    const idx = draftSets.findIndex((s) => s.id === id);
+    const before = draftSets.slice(0, idx);
+    const after = draftSets.slice(idx + 1);
+    persistDraftSets([...before, ...newSets, ...after]);
+  }
+
+  function handleDraftDragStart(index: number) {
+    draftDragFromIndex = index;
+  }
+
+  function handleDraftDragOver(index: number) {
+    draftDragToIndex = index;
+  }
+
+  function handleDraftDrop() {
+    if (
+      draftDragFromIndex === null ||
+      draftDragToIndex === null ||
+      draftDragFromIndex === draftDragToIndex
+    ) {
+      draftDragFromIndex = null;
+      draftDragToIndex = null;
+      return;
+    }
+    const newSets = [...draftSets];
+    const [moved] = newSets.splice(draftDragFromIndex, 1);
+    newSets.splice(draftDragToIndex, 0, moved);
+    draftDragFromIndex = null;
+    draftDragToIndex = null;
+    persistDraftSets(newSets);
+  }
+
+  function handleDraftTouchReorder(fromIndex: number, toIndex: number) {
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= draftSets.length ||
+      toIndex >= draftSets.length
+    ) return;
+    const newSets = [...draftSets];
+    const [moved] = newSets.splice(fromIndex, 1);
+    newSets.splice(toIndex, 0, moved);
+    persistDraftSets(newSets);
   }
 
   async function saveWorkoutEdits() {
@@ -267,6 +337,23 @@
     workout
       ? `${new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} – ${new Date(workout.endTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
       : ''
+  );
+
+  const draftEmptyRows = $derived(
+    workout
+      ? [
+          {
+            id: 'empty-0',
+            localWorkoutId: workout.id,
+            exerciseId: '',
+            exerciseName: '',
+            reps: null,
+            weight: null,
+            order: draftSets.length,
+            createdAt: Date.now(),
+          } as WorkoutSet,
+        ]
+      : []
   );
 </script>
 
@@ -428,52 +515,93 @@
 
           <div class="mt-5 border-t border-[hsl(var(--border))] pt-4">
             <h2 class="mb-3 text-base font-semibold text-[hsl(var(--foreground))]">Exercises</h2>
-            <div class="flex flex-col divide-y divide-[hsl(var(--border)/0.7)]">
-              {#each setsByExercise() as [exerciseName, exSets]}
-                <div class="py-3 first:pt-0 last:pb-0">
-                  <h3 class="mb-2 font-semibold text-[hsl(var(--foreground))]">{exerciseName}</h3>
-                  <div class="flex flex-col gap-1">
-                     {#each exSets as s, i}
-                      {#if editingWorkout}
-                        <div class="flex items-center gap-2 py-2">
-                          <span class="w-6 text-center text-xs font-medium text-[hsl(var(--muted-foreground))]">{i + 1}</span>
-                          <input
-                            type="number"
-                            value={s.weight ?? ''}
-                            oninput={(e) => updateDraftSetValue(s.id, 'weight', (e.currentTarget as HTMLInputElement).value)}
-                            placeholder="Weight"
-                            class="w-20 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]"
-                          />
-                          <span class="text-xs text-[hsl(var(--muted-foreground))]">{unit}</span>
-                          <input
-                            type="number"
-                            value={s.reps ?? ''}
-                            oninput={(e) => updateDraftSetValue(s.id, 'reps', (e.currentTarget as HTMLInputElement).value)}
-                            placeholder="Reps"
-                            class="w-16 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]"
-                          />
-                          <span class="text-xs text-[hsl(var(--muted-foreground))]">reps</span>
-                          <button
-                            type="button"
-                            onclick={() => removeDraftSet(s.id)}
-                            class="ml-auto rounded-lg bg-[hsl(var(--destructive)/0.12)] px-2 py-1 text-xs font-medium text-[hsl(var(--destructive))]"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      {:else if editingSetId === s.id}
-                        <div class="flex items-center gap-2 py-2">
-                          <span class="w-6 text-center text-xs font-medium text-[hsl(var(--muted-foreground))]">{i + 1}</span>
-                          <input type="number" bind:value={editSetWeight} placeholder="Weight" class="w-20 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
-                          <span class="text-xs text-[hsl(var(--muted-foreground))]">{unit}</span>
-                          <input type="number" bind:value={editSetReps} placeholder="Reps" class="w-16 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
-                          <span class="text-xs text-[hsl(var(--muted-foreground))]">reps</span>
-                          <div class="ml-auto flex gap-1">
-                            <button onclick={cancelEditSet} class="rounded-lg bg-[hsl(var(--muted))] px-2 py-1 text-xs font-medium text-[hsl(var(--muted-foreground))]">Cancel</button>
-                            <button onclick={saveEditedSet} class="rounded-lg bg-[hsl(var(--primary))] px-2 py-1 text-xs font-medium text-white">Save</button>
-                          </div>
-                        </div>
-                      {:else}
+            {#if editingWorkout}
+              <div class="-mx-4 border-y border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm min-h-[200px]">
+                <table class="w-full border-collapse">
+                  <thead>
+                    <tr class="border-b border-[hsl(var(--border))]">
+                      <th class="w-10 pl-4 pr-0 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">#</th>
+                      <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Exercise</th>
+                      <th class="w-12 px-0.5 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Reps</th>
+                      <th class="w-14 px-0.5 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">{unit}</th>
+                      <th class="w-12 pl-0 pr-4 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each draftSets as set, i (set.id)}
+                      <SetRow
+                        {set}
+                        selected={draftSelected.has(set.id)}
+                        isEmpty={false}
+                        index={i}
+                        setNumber={i + 1}
+                        onUpdate={handleDraftUpdate}
+                        onExerciseUpdate={handleDraftExerciseUpdate}
+                        onDelete={handleDraftDelete}
+                        onSelect={handleDraftSelect}
+                        onExpandSet={handleDraftExpandSet}
+                        onDragStart={handleDraftDragStart}
+                        onDragOver={handleDraftDragOver}
+                        onDrop={handleDraftDrop}
+                        onTouchReorder={handleDraftTouchReorder}
+                      />
+                    {/each}
+                    {#each draftEmptyRows as emptySet, i}
+                      <SetRow
+                        set={emptySet}
+                        selected={false}
+                        isEmpty={true}
+                        index={draftSets.length + i}
+                        setNumber={null}
+                        onAdd={handleDraftAdd}
+                        onAddMultiple={handleDraftAddMultiple}
+                        onDragStart={() => {}}
+                        onDragOver={() => {}}
+                        onDrop={() => {}}
+                      />
+                    {/each}
+                  </tbody>
+                </table>
+              </div>
+
+              {#if draftSelected.size > 0}
+                <div class="mt-2 flex items-center justify-between rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2">
+                  <span class="text-sm font-medium text-[hsl(var(--primary))]">{draftSelected.size} selected</span>
+                  <div class="flex items-center gap-2">
+                    <button
+                      onclick={clearDraftSelection}
+                      class="rounded-lg px-3 py-1.5 text-xs font-medium text-[hsl(var(--muted-foreground))] bg-[hsl(var(--muted))] hover:bg-[hsl(var(--border))]"
+                      aria-label="Clear selection"
+                    >
+                      Deselect
+                    </button>
+                    <button
+                      onclick={handleDraftDeleteSelected}
+                      class="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(var(--destructive)/0.12)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.2)]"
+                      aria-label="Delete selected sets"
+                      title="Delete selected"
+                    >
+                      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M2.5 4h11"/>
+                        <path d="M6 2.5h4"/>
+                        <path d="M5 4v8.5a1 1 0 001 1h4a1 1 0 001-1V4"/>
+                        <path d="M7 6.5v5M9 6.5v5"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              {/if}
+
+              <p class="mt-2 text-center text-[11px] text-[hsl(var(--muted-foreground))]">
+                tap a set number to select • swipe to delete set • drag to reorder
+              </p>
+            {:else}
+              <div class="flex flex-col divide-y divide-[hsl(var(--border)/0.7)]">
+                {#each setsByExercise() as [exerciseName, exSets]}
+                  <div class="py-3 first:pt-0 last:pb-0">
+                    <h3 class="mb-2 font-semibold text-[hsl(var(--foreground))]">{exerciseName}</h3>
+                    <div class="flex flex-col gap-1">
+                      {#each exSets as s, i}
                         <div class="group flex items-center gap-3 py-1">
                           <span class="w-6 text-center text-xs font-medium text-[hsl(var(--muted-foreground))]">{i + 1}</span>
                           <span class="flex-1 text-sm text-[hsl(var(--foreground))]">
@@ -487,38 +615,18 @@
                               —
                             {/if}
                           </span>
-                          <button onclick={() => beginEditSet(s)} class="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-medium text-[hsl(var(--primary))] hover:underline px-2 py-1">Edit</button>
                         </div>
-                      {/if}
-                     {/each}
-                    {#if editingWorkout}
-                      <button
-                        type="button"
-                        onclick={() => {
-                          const first = exSets[0];
-                          if (first) addDraftSet(first.exerciseId, first.exerciseName);
-                        }}
-                        class="mt-1 w-fit rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1 text-xs font-medium text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-                      >
-                        + Add set
-                      </button>
-                    {/if}
-                   </div>
-                 </div>
-              {/each}
-              {#if editingWorkout && setsByExercise().length === 0}
-                <button
-                  type="button"
-                  onclick={() => addDraftSet('', 'New Exercise')}
-                  class="mt-2 w-fit rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1 text-xs font-medium text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-                >
-                  + Add set
-                </button>
-              {/if}
-            </div>
+                      {/each}
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
           </div>
         </section>
       </div>
     </div>
   {/if}
 </div>
+
+<NumericKeypad />
