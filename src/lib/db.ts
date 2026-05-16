@@ -196,20 +196,23 @@ export async function getWorkout(id: string): Promise<Workout | undefined> {
 export async function getAllWorkouts(): Promise<Workout[]> {
   const db = await getDB();
   const stored = await db.getAllFromIndex('workouts', 'by_start_time');
-  if (stored.length > 0) {
-    const workoutsWithSets = await Promise.all(
-      stored.map(async (w) => {
-        const sets = await getSetsByWorkoutId(w.id);
-        return {
-          ...w,
-          sets: sets.sort((a, b) => a.order - b.order || a.createdAt - b.createdAt),
-        };
-      })
-    );
-    return workoutsWithSets.filter((w) => w.sets.length > 0).sort((a, b) => b.startTime - a.startTime);
+  
+  const allSets = await getAllSets();
+  const storedIds = new Set(stored.map(w => w.id));
+
+  const explicitWorkouts: Workout[] = [];
+  for (const w of stored) {
+    const wSets = allSets.filter(s => s.localWorkoutId === w.id)
+                         .sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
+    if (wSets.length > 0) {
+      explicitWorkouts.push({ ...w, sets: wSets });
+    }
   }
-  const grouped = await getAllWorkoutGroups();
-  return grouped.sort((a, b) => b.startTime - a.startTime);
+
+  const orphanSets = allSets.filter(s => !storedIds.has(s.localWorkoutId));
+  const groupedOrphans = groupSetsIntoWorkouts(orphanSets);
+
+  return [...explicitWorkouts, ...groupedOrphans].sort((a, b) => b.startTime - a.startTime);
 }
 
 export async function addPendingSync(
