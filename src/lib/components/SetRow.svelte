@@ -776,3 +776,9 @@
     {/if}
   </td>
 </tr>
+
+{#if isEmpty}
+  <tr class="h-0.5 bg-[hsl(var(--border)/0.5)]">
+    <td colspan="4" class="p-0"></td>
+  </tr>
+{/if}
