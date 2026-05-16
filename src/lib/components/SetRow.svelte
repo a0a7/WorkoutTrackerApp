@@ -623,7 +623,7 @@
   ontouchcancel={handleRowSwipeEnd}
 >
   <!-- Set number / select -->
-  <td class="w-8 pl-1 pr-0 py-0 text-center">
+  <td class="w-10 pl-3 pr-0 py-0 text-center">
     {#if isEmpty}
       {#if hasDraftContent()}
         <button
@@ -670,7 +670,7 @@
   </td>
 
   <!-- Exercise -->
-  <td class="min-w-0 py-0.5 px-3" onfocusin={closeKeypad}>
+  <td class="min-w-0 py-0.5 px-4" onfocusin={closeKeypad}>
     {#if isEmpty || editingExercise}
       <ExerciseAutocomplete
         value={isEmpty ? draftExerciseName : (set.exerciseName ?? '')}
@@ -738,7 +738,7 @@
   </td>
 
   <!-- Delete / commit -->
-  <td class="w-11 pl-0 pr-1 py-0">
+  <td class="w-12 pl-0 pr-3 py-0">
     {#if !isEmpty}
       <div class="flex h-full items-center justify-center">
         <button
@@ -779,6 +779,6 @@
 
 {#if isEmpty}
   <tr class="h-0.5 bg-[hsl(var(--border)/0.5)]">
-    <td colspan="4" class="p-0"></td>
+    <td colspan="5" class="p-0"></td>
   </tr>
 {/if}

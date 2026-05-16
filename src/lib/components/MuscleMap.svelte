@@ -158,8 +158,9 @@
   data-name="Layer 2"
   xmlns="http://www.w3.org/2000/svg"
   viewBox="0 0 768.41 607.66"
-  class="touch-manipulation"
+  class="block h-auto w-full max-w-lg touch-manipulation"
   role="button"
+  aria-label="Muscle activation map"
   tabindex="0"
   onpointermove={handlePointerMove}
   onpointerleave={handlePointerLeave}
