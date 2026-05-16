@@ -4,15 +4,15 @@
   let { activations = [] }: { activations: MuscleActivation[] } = $props();
 
   const muscleColors: Record<string, string> = {
-    primary: '#6366f1',
-    secondary: '#a5b4fc',
-    tertiary: '#e0e7ff',
+    primary: '#c73e36',
+    secondary: '#ebc050',
+    tertiary: '#F4E6A1',
   };
 
   function getMuscleColor(muscleId: MuscleId): string {
     const found = activations.find((a) => a.muscle === muscleId);
-    if (!found) return 'transparent';
-    return muscleColors[found.activation] ?? 'transparent';
+    if (!found) return 'rgba(124,124,124,0.5)';
+    return muscleColors[found.activation] ?? 'rgba(124,124,124,0.5)';
   }
 
   function getMuscleOpacity(muscleId: MuscleId): number {
