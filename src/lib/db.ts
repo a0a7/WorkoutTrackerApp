@@ -177,6 +177,7 @@ export async function getWorkout(id: string): Promise<Workout | undefined> {
   const stored = await db.get('workouts', id);
   const sets = await getSetsByWorkoutId(id);
   if (stored) {
+    if (sets.length === 0) return undefined;
     const sortedSets = [...sets].sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
     return { ...stored, sets: sortedSets };
   }
@@ -205,7 +206,7 @@ export async function getAllWorkouts(): Promise<Workout[]> {
         };
       })
     );
-    return workoutsWithSets.sort((a, b) => b.startTime - a.startTime);
+    return workoutsWithSets.filter((w) => w.sets.length > 0).sort((a, b) => b.startTime - a.startTime);
   }
   const grouped = await getAllWorkoutGroups();
   return grouped.sort((a, b) => b.startTime - a.startTime);

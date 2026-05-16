@@ -60,7 +60,7 @@
 </script>
 
 <svelte:head>
-  <title>WorkOut – History</title>
+  <title>Logbook – History</title>
 </svelte:head>
 
 <div class="px-4 pt-4">

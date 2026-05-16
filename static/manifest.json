@@ -1,6 +1,6 @@
 {
-  "name": "WorkOut",
-  "short_name": "WorkOut",
+  "name": "Logbook",
+  "short_name": "Logbook",
   "description": "Track your workouts offline-first",
   "start_url": "/",
   "display": "standalone",

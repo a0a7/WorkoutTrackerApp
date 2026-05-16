@@ -340,7 +340,7 @@
 </script>
 
 <svelte:head>
-  <title>WorkOut – Today</title>
+  <title>Logbook – Today</title>
 </svelte:head>
 
 <div class="px-4 pt-safe-top">

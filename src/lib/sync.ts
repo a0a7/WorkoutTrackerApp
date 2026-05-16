@@ -67,7 +67,7 @@ export async function syncToServer(user: User): Promise<void> {
               if (!res.ok) throw new Error(`Sync failed (${res.status})`);
             } else if (item.operation === 'delete') {
               const res = await apiFetch(`/sets/${item.id}`, user, { method: 'DELETE' });
-              if (!res.ok) throw new Error(`Sync failed (${res.status})`);
+              if (!res.ok && res.status !== 404) throw new Error(`Sync failed (${res.status})`);
             }
           } else if (item.type === 'workout') {
             if (item.operation === 'upsert') {
@@ -78,7 +78,7 @@ export async function syncToServer(user: User): Promise<void> {
               if (!res.ok) throw new Error(`Sync failed (${res.status})`);
             } else if (item.operation === 'delete') {
               const res = await apiFetch(`/workouts/${item.id}`, user, { method: 'DELETE' });
-              if (!res.ok) throw new Error(`Sync failed (${res.status})`);
+              if (!res.ok && res.status !== 404) throw new Error(`Sync failed (${res.status})`);
             }
           }
           await clearPendingSync(item.id);

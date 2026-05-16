@@ -29,7 +29,7 @@
 </script>
 
 <svelte:head>
-  <title>WorkOut – Settings</title>
+  <title>Logbook – Settings</title>
 </svelte:head>
 
 <div class="px-4 pt-4 pb-8">

@@ -36,7 +36,7 @@
 </script>
 
 <svelte:head>
-  <title>WorkOut – Sign In</title>
+  <title>Logbook - Sign in</title>
 </svelte:head>
 
 <div class="flex min-h-screen items-center justify-center px-4 bg-[hsl(var(--background))]">
@@ -48,8 +48,8 @@
           <path d="M6.5 6.5h11M6.5 12h11M6.5 17.5h11"/>
         </svg>
       </div>
-      <h1 class="text-3xl font-bold text-[hsl(var(--foreground))]">WorkOut</h1>
-      <p class="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Track your fitness journey</p>
+      <h1 class="text-3xl font-bold text-[hsl(var(--foreground))]">Logbook</h1>
+      <p class="mt-1 text-sm text-[hsl(var(--muted-foreground))]">log ur sessions broski</p>
     </div>
 
     <!-- Card -->

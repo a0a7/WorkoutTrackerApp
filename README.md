@@ -1,4 +1,4 @@
-# WorkOutTracker
+# Logbook
 
 A beautiful, offline-first Progressive Web App (PWA) for tracking weightlifting workouts. Works perfectly on iOS when added to the home screen, syncs data to the cloud when online.
 
@@ -88,7 +88,7 @@ npx wrangler deploy
 1. Open your deployed URL in **Safari** on iPhone/iPad.
 2. Tap the **Share** button (box with arrow).
 3. Tap **Add to Home Screen**.
-4. Name it "WorkOut" and tap **Add**.
+4. Name it "Logbook" and tap **Add**.
 5. Launch from your home screen — it opens as a standalone full-screen app.
 
 ---

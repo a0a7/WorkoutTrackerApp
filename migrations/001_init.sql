@@ -1,4 +1,4 @@
--- D1 schema for WorkOut tracker
+-- D1 schema for Logbook tracker
 
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
