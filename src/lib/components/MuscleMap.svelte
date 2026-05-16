@@ -11,14 +11,14 @@
 
   function getMuscleColor(muscleId: MuscleId): string {
     const found = activations.find((a) => a.muscle === muscleId);
-    if (!found) return 'rgba(124,124,124,0.5)';
-    return muscleColors[found.activation] ?? 'rgba(124,124,124,0.5)';
+    if (!found) return '#7C7C7C';
+    return muscleColors[found.activation] ?? '#7C7C7C';
   }
 
   function getMuscleOpacity(muscleId: MuscleId): number {
     const found = activations.find((a) => a.muscle === muscleId);
-    if (!found) return 0;
-    return found.activation === 'primary' ? 1 : found.activation === 'secondary' ? 0.75 : 0.5;
+    if (!found) return 0.5;
+    return 1;
   }
 
   // Helper to get fill style
