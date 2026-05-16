@@ -148,14 +148,15 @@
   }
 
   async function saveWorkoutEdits() {
-    if (!workout) return;
+    const workoutRef = workout;
+    if (!workoutRef) return;
     const normalized = draftSets.map((s, i) => ({
       ...s,
-      localWorkoutId: workout.id,
+      localWorkoutId: workoutRef.id,
       order: i + 1,
       createdAt: s.createdAt ?? Date.now(),
     }));
-    const originalIds = new Set(workout.sets.map((s) => s.id));
+    const originalIds = new Set(workoutRef.sets.map((s) => s.id));
     const nextIds = new Set(normalized.map((s) => s.id));
     const removedIds = [...originalIds].filter((id) => !nextIds.has(id));
     for (const id of removedIds) {
@@ -164,7 +165,7 @@
     if (normalized.length > 0) {
       await saveSets(normalized);
     }
-    const updatedWorkout = { ...workout, sets: normalized };
+    const updatedWorkout = { ...workoutRef, sets: normalized };
     await saveWorkout(updatedWorkout);
     workout = updatedWorkout;
     editingWorkout = false;

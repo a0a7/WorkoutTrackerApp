@@ -143,6 +143,13 @@
     pinned = true;
     activeMuscle = muscle;
   }
+
+  function handleKeyDown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      pinned = false;
+      activeMuscle = null;
+    }
+  }
 </script>
 
 <div bind:this={wrapperEl} class="relative flex justify-center w-full max-w-lg mx-auto">
@@ -152,9 +159,12 @@
   xmlns="http://www.w3.org/2000/svg"
   viewBox="0 0 768.41 607.66"
   class="touch-manipulation"
+  role="button"
+  tabindex="0"
   onpointermove={handlePointerMove}
   onpointerleave={handlePointerLeave}
   onclick={handleTap}
+  onkeydown={handleKeyDown}
 >
   <defs>
     
