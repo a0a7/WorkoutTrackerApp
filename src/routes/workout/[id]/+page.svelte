@@ -9,7 +9,7 @@
   import { EXERCISE_MAP } from '$lib/exercises';
   import { unitPreference, initUnitPreference, userStore } from '$lib/stores/userStore';
   import { syncToServer } from '$lib/sync';
-  import type { Workout, MuscleActivation } from '$lib/types';
+  import type { Workout, MuscleActivation, WorkoutSet } from '$lib/types';
 
   const workoutId = $derived($page.params.id);
 
@@ -26,6 +26,11 @@
   let editEndDate = $state('');
   let editEndTime = $state('');
   let confirmDelete = $state(false);
+
+  // New Set Editing State
+  let editingSetId = $state<string | null>(null);
+  let editSetReps = $state<number | null>(null);
+  let editSetWeight = $state<number | null>(null);
 
   function toDateInput(ts: number) {
     const d = new Date(ts);
@@ -62,11 +67,36 @@
     if (isNaN(newStart)) { timeEditError = 'Invalid start date or time.'; return; }
     if (isNaN(newEnd)) { timeEditError = 'Invalid end date or time.'; return; }
     // Prevent zero-duration workouts — end time must be strictly after start time
-    if (newEnd <= newStart) { timeEditError = 'End time must be after start time.'; return; }
+    if (newEnd <= newStart) { timeEditError = 'End time must be after start time.'; return; }     
     timeEditError = '';
     workout = { ...workout, startTime: newStart, endTime: newEnd };
     await saveWorkout(workout);
     editingTimes = false;
+  }
+
+  function beginEditSet(set: WorkoutSet) {
+    editingSetId = set.id;
+    editSetReps = set.reps;
+    editSetWeight = set.weight;
+  }
+
+  function cancelEditSet() {
+    editingSetId = null;
+    editSetReps = null;
+    editSetWeight = null;
+  }
+
+  async function saveEditedSet() {
+    if (!workout || !editingSetId) return;
+    const idx = workout.sets.findIndex(s => s.id === editingSetId);
+    if (idx !== -1) {
+      workout.sets[idx] = { ...workout.sets[idx], reps: editSetReps ?? 0, weight: editSetWeight ?? 0 };
+    }
+    // We update the local workout
+    await saveWorkout(workout);
+    editingSetId = null;
+    editSetReps = null;
+    editSetWeight = null;
   }
 
   async function handleDeleteWorkout() {
@@ -276,27 +306,42 @@
 
     <!-- Sets by exercise -->
     <div class="mb-5">
-      <h2 class="mb-3 text-base font-semibold text-[hsl(var(--foreground))]">Exercises</h2>
+      <h2 class="mb-3 text-base font-semibold text-[hsl(var(--foreground))]">Exercises</h2>       
       <div class="flex flex-col gap-3">
         {#each setsByExercise() as [exerciseName, exSets]}
           <div class="rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] p-4 shadow-sm">
-            <h3 class="mb-2 font-semibold text-[hsl(var(--foreground))]">{exerciseName}</h3>
+            <h3 class="mb-2 font-semibold text-[hsl(var(--foreground))]">{exerciseName}</h3>      
             <div class="flex flex-col gap-1">
               {#each exSets as s, i}
-                <div class="flex items-center gap-3 py-1">
-                  <span class="w-6 text-center text-xs font-medium text-[hsl(var(--muted-foreground))]">{i + 1}</span>
-                  <span class="flex-1 text-sm text-[hsl(var(--foreground))]">
-                    {#if s.reps !== null && s.weight !== null}
-                      <span class="font-semibold">{s.reps}</span> reps × <span class="font-semibold">{s.weight}</span> {unit}
-                    {:else if s.reps !== null}
-                      <span class="font-semibold">{s.reps}</span> reps
-                    {:else if s.weight !== null}
-                      <span class="font-semibold">{s.weight}</span> {unit}
-                    {:else}
-                      —
-                    {/if}
-                  </span>
-                </div>
+                {#if editingSetId === s.id}
+                  <div class="flex items-center gap-2 py-2">
+                    <span class="w-6 text-center text-xs font-medium text-[hsl(var(--muted-foreground))]">{i + 1}</span>
+                    <input type="number" bind:value={editSetWeight} placeholder="Weight" class="w-20 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+                    <span class="text-xs text-[hsl(var(--muted-foreground))]">{unit}</span>
+                    <input type="number" bind:value={editSetReps} placeholder="Reps" class="w-16 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+                    <span class="text-xs text-[hsl(var(--muted-foreground))]">reps</span>
+                    <div class="ml-auto flex gap-1">
+                      <button onclick={cancelEditSet} class="rounded-lg bg-[hsl(var(--muted))] px-2 py-1 text-xs font-medium text-[hsl(var(--muted-foreground))]">Cancel</button>
+                      <button onclick={saveEditedSet} class="rounded-lg bg-[hsl(var(--primary))] px-2 py-1 text-xs font-medium text-white">Save</button>
+                    </div>
+                  </div>
+                {:else}
+                  <div class="group flex items-center gap-3 py-1">
+                    <span class="w-6 text-center text-xs font-medium text-[hsl(var(--muted-foreground))]">{i + 1}</span>
+                    <span class="flex-1 text-sm text-[hsl(var(--foreground))]">
+                      {#if s.reps !== null && s.weight !== null}
+                        <span class="font-semibold">{s.reps}</span> reps × <span class="font-semibold">{s.weight}</span> {unit}
+                      {:else if s.reps !== null}
+                        <span class="font-semibold">{s.reps}</span> reps
+                      {:else if s.weight !== null}
+                        <span class="font-semibold">{s.weight}</span> {unit}
+                      {:else}
+                        —
+                      {/if}
+                    </span>
+                    <button onclick={() => beginEditSet(s)} class="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-medium text-[hsl(var(--primary))] hover:underline px-2 py-1">Edit</button>
+                  </div>
+                {/if}
               {/each}
             </div>
           </div>
