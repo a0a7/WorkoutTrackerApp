@@ -355,6 +355,58 @@
         ]
       : []
   );
+
+  // --- Helpers for compact display and totals
+  function computeTotalVolume() {
+    if (!workout) return 0;
+    let total = 0;
+    for (const s of workout.sets) {
+      if (typeof s.reps === 'number' && typeof s.weight === 'number' && s.reps > 0 && s.weight > 0) {
+        total += s.reps * s.weight;
+      }
+    }
+    return Math.round(total);
+  }
+
+  function formatExerciseCompact(exName: string, setsArr: any[]) {
+    // Determine if all sets have same reps and same weight (and weight > 0)
+    if (!setsArr || setsArr.length === 0) return '';
+    const parts = setsArr.map((s) => ({ reps: s.reps, weight: s.weight }));
+    const allSameReps = parts.every((p) => p.reps === parts[0].reps);
+    const allSameWeight = parts.every((p) => p.weight === parts[0].weight);
+
+    const firstEx = EXERCISE_MAP.get(setsArr[0].exerciseId);
+    const isBodyweight = firstEx?.category === 'bodyweight';
+
+    if (isBodyweight) {
+      // Count occurrences of identical reps sequences
+      const repsCounts = new Map();
+      for (const p of parts) {
+        const key = String(p.reps ?? '');
+        repsCounts.set(key, (repsCounts.get(key) || 0) + 1);
+      }
+      // Typical output: 3x6 reps if all same
+      if (repsCounts.size === 1) {
+        const reps = parts[0].reps ?? 0;
+        return `${parts.length}x${reps} reps`;
+      }
+      // Otherwise list each set as NxR
+      return parts.map((p) => `${p.reps ?? ''}x${p.weight ?? ''} ${isBodyweight ? 'reps' : ''}`.trim()).join(', ');
+    }
+
+    if (allSameReps && allSameWeight && parts[0].reps != null && parts[0].weight != null) {
+      return `${parts.length}x${parts[0].reps}x${parts[0].weight}`;
+    }
+
+    // Mixed sets: join each as `${reps}x${weight}` skipping nulls
+    return parts.map((p) => {
+      const r = p.reps != null ? String(p.reps) : '';
+      const w = p.weight != null ? String(p.weight) : '';
+      if (r && w) return `${r}x${w}`;
+      if (r && !w) return `${r} reps`;
+      return `${w}`;
+    }).filter(Boolean).join(', ');
+  }
 </script>
 
 <svelte:head>
@@ -381,252 +433,55 @@
   {:else}
     <div class="mb-5 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-sm lg:p-5">
       <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-        <section class="lg:order-2">
-          <h2 class="mb-3 text-base font-semibold text-[hsl(var(--foreground))]">Muscles Worked</h2>
+
+        <!-- Mobile-first: Muscle map first (no header above it) -->
+        <section class="order-1 lg:order-2">
           <MuscleMap activations={allActivations()} details={muscleDetails()} />
         </section>
 
-        <section class="lg:order-1 min-w-0">
-          <div class="flex items-start justify-between gap-2">
-            <div>
-              <h1 class="text-xl font-bold text-[hsl(var(--foreground))]">{dateLabel}</h1>
-              {#if !editingTimes}
-                <button
-                  type="button"
-                  onclick={beginEditTimes}
-                  class="mt-0.5 text-left text-sm text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] transition-colors"
-                >
-                  {timeLabel}
-                </button>
-              {/if}
-            </div>
-            {#if editingTimes}
-              <button
-                onclick={saveEditedTimes}
-                class="shrink-0 rounded-lg bg-[hsl(var(--primary))] px-3 py-1.5 text-xs font-medium text-white transition-colors"
-              >
-                Save
-              </button>
-            {/if}
-          </div>
-
-          {#if editingTimes}
-            <div class="mt-3 flex flex-col gap-2">
-              <div>
-                <p class="mb-1 text-xs font-medium text-[hsl(var(--muted-foreground))]">Start</p>
-                <div class="flex gap-2">
-                  <input type="date" bind:value={editStartDate} class="flex-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
-                  <input type="time" bind:value={editStartTime} class="w-28 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
-                </div>
-              </div>
-              <div>
-                <p class="mb-1 text-xs font-medium text-[hsl(var(--muted-foreground))]">End</p>
-                <div class="flex gap-2">
-                  <input type="date" bind:value={editEndDate} class="flex-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
-                  <input type="time" bind:value={editEndTime} class="w-28 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
-                </div>
-              </div>
-              <button
-                onclick={cancelEditTimes}
-                class="mt-1 text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-              >Cancel</button>
-              {#if timeEditError}
-                <p class="mt-1 text-xs text-red-500">{timeEditError}</p>
-              {/if}
-            </div>
-          {/if}
-
-          <div class="mt-3 flex flex-wrap gap-4">
-            <div class="flex items-center gap-1.5">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--primary))" stroke-width="2" stroke-linecap="round">
-                <circle cx="12" cy="12" r="10"/>
-                <polyline points="12 6 12 12 16 14"/>
-              </svg>
-              <span class="text-sm font-medium text-[hsl(var(--foreground))]">{durationLabel()}</span>
-            </div>
-            <div class="flex items-center gap-1.5">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--primary))" stroke-width="2" stroke-linecap="round">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-              </svg>
-              <span class="text-sm font-medium text-[hsl(var(--foreground))]">{workout.sets.length} sets</span>
-            </div>
-            {#if workout.location}
-              <div class="flex items-center gap-1.5">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--primary))" stroke-width="2" stroke-linecap="round">
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
-                  <circle cx="12" cy="10" r="3"/>
-                </svg>
-                <span class="text-sm text-[hsl(var(--foreground))]">{workout.location.label ?? 'Location'}</span>
-              </div>
-            {/if}
-          </div>
-
-          <div class="mt-4 border-t border-[hsl(var(--border))] pt-3">
-            {#if confirmDelete}
-              <div class="flex items-center justify-between gap-2">
-                <p class="text-xs text-[hsl(var(--muted-foreground))]">Delete this full workout?</p>
-                <div class="flex items-center gap-2">
-                  <button
-                    onclick={() => { confirmDelete = false; }}
-                    class="rounded-lg px-3 py-1.5 text-xs font-medium bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onclick={handleDeleteWorkout}
-                    class="rounded-lg px-3 py-1.5 text-xs font-medium bg-red-600 text-white hover:bg-red-500"
-                  >
-                    Confirm delete
-                  </button>
-                </div>
-              </div>
-            {:else}
-              <div class="flex items-center gap-3">
-                {#if editingWorkout}
-                  <button
-                    onclick={saveWorkoutEdits}
-                    class="text-xs font-medium text-[hsl(var(--primary))] hover:underline"
-                  >
-                    Save workout edits
-                  </button>
-                  <button
-                    onclick={cancelEditWorkout}
-                    class="text-xs font-medium text-[hsl(var(--muted-foreground))] hover:underline"
-                  >
-                    Cancel
-                  </button>
-                {:else}
-                  <button
-                    onclick={beginEditWorkout}
-                    class="text-xs font-medium text-[hsl(var(--primary))] hover:underline"
-                  >
-                    Edit workout
-                  </button>
-                {/if}
-                <button
-                  onclick={() => { confirmDelete = true; }}
-                  class="text-xs font-medium text-red-500 hover:text-red-400"
-                >
-                  Delete workout
-                </button>
-              </div>
-            {/if}
-          </div>
-
-          <div class="mt-5 border-t border-[hsl(var(--border))] pt-4">
-            <h2 class="mb-3 text-base font-semibold text-[hsl(var(--foreground))]">Exercises</h2>
-            {#if editingWorkout}
-              <div class="-mx-4 border-y border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm min-h-[200px]">
-                <table class="w-full border-collapse">
-                  <thead>
-                    <tr class="border-b border-[hsl(var(--border))]">
-                      <th class="w-10 pl-4 pr-0 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">#</th>
-                      <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Exercise</th>
-                      <th class="w-12 px-0.5 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Reps</th>
-                      <th class="w-14 px-0.5 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">{unit}</th>
-                      <th class="w-12 pl-0 pr-4 py-2"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {#each draftSets as set, i (set.id)}
-                      <SetRow
-                        {set}
-                        selected={draftSelected.has(set.id)}
-                        isEmpty={false}
-                        index={i}
-                        setNumber={i + 1}
-                        onUpdate={handleDraftUpdate}
-                        onExerciseUpdate={handleDraftExerciseUpdate}
-                        onDelete={handleDraftDelete}
-                        onSelect={handleDraftSelect}
-                        onExpandSet={handleDraftExpandSet}
-                        onDragStart={handleDraftDragStart}
-                        onDragOver={handleDraftDragOver}
-                        onDrop={handleDraftDrop}
-                        onTouchReorder={handleDraftTouchReorder}
-                      />
-                    {/each}
-                    {#each draftEmptyRows as emptySet, i}
-                      <SetRow
-                        set={emptySet}
-                        selected={false}
-                        isEmpty={true}
-                        index={draftSets.length + i}
-                        setNumber={null}
-                        onAdd={handleDraftAdd}
-                        onAddMultiple={handleDraftAddMultiple}
-                        onDragStart={() => {}}
-                        onDragOver={() => {}}
-                        onDrop={() => {}}
-                      />
-                    {/each}
-                  </tbody>
-                </table>
-              </div>
-
-              {#if draftSelected.size > 0}
-                <div class="mt-2 flex items-center justify-between rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2">
-                  <span class="text-sm font-medium text-[hsl(var(--primary))]">{draftSelected.size} selected</span>
-                  <div class="flex items-center gap-2">
-                    <button
-                      onclick={clearDraftSelection}
-                      class="rounded-lg px-3 py-1.5 text-xs font-medium text-[hsl(var(--muted-foreground))] bg-[hsl(var(--muted))] hover:bg-[hsl(var(--border))]"
-                      aria-label="Clear selection"
-                    >
-                      Deselect
-                    </button>
-                    <button
-                      onclick={handleDraftDeleteSelected}
-                      class="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(var(--destructive)/0.12)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.2)]"
-                      aria-label="Delete selected sets"
-                      title="Delete selected"
-                    >
-                      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M2.5 4h11"/>
-                        <path d="M6 2.5h4"/>
-                        <path d="M5 4v8.5a1 1 0 001 1h4a1 1 0 001-1V4"/>
-                        <path d="M7 6.5v5M9 6.5v5"/>
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              {/if}
-
-              <p class="mt-2 text-center text-[11px] text-[hsl(var(--muted-foreground))]">
-                tap a set number to select • swipe to delete set • drag to reorder
+        <!-- Info block: name, start time, duration · # sets · total volume, Edit/Delete buttons -->
+        <section class="order-2 lg:order-1 min-w-0">
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <h1 class="text-lg font-bold text-[hsl(var(--foreground))] truncate">{workout.name ?? 'Workout'}</h1>
+              <p class="text-sm text-[hsl(var(--muted-foreground))] mt-0.5">at {new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</p>
+              <p class="text-sm text-[hsl(var(--foreground))] mt-1">
+                {(() => {
+                  const mins = Math.round((workout.endTime - workout.startTime) / 60000);
+                  const setsCount = workout.sets.length;
+                  const vol = computeTotalVolume();
+                  const minsLabel = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+                  return `${minsLabel} · ${setsCount} sets · ${vol} total`;
+                })()}
               </p>
-            {:else}
-              <div class="flex flex-col divide-y divide-[hsl(var(--border)/0.7)]">
-                {#each setsByExercise() as [exerciseName, exSets]}
-                  <div class="py-3 first:pt-0 last:pb-0">
-                    <h3 class="mb-2 font-semibold text-[hsl(var(--foreground))]">{exerciseName}</h3>
-                    <div class="flex flex-col gap-1">
-                      {#each exSets as s, i}
-                        <div class="group flex items-center gap-3 py-1">
-                          <span class="w-6 text-center text-xs font-medium text-[hsl(var(--muted-foreground))]">{i + 1}</span>
-                          <span class="flex-1 text-sm text-[hsl(var(--foreground))]">
-                            {#if s.reps !== null && s.weight !== null}
-                              <span class="font-semibold">{s.reps}</span> reps × <span class="font-semibold">{s.weight}</span> {unit}
-                            {:else if s.reps !== null}
-                              <span class="font-semibold">{s.reps}</span> reps
-                            {:else if s.weight !== null}
-                              <span class="font-semibold">{s.weight}</span> {unit}
-                            {:else}
-                              —
-                            {/if}
-                          </span>
-                        </div>
-                      {/each}
-                    </div>
-                  </div>
-                {/each}
-              </div>
-            {/if}
+            </div>
+            <div class="flex items-center gap-3">
+              <button class="text-sm text-[hsl(var(--primary))]" onclick={beginEditWorkout}>Edit</button>
+              <button class="text-sm text-red-500" onclick={() => { confirmDelete = true; }}>Delete</button>
+            </div>
           </div>
+
+          <hr class="my-3 border-[hsl(var(--border))]" />
+
+          <!-- Compact exercises list -->
+          <div class="flex flex-col gap-3">
+            {#each setsByExercise() as [exName, setsArr]}
+              <div>
+                <div class="flex items-baseline gap-2">
+                  <p class="text-sm font-medium text-[hsl(var(--foreground))] truncate">{exName}</p>
+                  <span class="text-xs text-[hsl(var(--muted-foreground))]">({setsArr.length})</span>
+                </div>
+                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">{formatExerciseCompact(exName, setsArr)}</p>
+              </div>
+            {/each}
+          </div>
+
         </section>
+
       </div>
     </div>
   {/if}
 </div>
 
+<!-- Custom numeric keypad — rendered at root so it sits above all row content -->
 <NumericKeypad />
