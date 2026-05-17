@@ -461,7 +461,7 @@
   {/if}
 
   <!-- Sets table -->
-  <div class="-mx-4 border-y border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm min-h-[200px]">
+  <div class="-mx-4 border-y border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm min-h-30">
     <table class="w-full border-collapse">
       <thead>
         <tr class="border-b border-[hsl(var(--border))]">

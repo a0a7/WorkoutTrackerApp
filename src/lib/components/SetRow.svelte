@@ -282,7 +282,28 @@
 
   function scrollRowIntoView() {
     setTimeout(() => {
-      trEl?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      const el = trEl;
+      if (!el) return;
+      // Prefer visualViewport when available (mobile keyboards change visualViewport)
+      const vv = (window as any).visualViewport;
+      if (vv) {
+        // Element rect relative to layout viewport
+        const rect = el.getBoundingClientRect();
+        const margin = 12; // small padding above/below
+        const viewTop = vv.offsetTop || 0;
+        const viewBottom = viewTop + vv.height;
+        const elemTop = rect.top;
+        const elemBottom = rect.bottom;
+
+        if (elemTop < viewTop + margin || elemBottom > viewBottom - margin) {
+          // center the element within the visual viewport
+          const targetScroll = window.scrollY + (elemTop - (viewTop + (vv.height / 2 - rect.height / 2)));
+          window.scrollTo({ top: Math.max(0, Math.round(targetScroll)), behavior: 'smooth' });
+        }
+      } else {
+        // Fallback
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
     }, 50);
   }
 
@@ -606,7 +627,7 @@
   data-empty-row={isEmpty ? 'true' : 'false'}
   class="group relative border-b border-[hsl(var(--border)/0.5)] last:border-b-0 transition-[background-color,transform,box-shadow] duration-150
     {selected ? 'bg-[hsl(var(--primary)/0.06)]' : 'hover:bg-[hsl(var(--muted)/0.25)]'}
-    {dragOver ? 'outline outline-2 outline-[hsl(var(--primary))] outline-offset-[-1px]' : ''}
+  {dragOver ? 'outline-2 outline-[hsl(var(--primary))] -outline-offset-1' : ''}
     {handleDragging ? 'z-20 bg-[hsl(var(--card))] shadow-2xl ring-2 ring-[hsl(var(--primary)/0.45)] scale-[1.01]' : ''}
     {isEmpty || editingExercise ? 'z-10' : ''}"
   draggable="false"
@@ -628,7 +649,7 @@
       {#if hasDraftContent()}
         <button
           type="button"
-          class="flex h-full min-h-10 w-full items-center justify-center text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] transition-colors"
+          class="flex h-full min-h-8 w-full items-center justify-center text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] transition-colors"
           onclick={clearDraftRow}
           aria-label="Clear draft set row"
           title="Clear"
@@ -643,7 +664,7 @@
     {:else if selected}
       <button
         type="button"
-        class="flex h-full min-h-10 w-full items-center justify-center bg-[hsl(var(--primary)/0.1)]"
+        class="flex h-full min-h-8 w-full items-center justify-center bg-[hsl(var(--primary)/0.1)]"
         onclick={(e) => onSelect?.(set.id, e.shiftKey)}
         ontouchstart={handleTouchStart}
         ontouchmove={handleTouchMove}
@@ -657,7 +678,7 @@
     {:else}
       <button
         type="button"
-        class="flex h-full min-h-10 w-full items-center justify-center text-xs font-semibold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--primary)/0.1)] hover:text-[hsl(var(--primary))] transition-colors"
+        class="flex h-full min-h-8 w-full items-center justify-center text-xs font-semibold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--primary)/0.1)] hover:text-[hsl(var(--primary))] transition-colors"
         onclick={(e) => onSelect?.(set.id, e.shiftKey)}
         ontouchstart={handleTouchStart}
         ontouchmove={handleTouchMove}
@@ -704,7 +725,7 @@
              {$keypadConfig?.id === `${set.id}:reps`
                ? 'ring-2 ring-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.08)]'
                : 'focus:bg-[hsl(var(--muted)/0.5)]'}"
-      style="font-size:16px; min-height: 2.25rem;"
+      style="font-size:16px; min-height: 2rem;"
       aria-label="Reps"
     >
       {#if (isEmpty ? draftReps : localReps)}
@@ -729,7 +750,7 @@
              {$keypadConfig?.id === `${set.id}:weight`
                ? 'ring-2 ring-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.08)]'
                : 'focus:bg-[hsl(var(--muted)/0.5)]'}"
-      style="font-size:16px; min-height: 2.25rem;"
+      style="font-size:16px; min-height: 2rem;"
       aria-label="Weight"
     >
       {#if (isEmpty ? draftWeight : localWeight)}
@@ -756,7 +777,7 @@
           onpointerup={handleDragHandlePointerEnd}
           onpointercancel={handleDragHandlePointerEnd}
           oncontextmenu={(e) => e.preventDefault()}
-          class="flex h-full min-h-10 w-full items-center justify-center text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] transition-colors cursor-grab active:cursor-grabbing touch-none select-none"
+          class="flex h-full min-h-8 w-full items-center justify-center text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] transition-colors cursor-grab active:cursor-grabbing touch-none select-none"
           title="Drag to reorder"
           aria-label="Drag to reorder set"
         >
