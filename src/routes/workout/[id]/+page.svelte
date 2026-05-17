@@ -33,6 +33,9 @@
   let draftSelected = $state<Set<string>>(new Set());
   let draftDragFromIndex = $state<number | null>(null);
   let draftDragToIndex = $state<number | null>(null);
+  let stravaConnected = $state(false);
+  let stravaSyncing = $state(false);
+  let stravaMessage = $state('');
 
   function toDateInput(ts: number) {
     const d = new Date(ts);
@@ -250,11 +253,49 @@
     goto('/history');
   }
 
+  async function loadStravaStatus() {
+    const user = get(userStore);
+    if (!user) {
+      stravaConnected = false;
+      return;
+    }
+    try {
+      const res = await fetch('/api/strava/status', {
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { connected?: boolean };
+      stravaConnected = Boolean(data.connected);
+    } catch {
+      // ignored
+    }
+  }
+
+  async function pushWorkoutToStrava() {
+    const user = get(userStore);
+    if (!user || !workout || stravaSyncing) return;
+    stravaSyncing = true;
+    stravaMessage = '';
+    try {
+      const res = await fetch(`/api/strava/workouts/${encodeURIComponent(workout.id)}/sync`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      if (!res.ok) throw new Error(`Failed (${res.status})`);
+      stravaMessage = 'Synced to Strava.';
+    } catch (e) {
+      stravaMessage = e instanceof Error ? e.message : 'Failed to sync to Strava.';
+    } finally {
+      stravaSyncing = false;
+    }
+  }
+
   onMount(async () => {
     initUnitPreference();
     if (workoutId) {
       workout = await getWorkout(workoutId) ?? null;
     }
+    await loadStravaStatus();
     loading = false;
   });
 
@@ -458,10 +499,18 @@
               </p>
             </div>
             <div class="flex items-center gap-3">
+              {#if stravaConnected}
+                <button class="text-sm text-[hsl(var(--primary))]" disabled={stravaSyncing} onclick={pushWorkoutToStrava}>
+                  {stravaSyncing ? 'Pushing…' : 'Push to Strava'}
+                </button>
+              {/if}
               <button class="text-sm text-[hsl(var(--primary))]" onclick={() => { beginEditWorkout(); beginEditTimes(); }}>Edit</button>
               <button class="text-sm text-red-500" onclick={() => { confirmDelete = true; }}>Delete</button>
             </div>
           </div>
+          {#if stravaMessage}
+            <p class="mt-2 text-xs text-[hsl(var(--muted-foreground))]">{stravaMessage}</p>
+          {/if}
 
           {#if editingTimes}
             <div class="mt-3 flex flex-col gap-2">

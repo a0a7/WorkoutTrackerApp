@@ -40,6 +40,7 @@ Sign up at [cloudflare.com](https://cloudflare.com) if you don't have one.
 4. Note the **Database ID** shown on the database page.
 5. Click on the database → **Console** tab.
 6. Paste and run the contents of `migrations/001_init.sql` in the SQL console. This creates the tables.
+7. Run `migrations/002_workouts_updated_at.sql` and `migrations/003_strava_sync.sql`.
 
 ### Step 3: Create the KV Namespace
 
@@ -63,6 +64,10 @@ Sign up at [cloudflare.com](https://cloudflare.com) if you don't have one.
    - Under **D1 database bindings**: Add binding with variable name `DB`, select `workout-tracker-db`.
    - Under **KV namespace bindings**: Add binding with variable name `SESSIONS`, select `workout-tracker-sessions`.
 8. Go to **Deployments** and click **Retry deploy** (or push a new commit) to apply the bindings.
+9. Add these **Environment Variables** in Pages/Workers settings:
+   - `STRAVA_CLIENT_ID`
+   - `STRAVA_CLIENT_SECRET`
+   - `STRAVA_REDIRECT_URI` (example: `https://<your-project>.pages.dev/api/strava/callback`)
 
 Your app will be live at `https://<your-project>.pages.dev`.
 
@@ -107,6 +112,8 @@ For local testing with the full Cloudflare Workers environment:
 ```bash
 # Apply migrations to local D1
 npx wrangler d1 execute workout-tracker-db --local --file=migrations/001_init.sql
+npx wrangler d1 execute workout-tracker-db --local --file=migrations/002_workouts_updated_at.sql
+npx wrangler d1 execute workout-tracker-db --local --file=migrations/003_strava_sync.sql
 
 # Build and run with wrangler (simulates the production environment)
 npm run build

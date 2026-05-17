@@ -2,16 +2,41 @@
 
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { userStore } from '$lib/stores/userStore';
   import { unitPreference, initUnitPreference } from '$lib/stores/userStore';
   import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 
   let user = $state<{ id: string; email: string; token: string } | null>(null);
   let unit = $state<'lbs' | 'kg'>('lbs');
+  let stravaConnected = $state(false);
+  let stravaLoading = $state(false);
+  let stravaError = $state('');
+  const stravaConnectedNow = $derived($page.url.searchParams.get('strava') === 'connected');
+
+  async function loadStravaStatus() {
+    if (!user) {
+      stravaConnected = false;
+      return;
+    }
+    try {
+      const res = await fetch('/api/strava/status', {
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { connected?: boolean };
+      stravaConnected = Boolean(data.connected);
+    } catch {
+      // ignore
+    }
+  }
 
   onMount(() => {
     initUnitPreference();
-    const unsub = userStore.subscribe((u) => { user = u; });
+    const unsub = userStore.subscribe((u) => {
+      user = u;
+      loadStravaStatus();
+    });
     const unsub2 = unitPreference.subscribe((u) => { unit = u; });
     return () => { unsub(); unsub2(); };
   });
@@ -25,6 +50,24 @@
     unit = u;
     unitPreference.set(u);
     localStorage.setItem('unit_preference', u);
+  }
+
+  async function connectStrava() {
+    if (!user || stravaLoading) return;
+    stravaLoading = true;
+    stravaError = '';
+    try {
+      const res = await fetch('/api/strava/connect', {
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const data = (await res.json()) as { url?: string };
+      if (!data.url) throw new Error('Missing redirect URL');
+      window.location.href = data.url;
+    } catch (e) {
+      stravaError = e instanceof Error ? e.message : 'Failed to connect Strava';
+      stravaLoading = false;
+    }
   }
 </script>
 
@@ -89,6 +132,40 @@
           >kg</button>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- Integrations -->
+  <section class="mb-5">
+    <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Integrations</h2>
+    <div class="rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] overflow-hidden shadow-sm">
+      <div class="px-4 py-3 border-b border-[hsl(var(--border))]">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="text-sm font-medium text-[hsl(var(--foreground))]">Strava</p>
+            <p class="text-xs text-[hsl(var(--muted-foreground))]">
+              {#if stravaConnected || stravaConnectedNow}
+                Connected
+              {:else}
+                Not connected
+              {/if}
+            </p>
+          </div>
+          {#if user}
+            <button
+              onclick={connectStrava}
+              disabled={stravaLoading || stravaConnected}
+              class="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60
+                     {stravaConnected ? 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]' : 'bg-[hsl(var(--primary))] text-white'}"
+            >
+              {stravaConnected ? 'Connected' : (stravaLoading ? 'Connecting…' : 'Connect')}
+            </button>
+          {/if}
+        </div>
+      </div>
+      {#if stravaError}
+        <p class="px-4 py-2 text-xs text-red-500">{stravaError}</p>
+      {/if}
     </div>
   </section>
 </div>

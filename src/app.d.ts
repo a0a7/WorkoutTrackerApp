@@ -14,6 +14,9 @@ declare global {
 				DB: D1Database;
 				SESSIONS: KVNamespace;
 				ASSETS: { fetch: typeof fetch };
+				STRAVA_CLIENT_ID?: string;
+				STRAVA_CLIENT_SECRET?: string;
+				STRAVA_REDIRECT_URI?: string;
 			};
 			context: ExecutionContext;
 			caches: CacheStorage & { default: Cache };

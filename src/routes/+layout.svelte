@@ -21,6 +21,19 @@
     { href: '/settings', label: 'Settings', icon: 'settings' },
   ];
 
+  const STRAVA_DUE_SYNC_INTERVAL_MS = 5 * 60_000;
+
+  async function triggerStravaDueSync(token: string) {
+    try {
+      await fetch('/api/strava/sync-due', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {
+      // ignored
+    }
+  }
+
   onMount(() => {
     // 1. Theme (synchronous — avoid flash of wrong theme)
     const saved = localStorage.getItem('theme');
@@ -48,18 +61,47 @@
 
     // 6. Setup cloud sync when logged in
     let cleanup: (() => void) | undefined;
+    let dueSyncTimer: ReturnType<typeof setInterval> | undefined;
+    const handleVisibility = () => {
+      const u = get(userStore);
+      if (!u || document.visibilityState !== 'visible') return;
+      triggerStravaDueSync(u.token);
+    };
+    const handleOnline = () => {
+      const u = get(userStore);
+      if (!u) return;
+      triggerStravaDueSync(u.token);
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('online', handleOnline);
     const unsub = userStore.subscribe((u) => {
       cleanup?.();
+      if (dueSyncTimer) {
+        clearInterval(dueSyncTimer);
+        dueSyncTimer = undefined;
+      }
       if (u) {
         cleanup = setupSyncListeners(u);
         // Initial two-way sync: push queued local changes first, then pull latest server state
         (async () => {
           await syncToServer(u);
           await syncFromServer(u);
+          await triggerStravaDueSync(u.token);
         })().catch(() => {});
+        dueSyncTimer = setInterval(() => {
+          if (document.visibilityState === 'visible') {
+            triggerStravaDueSync(u.token);
+          }
+        }, STRAVA_DUE_SYNC_INTERVAL_MS);
       }
     });
-    return () => { unsub(); cleanup?.(); };
+    return () => {
+      unsub();
+      cleanup?.();
+      if (dueSyncTimer) clearInterval(dueSyncTimer);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('online', handleOnline);
+    };
   });
 
   const currentPath = $derived($page.url.pathname);
