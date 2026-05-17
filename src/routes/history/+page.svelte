@@ -82,6 +82,10 @@
     return { first: names[0] ?? '', remaining: Math.max(0, names.length - 1) };
   }
 
+  function getExerciseNamesString(workout: Workout) {
+    return getUniqueExerciseNames(workout).join(', ');
+  }
+
   function formatCompactDateTime(startTime: number): string {
     return `${new Date(startTime).toLocaleDateString('en-US', {
       month: 'short',
@@ -190,22 +194,16 @@
     <div class="flex flex-col divide-y divide-[hsl(var(--border))]">
       {#each filtered() as workout (workout.id)}
         <a href="/workout/{workout.id}" class="py-2 active:scale-[0.995] transition-transform">
-          <div class="flex items-center justify-between gap-1.5 text-sm text-[hsl(var(--foreground))]">
+          <div class="flex items-start justify-between gap-1.5 text-sm text-[hsl(var(--foreground))]">
             <div class="min-w-0">
               <p class="truncate text-sm font-semibold text-[hsl(var(--foreground))]">{formatCompactDateTime(workout.startTime)}</p>
-              <p class="truncate text-xs text-[hsl(var(--muted-foreground))]">
-                {#if getCompactSummary(workout).first}
-                  <span class="font-medium">{getCompactSummary(workout).first}</span>{#if getCompactSummary(workout).remaining > 0} <span class="text-[hsl(var(--muted-foreground))]">& {getCompactSummary(workout).remaining} more</span>{/if}
-                {/if}
-              </p>
+              <p class="truncate text-xs text-[hsl(var(--muted-foreground))]">{getExerciseNamesString(workout)}</p>
             </div>
-            <p class="shrink-0 text-xs font-medium text-[hsl(var(--primary))]">
-              {(() => { const mins = Math.round((workout.endTime - workout.startTime) / 60000); return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`; })()}
-            </p>
+            <div class="flex flex-col items-end shrink-0 ml-3">
+              <p class="text-xs font-medium text-[hsl(var(--primary))]">{new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</p>
+              <p class="text-xs text-[hsl(var(--muted-foreground))]">{workout.sets.length} sets</p>
+            </div>
           </div>
-          <p class="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
-            {workout.sets.length} sets · {Math.round((workout.endTime - workout.startTime) / 60000)} minutes
-          </p>
         </a>
       {/each}
     </div>
