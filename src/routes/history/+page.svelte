@@ -200,7 +200,7 @@
               <p class="truncate text-xs text-[hsl(var(--muted-foreground))]">{getExerciseNamesString(workout)}</p>
             </div>
             <div class="flex flex-col items-end shrink-0 ml-3">
-              <p class="text-xs font-medium text-[hsl(var(--primary))]">{new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</p>
+              <p class="text-xs font-medium text-[hsl(var(--primary))]">{(() => { const mins = Math.round((workout.endTime - workout.startTime) / 60000); return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`; })()}</p>
               <p class="text-xs text-[hsl(var(--muted-foreground))]">{workout.sets.length} sets</p>
             </div>
           </div>
