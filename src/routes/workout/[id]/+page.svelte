@@ -518,7 +518,6 @@
           <div class="flex items-center justify-between gap-3">
             <div class="min-w-0">
               <h1 class="text-lg font-bold text-[hsl(var(--foreground))] truncate">{new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} · {new Date(workout.startTime).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</h1>
-              <p class="text-sm text-[hsl(var(--muted-foreground))] mt-0.5">at {new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</p>
               <p class="text-sm text-[hsl(var(--foreground))] mt-1">
                 {(() => {
                   const mins = Math.round((workout.endTime - workout.startTime) / 60000);
@@ -546,44 +545,40 @@
           {/if}
 
           {#if editingTimes}
-            <div class="mt-3 flex flex-col gap-2">
-              <div>
-                <p class="text-xs font-medium text-[hsl(var(--muted-foreground))]">Start</p>
-                <div class="flex gap-2">
-                  <input type="date" bind:value={editStartDate} class="flex-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
-                  <input type="time" bind:value={editStartTime} class="w-28 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
-                </div>
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs font-medium text-[hsl(var(--muted-foreground))]">Start</span>
+                <input type="date" bind:value={editStartDate} class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+                <input type="time" bind:value={editStartTime} class="w-24 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
               </div>
-              <div>
-                <p class="text-xs font-medium text-[hsl(var(--muted-foreground))]">End</p>
-                <div class="flex gap-2">
-                  <input type="date" bind:value={editEndDate} class="flex-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
-                  <input type="time" bind:value={editEndTime} class="w-28 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
-                </div>
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs font-medium text-[hsl(var(--muted-foreground))]">End</span>
+                <input type="date" bind:value={editEndDate} class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+                <input type="time" bind:value={editEndTime} class="w-24 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
               </div>
-              <div class="flex gap-2">
-                <button onclick={saveEditedTimes} class="flex-1 rounded-xl bg-[hsl(var(--primary))] text-white py-2 text-sm font-medium">Save</button>
-                <button onclick={cancelEditTimes} class="flex-1 rounded-xl bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] py-2 text-sm font-medium">Cancel</button>
-              </div>
-              {#if timeEditError}
-                <p class="text-xs text-red-500">{timeEditError}</p>
-              {/if}
+              <button onclick={saveEditedTimes} class="rounded-xl bg-[hsl(var(--primary))] px-3 py-1.5 text-xs font-medium text-white">Save</button>
+              <button onclick={cancelEditTimes} class="rounded-xl bg-[hsl(var(--muted))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--muted-foreground))]">Cancel</button>
             </div>
-            <hr class="my-3 border-[hsl(var(--border))]" />
+            {#if timeEditError}
+              <p class="mt-2 text-xs text-red-500">{timeEditError}</p>
+            {/if}
           {/if}
 
-          <!-- Compact exercises list -->
-          <div class="flex flex-col gap-3">
-            {#each setsByExercise() as [exName, setsArr]}
-              <div>
-                <div class="flex items-baseline gap-2">
-                  <p class="text-sm font-medium text-[hsl(var(--foreground))] truncate">{exName}</p>
-                  <span class="text-xs text-[hsl(var(--muted-foreground))]">({setsArr.length})</span>
+          {#if !editingWorkout}
+            <hr class="my-3 border-[hsl(var(--border))]" />
+            <!-- Compact exercises list -->
+            <div class="flex flex-col gap-3">
+              {#each setsByExercise() as [exName, setsArr]}
+                <div>
+                  <div class="flex items-baseline gap-2">
+                    <p class="text-sm font-medium text-[hsl(var(--foreground))] truncate">{exName}</p>
+                    <span class="text-xs text-[hsl(var(--muted-foreground))]">({setsArr.length})</span>
+                  </div>
+                  <p class="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">{formatExerciseCompact(exName, setsArr)}</p>
                 </div>
-                <p class="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">{formatExerciseCompact(exName, setsArr)}</p>
-              </div>
-            {/each}
-          </div>
+              {/each}
+            </div>
+          {/if}
 
         </section>
 
