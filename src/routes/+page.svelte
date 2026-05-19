@@ -67,6 +67,7 @@
   // Custom times override the auto-derived times
   let customStartTime = $state<number | null>(null);
   let customEndTime = $state<number | null>(null);
+  let writeQueue = Promise.resolve();
 
   const dateLabel = $derived(
     new Date().toLocaleDateString('en-US', {
@@ -140,7 +141,11 @@
   }
 
   function toDateInput(ts: number) {
-    return new Date(ts).toISOString().slice(0, 10);
+    const d = new Date(ts);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }
   function toTimeInput(ts: number) {
     return new Date(ts).toTimeString().slice(0, 5);
@@ -175,11 +180,17 @@
     timeEditError = '';
     customStartTime = newStart;
     customEndTime = newEnd;
-    await persistWorkoutMeta();
+    await enqueueWrite(() => persistWorkoutMeta());
     editingTimes = false;
     markSyncPending();
     const user = get(userStore);
     if (user) syncToServer(user).catch(() => {});
+  }
+
+  function enqueueWrite<T>(task: () => Promise<T>): Promise<T> {
+    const run = writeQueue.then(task, task);
+    writeQueue = run.then(() => {}, () => {});
+    return run;
   }
 
   async function persistWorkoutMeta() {
@@ -200,8 +211,11 @@
   async function persistSets(newSets: WorkoutSet[]) {
     sets = newSets;
     setsStore.set(newSets);
-    await saveSets(newSets);
-    await persistWorkoutMeta();
+    const snapshot = newSets.map((s, i) => ({ ...s, order: i }));
+    await enqueueWrite(async () => {
+      await saveSets(snapshot);
+      await persistWorkoutMeta();
+    });
     markSyncPending();
     // Push any queued changes to the server
     const user = get(userStore);
@@ -254,6 +268,15 @@
     const targetIds = selected.has(id) && selected.size > 1 ? [...selected] : [id];
     const newSets = sets.map((s) =>
       targetIds.includes(s.id) ? { ...s, [field]: normalizedValue } : s
+    );
+    await persistSets(newSets);
+  }
+
+  async function handleUpdateMultiple(id: string, updates: Partial<WorkoutSet>) {
+    pushUndo('Edit set', sets);
+    const targetIds = selected.has(id) && selected.size > 1 ? [...selected] : [id];
+    const newSets = sets.map((s) =>
+      targetIds.includes(s.id) ? { ...s, ...updates } : s
     );
     await persistSets(newSets);
   }
@@ -481,6 +504,7 @@
             index={i}
             setNumber={i + 1}
             onUpdate={handleUpdate}
+            onUpdateMultiple={handleUpdateMultiple}
             onExerciseUpdate={handleExerciseUpdate}
             onDelete={handleDelete}
             onSelect={handleSelect}

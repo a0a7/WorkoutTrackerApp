@@ -53,6 +53,7 @@ export async function syncToServer(user: User): Promise<void> {
   syncToServerInFlight = (async () => {
   syncStore.update((s) => ({ ...s, syncing: true, error: null }));
   try {
+    let hadFailures = false;
     do {
       syncToServerNeedsRerun = false;
       const pending = await getPendingSync();
@@ -83,11 +84,20 @@ export async function syncToServer(user: User): Promise<void> {
           }
           await clearPendingSync(item.id);
         } catch {
+          hadFailures = true;
           // Continue with next item
         }
       }
     } while (syncToServerNeedsRerun);
-    syncStore.update((s) => ({ ...s, lastSync: Date.now() }));
+    await refreshSyncStatus();
+    syncStore.update((s) => {
+      const pendingOrFailed = s.hasPending || hadFailures;
+      return {
+        ...s,
+        lastSync: pendingOrFailed ? s.lastSync : Date.now(),
+        error: pendingOrFailed ? (s.error ?? 'Some changes are still pending sync') : null,
+      };
+    });
   } catch (e) {
     syncStore.update((s) => ({ ...s, error: e instanceof Error ? e.message : 'Sync failed' }));
   } finally {

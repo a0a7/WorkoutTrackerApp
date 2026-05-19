@@ -39,7 +39,10 @@
 
   function toDateInput(ts: number) {
     const d = new Date(ts);
-    return d.toISOString().slice(0, 10);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }
   function toTimeInput(ts: number) {
     const d = new Date(ts);
@@ -99,6 +102,27 @@
     draftSets = newSets.map((s, i) => ({ ...s, order: i }));
   }
 
+  function normalizeDraftValue(field: keyof WorkoutSet, value: unknown) {
+    if (field === 'reps') {
+      if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+      if (typeof value === 'string') {
+        if (/[xX×*]/.test(value)) return null;
+        const parsed = parseInt(value, 10);
+        return Number.isFinite(parsed) ? parsed : null;
+      }
+      return null;
+    }
+    if (field === 'weight') {
+      if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+      if (typeof value === 'string') {
+        const parsed = parseFloat(value);
+        return Number.isFinite(parsed) ? parsed : null;
+      }
+      return null;
+    }
+    return value;
+  }
+
   function handleDraftAdd(newSet: WorkoutSet) {
     if (!workout) return;
     persistDraftSets([...draftSets, { ...newSet, localWorkoutId: workout.id }]);
@@ -119,30 +143,20 @@
   }
 
   function handleDraftUpdate(id: string, field: keyof WorkoutSet, value: unknown) {
-    const normalizeValue = (f: keyof WorkoutSet, v: unknown) => {
-      if (f === 'reps') {
-        if (typeof v === 'number') return Number.isFinite(v) ? v : null;
-        if (typeof v === 'string') {
-          if (/[xX×*]/.test(v)) return null;
-          const parsed = parseInt(v, 10);
-          return Number.isFinite(parsed) ? parsed : null;
-        }
-        return null;
-      }
-      if (f === 'weight') {
-        if (typeof v === 'number') return Number.isFinite(v) ? v : null;
-        if (typeof v === 'string') {
-          const parsed = parseFloat(v);
-          return Number.isFinite(parsed) ? parsed : null;
-        }
-        return null;
-      }
-      return v;
-    };
-    const normalizedValue = normalizeValue(field, value);
+    const normalizedValue = normalizeDraftValue(field, value);
     const targetIds = draftSelected.has(id) && draftSelected.size > 1 ? [...draftSelected] : [id];
     persistDraftSets(
       draftSets.map((s) => (targetIds.includes(s.id) ? { ...s, [field]: normalizedValue } : s))
+    );
+  }
+
+  function handleDraftUpdateMultiple(id: string, updates: Partial<WorkoutSet>) {
+    const targetIds = draftSelected.has(id) && draftSelected.size > 1 ? [...draftSelected] : [id];
+    const normalizedUpdates = Object.fromEntries(
+      Object.entries(updates).map(([k, v]) => [k, normalizeDraftValue(k as keyof WorkoutSet, v)])
+    ) as Partial<WorkoutSet>;
+    persistDraftSets(
+      draftSets.map((s) => (targetIds.includes(s.id) ? { ...s, ...normalizedUpdates } : s))
     );
   }
 
@@ -223,6 +237,18 @@
   async function saveWorkoutEdits() {
     const workoutRef = workout;
     if (!workoutRef) return;
+    let nextStartTime = workoutRef.startTime;
+    let nextEndTime = workoutRef.endTime;
+    if (editingTimes) {
+      const newStart = fromDateTimeInputs(editStartDate, editStartTime);
+      const newEnd = fromDateTimeInputs(editEndDate, editEndTime);
+      if (isNaN(newStart)) { timeEditError = 'Invalid start date or time.'; return; }
+      if (isNaN(newEnd)) { timeEditError = 'Invalid end date or time.'; return; }
+      if (newEnd <= newStart) { timeEditError = 'End time must be after start time.'; return; }
+      timeEditError = '';
+      nextStartTime = newStart;
+      nextEndTime = newEnd;
+    }
     const normalized = draftSets.map((s, i) => ({
       ...s,
       localWorkoutId: workoutRef.id,
@@ -238,11 +264,18 @@
     if (normalized.length > 0) {
       await saveSets(normalized);
     }
-    const updatedWorkout = { ...workoutRef, sets: normalized };
+    const updatedWorkout = {
+      ...workoutRef,
+      startTime: nextStartTime,
+      endTime: nextEndTime,
+      sets: normalized,
+    };
     await saveWorkout(updatedWorkout);
     workout = updatedWorkout;
     editingWorkout = false;
+    editingTimes = false;
     draftSets = [];
+    draftSelected = new Set();
   }
 
   async function handleDeleteWorkout() {
@@ -562,6 +595,99 @@
 <!-- Divider between workout info and sets table (editing mode) -->
 {#if editingWorkout}
   <hr class="my-4 border-[hsl(var(--border))]" />
+{/if}
+
+{#if editingWorkout && workout}
+  <div class="px-4 pb-6">
+    <div class="mb-3 flex items-center justify-between gap-2">
+      <p class="text-sm font-medium text-[hsl(var(--foreground))]">Editing sets</p>
+      <div class="flex items-center gap-2">
+        <button
+          onclick={cancelEditWorkout}
+          class="rounded-xl bg-[hsl(var(--muted))] px-3 py-2 text-xs font-medium text-[hsl(var(--muted-foreground))]"
+        >
+          Cancel
+        </button>
+        <button
+          onclick={saveWorkoutEdits}
+          class="rounded-xl bg-[hsl(var(--primary))] px-3 py-2 text-xs font-medium text-white"
+        >
+          Save changes
+        </button>
+      </div>
+    </div>
+
+    <div class="-mx-4 border-y border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm min-h-30">
+      <table class="w-full border-collapse">
+        <thead>
+          <tr class="border-b border-[hsl(var(--border))]">
+            <th class="w-10 pl-4 pr-0 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">#</th>
+            <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Exercise</th>
+            <th class="w-12 px-0.5 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Reps</th>
+            <th class="w-14 px-0.5 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">{unit}</th>
+            <th class="w-12 pl-0 pr-4 py-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each draftSets as set, i (set.id)}
+            <SetRow
+              {set}
+              selected={draftSelected.has(set.id)}
+              isEmpty={false}
+              index={i}
+              setNumber={i + 1}
+              onUpdate={handleDraftUpdate}
+              onUpdateMultiple={handleDraftUpdateMultiple}
+              onExerciseUpdate={handleDraftExerciseUpdate}
+              onDelete={handleDraftDelete}
+              onSelect={handleDraftSelect}
+              onExpandSet={handleDraftExpandSet}
+              onDragStart={handleDraftDragStart}
+              onDragOver={handleDraftDragOver}
+              onDrop={handleDraftDrop}
+              onTouchReorder={handleDraftTouchReorder}
+            />
+          {/each}
+          {#each draftEmptyRows as emptySet, i}
+            <SetRow
+              set={emptySet}
+              selected={false}
+              isEmpty={true}
+              index={draftSets.length + i}
+              setNumber={null}
+              onAdd={handleDraftAdd}
+              onAddMultiple={handleDraftAddMultiple}
+              onDragStart={() => {}}
+              onDragOver={() => {}}
+              onDrop={() => {}}
+            />
+          {/each}
+        </tbody>
+      </table>
+    </div>
+
+    {#if draftSelected.size > 0}
+      <div class="mt-2 flex items-center justify-between rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2">
+        <span class="text-sm font-medium text-[hsl(var(--primary))]">{draftSelected.size} selected</span>
+        <div class="flex items-center gap-2">
+          <button
+            onclick={clearDraftSelection}
+            class="rounded-lg px-3 py-1.5 text-xs font-medium text-[hsl(var(--muted-foreground))] bg-[hsl(var(--muted))] hover:bg-[hsl(var(--border))]"
+            aria-label="Clear selection"
+          >
+            Deselect
+          </button>
+          <button
+            onclick={handleDraftDeleteSelected}
+            class="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-600"
+            aria-label="Delete selected sets"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    {/if}
+  </div>
 {/if}
 
 <!-- Custom numeric keypad — rendered at root so it sits above all row content -->
