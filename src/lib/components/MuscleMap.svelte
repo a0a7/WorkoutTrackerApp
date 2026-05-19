@@ -12,7 +12,7 @@
   const muscleColors: Record<string, string> = {
     primary: '#c73e36',
     secondary: '#ebc050',
-    tertiary: '#F4E6A1',
+    tertiary: '#f4e6a1',
   };
 
   const activationRank = { primary: 3, secondary: 2, tertiary: 1 } as const;
@@ -115,8 +115,9 @@
     abs: ['abs'],
     obliques: ['oblique'],
     pecs: ['chest_mid', 'chest_upper', 'chest_lower'],
-    middlechest: ['chest_mid'],
-    midchest: ['chest_mid'],
+    upperchest: ['chest_upper'],
+    middlechest: ['chest_mid', 'chest_lower'],
+    midchest: ['chest_mid', 'chest_lower'],
     frontsidedelts: ['front_delt', 'side_delt'],
     biceps: ['bicep'],
     forearmsbrachioradialis: ['forearm'],
@@ -270,16 +271,16 @@
       <path fill={fill('quad')} opacity={getMuscleOpacity('quad')} d="M151.01,315.88c-6.67-4.85-9.59-16.75-18.25-18.34-11.91,16.35-11.95,61.87-7.36,91.02,7.05,35.76,27.7,43.43,40.36,11.13,6.51-28.6,9.9-63.83-14.75-83.81Z"/>
       <path fill={fill('quad')} opacity={getMuscleOpacity('quad')} d="M228.64,315.88c6.67-4.85,9.59-16.75,18.25-18.34,11.74,15.86,11.67,59.67,7.83,88.67-2.44,15.9-12.22,34.11-19.42,34.28-9.66.44-21.62-13.84-22.36-25.08-5.97-26.74-7.24-61.81,15.7-79.53Z"/>
     </g>
-    <g id="Adductors_Abductors" data-name="Adductors/Abductors">
+    <g id="Hip_Flexors" data-name="Hip Flexors">
       <g>
         <path fill={fill('hip_flexor')} opacity={getMuscleOpacity('hip_flexor')} d="M134.6 227.81c3.8 6.94 18.39 12.84 25.99 17.37 4.61 7.73 7.11 16 14.24 20.62 1.83 1.45 1.31 1.85-.96 1.53-23.25-3.08-51.61-15.74-39.26-39.51Zm-5.43 21.29Z"/>
-        <path fill={fill('adductor')} opacity={getMuscleOpacity('adductor')} d="M129.17 249.1Zm12.96 12.29c5.04-1.63 21.17 16.24 25.98 20.15 26.03 21.1 11.16 47.8 8.92 81.34-.93-25.63-15.82-44.65-28.71-57.81-4.74-13.05-9.5-29.74-6.19-43.68Z"/>
-        <path fill={fill('abductor')} opacity={getMuscleOpacity('abductor')} d="M129.17,249.1c-7.52,21.61-8.99,54.91-10.46,82.75,2.56-17.71,8.9-39.19,15.47-54.95,3.88-20.3,6.52-13.7-5.02-27.8Z"/>
+        <path fill={fill('hip_flexor')} opacity={getMuscleOpacity('hip_flexor')} d="M129.17 249.1Zm12.96 12.29c5.04-1.63 21.17 16.24 25.98 20.15 26.03 21.1 11.16 47.8 8.92 81.34-.93-25.63-15.82-44.65-28.71-57.81-4.74-13.05-9.5-29.74-6.19-43.68Z"/>
+        <path fill={fill('hip_flexor')} opacity={getMuscleOpacity('hip_flexor')} d="M129.17,249.1c-7.52,21.61-8.99,54.91-10.46,82.75,2.56-17.71,8.9-39.19,15.47-54.95,3.88-20.3,6.52-13.7-5.02-27.8Z"/>
       </g>
       <g>
         <path fill={fill('hip_flexor')} opacity={getMuscleOpacity('hip_flexor')} d="M245.05 227.81c-3.8 6.94-18.39 12.84-25.99 17.37-4.61 7.73-7.11 16-14.24 20.62-1.83 1.45-1.31 1.85.96 1.53 23.25-3.08 51.61-15.74 39.26-39.51Zm-7.53 33.58Z"/>
-        <path fill={fill('adductor')} opacity={getMuscleOpacity('adductor')} d="M237.52 261.39c-5.04-1.63-21.17 16.24-25.98 20.15-26.02 21.1-11.16 47.8-8.92 81.34.93-25.64 15.82-44.65 28.71-57.81 4.74-13.05 9.5-29.74 6.19-43.68Z"/>
-        <path fill={fill('abductor')} opacity={getMuscleOpacity('abductor')} d="M250.48,249.1c7.52,21.61,8.99,54.91,10.46,82.75-2.56-17.71-8.9-39.19-15.47-54.95-3.87-20.3-6.52-13.7,5.02-27.8Z"/>
+        <path fill={fill('hip_flexor')} opacity={getMuscleOpacity('hip_flexor')} d="M237.52 261.39c-5.04-1.63-21.17 16.24-25.98 20.15-26.02 21.1-11.16 47.8-8.92 81.34.93-25.64 15.82-44.65 28.71-57.81 4.74-13.05 9.5-29.74 6.19-43.68Z"/>
+        <path fill={fill('hip_flexor')} opacity={getMuscleOpacity('hip_flexor')} d="M250.48,249.1c7.52,21.61,8.99,54.91,10.46,82.75-2.56-17.71-8.9-39.19-15.47-54.95-3.87-20.3-6.52-13.7,5.02-27.8Z"/>
       </g>
     </g>
     <g id="Abs">
@@ -290,11 +291,13 @@
       <path fill={fill('oblique')} opacity={getMuscleOpacity('oblique')} d="M154.34,195.68c3.35-14.26-5.08-36.68.25-49.8-18.72.67-10.85,49.97-9.96,53.4-5.07,13.77-10.35,18.53,3.06,29.72,1.36,1.16,11.45,10.81,8.36,3.94-4.25-12.03-2.8-28.55-1.7-37.26Z"/>
       <path fill={fill('oblique')} opacity={getMuscleOpacity('oblique')} d="M225.31,195.68c-3.35-14.27,5.08-36.67-.25-49.8,19.72.84,9.54,51.41,10.36,54.72,1.45,5.64,7.12,12.73,4.84,18.47-4.01,6.17-10.33,13.21-17.02,16.33,3.72-12.2,3.8-30.35,2.07-39.72Z"/>
     </g>
-    <g id="Pecs" transform="translate(129, 73)">
-      <path fill={fillAny(['chest_mid', 'chest_upper', 'chest_lower'])} opacity={getAnyMuscleOpacity(['chest_mid', 'chest_upper', 'chest_lower'])} transform="translate(0, 2)" d="M51.8068 54.8791c-13.67 11.33-38.8 7.6-48.94-7.8-7.72-12.34 2-11.9474 7.4746-13.1 9.5-2 19-3.0841 27.5-4.5 8.5-1.4158 10-2.9119 16.5-2.3627 6.5.5491 7.7354 18.5827-2.5346 27.7627ZM51.8068 54.8791c-13.67 11.33-38.8 7.6-48.94-7.8-7.72-12.34 2-11.9474 7.4746-13.1 9.5-2 19-3.0841 27.5-4.5 8.5-1.4158 10-2.9119 16.5-2.3627 6.5.5491 7.7354 18.5827-2.5346 27.7627Z"/>
-      <path fill={fillAny(['chest_mid', 'chest_upper', 'chest_lower'])} opacity={getAnyMuscleOpacity(['chest_mid', 'chest_upper', 'chest_lower'])} transform="translate(0, 2)" d="M69.5181 54.503c-10.2056-9.0561-8.978-26.8465-2.5187-27.3882 6.4592-.5417 7.9498.9341 16.3965 2.3309 8.4467 1.3967 17.8871 2.4663 27.3271 4.4393 5.441 1.137 15.1.7497 7.428 12.9232-10.076 15.1923-35.0486 18.872-48.6329 7.6948Z"/>
-      <path fill={fillAny(['chest_upper', 'chest_mid', 'chest_lower'])} opacity={getAnyMuscleOpacity(['chest_upper', 'chest_mid', 'chest_lower'])} d="M39.1584 26.9756c-13.67 1.8259-25 3.5-34 5-4.932.822-9.68-9.9584 2.74-18.3884 8.29-5.55 20.15-12.51 27.76-13.57 9.76.02 24.21-1.17 22.5 13.05 0 3.9084 1.5 11.1702-19 13.9084Z"/>
-      <path fill={fillAny(['chest_upper', 'chest_mid', 'chest_lower'])} opacity={getAnyMuscleOpacity(['chest_upper', 'chest_mid', 'chest_lower'])} d="M82.0414 26.9588c13.6002 1.8248 24.8726 3.4978 33.8266 4.9969 4.907.8215 9.631-9.9522-2.726-18.377C104.894 8.0322 93.0947 1.0765 85.5235.0172c-9.7102.02-24.0865-1.1693-22.3852 13.0419 0 3.9059-1.4924 11.1632 18.9031 13.8997Z"/>
+    <g id="Upper_Chest" data-name="Upper Pecs" transform="translate(129, 73)">
+      <path fill={fill("chest_upper")} opacity={getMuscleOpacity('chest_upper')} transform="translate(0, 2)" d="M51.8068 54.8791c-13.67 11.33-38.8 7.6-48.94-7.8-7.72-12.34 2-11.9474 7.4746-13.1 9.5-2 19-3.0841 27.5-4.5 8.5-1.4158 10-2.9119 16.5-2.3627 6.5.5491 7.7354 18.5827-2.5346 27.7627ZM51.8068 54.8791c-13.67 11.33-38.8 7.6-48.94-7.8-7.72-12.34 2-11.9474 7.4746-13.1 9.5-2 19-3.0841 27.5-4.5 8.5-1.4158 10-2.9119 16.5-2.3627 6.5.5491 7.7354 18.5827-2.5346 27.7627Z"/>
+      <path fill={fill("chest_upper")} opacity={getMuscleOpacity('chest_upper')} transform="translate(0, 2)" d="M69.5181 54.503c-10.2056-9.0561-8.978-26.8465-2.5187-27.3882 6.4592-.5417 7.9498.9341 16.3965 2.3309 8.4467 1.3967 17.8871 2.4663 27.3271 4.4393 5.441 1.137 15.1.7497 7.428 12.9232-10.076 15.1923-35.0486 18.872-48.6329 7.6948Z"/>
+    </g>
+    <g id="Middle_Lower_Chest" data-name="Mid/Lower Pecs" transform="translate(129, 73)">
+      <path fill={fillAny(['chest_mid', 'chest_lower'])} opacity={getAnyMuscleOpacity(['chest_mid', 'chest_lower'])} d="M39.1584 26.9756c-13.67 1.8259-25 3.5-34 5-4.932.822-9.68-9.9584 2.74-18.3884 8.29-5.55 20.15-12.51 27.76-13.57 9.76.02 24.21-1.17 22.5 13.05 0 3.9084 1.5 11.1702-19 13.9084Z"/>
+      <path fill={fillAny(['chest_mid', 'chest_lower'])} opacity={getAnyMuscleOpacity(['chest_mid', 'chest_lower'])} d="M82.0414 26.9588c13.6002 1.8248 24.8726 3.4978 33.8266 4.9969 4.907.8215 9.631-9.9522-2.726-18.377C104.894 8.0322 93.0947 1.0765 85.5235.0172c-9.7102.02-24.0865-1.1693-22.3852 13.0419 0 3.9059-1.4924 11.1632 18.9031 13.8997Z"/>
     </g>
     <g id="Front_Side_Delts" data-name="Front/Side Delts">
       <path fill={fillAny(['front_delt', 'side_delt'])} opacity={getAnyMuscleOpacity(['front_delt', 'side_delt'])} d="M116.72,97.36c10.08-11.47,26.29-26.45,42.73-31.09,5.85-1.94-12.81-5.05-13.26-4.88-8.48-.76-14.78,1.34-21.08,5.32-16.65,9.89-24.72,30.09-27.93,50.04-1.25,9.1,18.48-19.19,19.54-19.39Z"/>
@@ -304,7 +307,7 @@
       <path fill={fill('bicep')} opacity={getMuscleOpacity('bicep')} d="M93.42,134.04c-19.88,47.7,4.36,60.02,28.59,6.62,2.05-9.28,2.39-31.36.13-37.25-6.83,3.45-24.34,20.58-28.72,30.64Z"/>
       <path fill={fill('bicep')} opacity={getMuscleOpacity('bicep')} d="M290.1,176.9c12.78-21.21-10.77-61.62-32.65-72.59-1.4,8.02-2.97,32.2,2.53,42.38,4.47,9.42,21.05,34.27,30.12,30.21Z"/>
     </g>
-    <g id="Forearms_Brachioradialis_" data-name="Forearms (Brachioradialis)">
+    <g id="Forearms_Brachioradialis" data-name="Forearms">
       <path fill={fill('forearm')} opacity={getMuscleOpacity('forearm')} d="M85.71,180.12c-7.79-3.41-20.03,4.26-24.42,12.25-6.08,11.07-22.88,51.89-16.06,56.45,9.76,3.26,57.52-53.21,40.48-68.7Z"/>
       <path fill={fill('forearm')} opacity={getMuscleOpacity('forearm')} d="M293.52,181.4c-16.64,15.71,30.73,71.77,40.6,68.63,6.82-4.56-9.98-45.37-16.06-56.45-4.41-8.01-16.73-15.76-24.54-12.18Z"/>
     </g>
