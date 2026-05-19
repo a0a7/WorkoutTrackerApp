@@ -59,7 +59,7 @@
   const muscleLabels: Record<MuscleId, string> = {
     chest_upper: 'Upper Chest',
     chest_lower: 'Lower Chest',
-    chest_mid: 'Middle Chest',
+    chest_mid: 'Middle/Lower Chest',
     front_delt: 'Front Delts',
     side_delt: 'Side Delts',
     rear_delt: 'Rear Delts',
@@ -86,9 +86,10 @@
   };
 
   const activationLabels = {
-    primary: 'Primary',
-    secondary: 'Secondary',
-    tertiary: 'Tertiary',
+    primary: 'Primary Mover',
+    secondary: 'Secondary Mover',
+    tertiary: 'Tertiary Mover',
+    not_hit: 'Not Hit',
   } as const;
 
   function normalizeGroupId(value: string): string {
@@ -111,15 +112,19 @@
     triceps: ['tricep'],
     neck: ['trap_upper'],
     quads: ['quad'],
+    hipflexors: ['hip_flexor'],
     adductorsabductors: ['adductor', 'abductor'],
     abs: ['abs'],
     obliques: ['oblique'],
     pecs: ['chest_mid', 'chest_upper', 'chest_lower'],
+    upperpecs: ['chest_upper'],
     upperchest: ['chest_upper'],
+    midlowerpecs: ['chest_mid', 'chest_lower'],
     middlechest: ['chest_mid', 'chest_lower'],
     midchest: ['chest_mid', 'chest_lower'],
     frontsidedelts: ['front_delt', 'side_delt'],
     biceps: ['bicep'],
+    forearms: ['forearm'],
     forearmsbrachioradialis: ['forearm'],
   };
 
@@ -132,10 +137,19 @@
 
   function findMuscleFromEventTarget(target: EventTarget | null): MuscleId[] {
     const el = target as Element | null;
-    const group = el?.closest('g[id]');
-    const rawId = group?.getAttribute('id');
+    const group = el?.closest('g[data-name]');
+    const rawId = group?.getAttribute('data-name');
     if (!rawId) return [];
-    return groupToMuscleIds[normalizeGroupId(rawId)] ?? [];
+
+    let cleaned = normalizeGroupId(rawId);
+    
+    // We added the specific pecs mappings to replace standard 'pecs'
+    if (cleaned === 'chest') {
+        const idAttr = group?.getAttribute('id') || '';
+        cleaned = normalizeGroupId(idAttr);
+    }
+    
+    return groupToMuscleIds[cleaned] || [];
   }
 
   function setTooltipPosition(clientX: number, clientY: number) {
@@ -291,13 +305,13 @@
       <path fill={fill('oblique')} opacity={getMuscleOpacity('oblique')} d="M154.34,195.68c3.35-14.26-5.08-36.68.25-49.8-18.72.67-10.85,49.97-9.96,53.4-5.07,13.77-10.35,18.53,3.06,29.72,1.36,1.16,11.45,10.81,8.36,3.94-4.25-12.03-2.8-28.55-1.7-37.26Z"/>
       <path fill={fill('oblique')} opacity={getMuscleOpacity('oblique')} d="M225.31,195.68c-3.35-14.27,5.08-36.67-.25-49.8,19.72.84,9.54,51.41,10.36,54.72,1.45,5.64,7.12,12.73,4.84,18.47-4.01,6.17-10.33,13.21-17.02,16.33,3.72-12.2,3.8-30.35,2.07-39.72Z"/>
     </g>
-    <g id="Upper_Chest" data-name="Upper Pecs" transform="translate(129, 73)">
-      <path fill={fill("chest_upper")} opacity={getMuscleOpacity('chest_upper')} transform="translate(0, 2)" d="M51.8068 54.8791c-13.67 11.33-38.8 7.6-48.94-7.8-7.72-12.34 2-11.9474 7.4746-13.1 9.5-2 19-3.0841 27.5-4.5 8.5-1.4158 10-2.9119 16.5-2.3627 6.5.5491 7.7354 18.5827-2.5346 27.7627ZM51.8068 54.8791c-13.67 11.33-38.8 7.6-48.94-7.8-7.72-12.34 2-11.9474 7.4746-13.1 9.5-2 19-3.0841 27.5-4.5 8.5-1.4158 10-2.9119 16.5-2.3627 6.5.5491 7.7354 18.5827-2.5346 27.7627Z"/>
-      <path fill={fill("chest_upper")} opacity={getMuscleOpacity('chest_upper')} transform="translate(0, 2)" d="M69.5181 54.503c-10.2056-9.0561-8.978-26.8465-2.5187-27.3882 6.4592-.5417 7.9498.9341 16.3965 2.3309 8.4467 1.3967 17.8871 2.4663 27.3271 4.4393 5.441 1.137 15.1.7497 7.428 12.9232-10.076 15.1923-35.0486 18.872-48.6329 7.6948Z"/>
+    <g id="Upper_Chest" data-name="Upper Chest" transform="translate(129, 73)">
+      <path fill={fill("chest_upper")} opacity={getMuscleOpacity('chest_upper')} d="M39.1584 26.9756c-13.67 1.8259-25 3.5-34 5-4.932.822-9.68-9.9584 2.74-18.3884 8.29-5.55 20.15-12.51 27.76-13.57 9.76.02 24.21-1.17 22.5 13.05 0 3.9084 1.5 11.1702-19 13.9084Z"/>
+      <path fill={fill("chest_upper")} opacity={getMuscleOpacity('chest_upper')} d="M82.0414 26.9588c13.6002 1.8248 24.8726 3.4978 33.8266 4.9969 4.907.8215 9.631-9.9522-2.726-18.377C104.894 8.0322 93.0947 1.0765 85.5235.0172c-9.7102.02-24.0865-1.1693-22.3852 13.0419 0 3.9059-1.4924 11.1632 18.9031 13.8997Z"/>
     </g>
     <g id="Middle_Lower_Chest" data-name="Mid/Lower Pecs" transform="translate(129, 73)">
-      <path fill={fillAny(['chest_mid', 'chest_lower'])} opacity={getAnyMuscleOpacity(['chest_mid', 'chest_lower'])} d="M39.1584 26.9756c-13.67 1.8259-25 3.5-34 5-4.932.822-9.68-9.9584 2.74-18.3884 8.29-5.55 20.15-12.51 27.76-13.57 9.76.02 24.21-1.17 22.5 13.05 0 3.9084 1.5 11.1702-19 13.9084Z"/>
-      <path fill={fillAny(['chest_mid', 'chest_lower'])} opacity={getAnyMuscleOpacity(['chest_mid', 'chest_lower'])} d="M82.0414 26.9588c13.6002 1.8248 24.8726 3.4978 33.8266 4.9969 4.907.8215 9.631-9.9522-2.726-18.377C104.894 8.0322 93.0947 1.0765 85.5235.0172c-9.7102.02-24.0865-1.1693-22.3852 13.0419 0 3.9059-1.4924 11.1632 18.9031 13.8997Z"/>
+      <path fill={fillAny(['chest_mid', 'chest_lower'])} opacity={getAnyMuscleOpacity(['chest_mid', 'chest_lower'])} transform="translate(0, 2)" d="M51.8068 54.8791c-13.67 11.33-38.8 7.6-48.94-7.8-7.72-12.34 2-11.9474 7.4746-13.1 9.5-2 19-3.0841 27.5-4.5 8.5-1.4158 10-2.9119 16.5-2.3627 6.5.5491 7.7354 18.5827-2.5346 27.7627ZM51.8068 54.8791c-13.67 11.33-38.8 7.6-48.94-7.8-7.72-12.34 2-11.9474 7.4746-13.1 9.5-2 19-3.0841 27.5-4.5 8.5-1.4158 10-2.9119 16.5-2.3627 6.5.5491 7.7354 18.5827-2.5346 27.7627Z"/>
+      <path fill={fillAny(['chest_mid', 'chest_lower'])} opacity={getAnyMuscleOpacity(['chest_mid', 'chest_lower'])} transform="translate(0, 2)" d="M69.5181 54.503c-10.2056-9.0561-8.978-26.8465-2.5187-27.3882 6.4592-.5417 7.9498.9341 16.3965 2.3309 8.4467 1.3967 17.8871 2.4663 27.3271 4.4393 5.441 1.137 15.1.7497 7.428 12.9232-10.076 15.1923-35.0486 18.872-48.6329 7.6948Z"/>
     </g>
     <g id="Front_Side_Delts" data-name="Front/Side Delts">
       <path fill={fillAny(['front_delt', 'side_delt'])} opacity={getAnyMuscleOpacity(['front_delt', 'side_delt'])} d="M116.72,97.36c10.08-11.47,26.29-26.45,42.73-31.09,5.85-1.94-12.81-5.05-13.26-4.88-8.48-.76-14.78,1.34-21.08,5.32-16.65,9.89-24.72,30.09-27.93,50.04-1.25,9.1,18.48-19.19,19.54-19.39Z"/>
@@ -323,7 +337,7 @@
   >
     <p class="font-semibold text-[hsl(var(--foreground))]">{muscleLabels[tooltipMuscle]}</p>
     <p class="mt-0.5 text-[hsl(var(--muted-foreground))]">
-      {activationLabels[muscleInfo?.activation ?? activations.find((a) => a.muscle === tooltipMuscle)?.activation ?? 'tertiary']} hit
+      {activationLabels[muscleInfo?.activation ?? activations.find((a) => a.muscle === tooltipMuscle)?.activation ?? 'not_hit']}
     </p>
     <p class="mt-1 text-[hsl(var(--muted-foreground))]">
       {(muscleInfo?.exercises?.length ?? 0) > 0 ? muscleInfo?.exercises.join(', ') : 'No contributing exercises'}
