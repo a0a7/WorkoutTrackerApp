@@ -244,8 +244,8 @@
   </g>
   <g id="Posterior_View_Muscles" data-name="Posterior View Muscles">
     <g id="Calves">
-      <path fill={fill('calf')} opacity={getMuscleOpacity('calf')} d="M522.19,464.16c-10.64.77-18.8,16.92-17.44,29.44,2.02,15.91,2.72,127.62,23.82,79.43,3.02-13.48,3.42-29.56,7.01-43.68,6.19-18.73,16.37-61.71-13.38-65.18Z"/>
-      <path fill={fill('calf')} opacity={getMuscleOpacity('calf')} d="M639.16,460.15c-29.57,3.79-19.37,46.45-13.2,65.19,3.59,14.14,3.98,30.17,7.01,43.68,21.1,48.19,21.79-63.45,23.82-79.42,1.35-12.56-6.85-28.84-17.62-29.45Z"/>
+      <path fill={fill('calf')} opacity={getMuscleOpacity('calf')} transform="translate(0, 0)" d="M522.19 464.16c-10.64.77-16.19 16.84-16.19 29.84 2.02 15.91 3 128 26.25 79.4.75-14.4 1.75-30.4 3.75-44.4 5.42-19.35 7.99-60.32-13.38-65.18Z"/>
+      <path fill={fill('calf')} opacity={getMuscleOpacity('calf')} transform="translate(1161, 0) scale(-1, 1)" d="M522.19 464.16c-10.64.77-16.19 16.84-16.19 29.84 2.02 15.91 3 128 26.25 79.4.75-14.4 1.75-30.4 3.75-44.4 5.42-19.35 7.99-60.32-13.38-65.18Z"/>
     </g>
     <g id="Hamstrings">
       <path fill={fill('hamstring')} opacity={getMuscleOpacity('hamstring')} d="M543.7,304.62c-13.96-4.79-23.48,13.79-29.74,27.53.24,31.13,1.14,103.92,12.56,109.83,38.9,6.5,19.93-128.87,17.19-137.37Z"/>
