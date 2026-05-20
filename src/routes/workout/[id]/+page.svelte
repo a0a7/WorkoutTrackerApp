@@ -506,7 +506,7 @@
     </div>
   {:else}
     <div class="mb-5 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-sm lg:p-5">
-      <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+      <div class="grid gap-5 lg:grid-cols-[3fr_2fr] lg:items-start ">
 
         <!-- Mobile-first: Muscle map first (no header above it) -->
         <section class="order-1 lg:order-2">
@@ -517,8 +517,8 @@
         <section class="order-2 lg:order-1 min-w-0">
           <div class="flex items-center justify-between gap-3">
             <div class="min-w-0">
-              <h1 class="text-lg font-bold text-[hsl(var(--foreground))] truncate">{new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} · {new Date(workout.startTime).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</h1>
-              <p class="text-sm text-[hsl(var(--foreground))] mt-1">
+              <h1 class="text-lg font-black text-[hsl(var(--foreground))] truncate">{new Date(workout.startTime).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} at {new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</h1>
+              <p class="text-md font-bold text-[hsl(var(--foreground))] mt-1">
                 {(() => {
                   const mins = Math.round((workout.endTime - workout.startTime) / 60000);
                   const setsCount = workout.sets.length;
@@ -530,14 +530,14 @@
                 })()}
               </p>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex text-right flex-col">
               {#if stravaConnected}
                 <button class="text-sm text-[hsl(var(--primary))]" disabled={stravaSyncing} onclick={pushWorkoutToStrava}>
                   {stravaSyncing ? 'Pushing…' : 'Push to Strava'}
                 </button>
               {/if}
-              <button class="text-sm text-[hsl(var(--primary))]" onclick={() => { beginEditWorkout(); beginEditTimes(); }}>Edit</button>
-              <button class="text-sm text-red-500" onclick={() => { confirmDelete = true; }}>Delete</button>
+              <button class="text-sm text-right text-[hsl(var(--primary))]" onclick={() => { beginEditWorkout(); beginEditTimes(); }}>Edit</button>
+              <button class="text-sm text-right text-red-500" onclick={() => { confirmDelete = true; }}>Delete</button>
             </div>
           </div>
           {#if stravaMessage}

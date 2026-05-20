@@ -60,7 +60,7 @@
     chest_upper: 'Upper Chest',
     chest_lower: 'Lower Chest',
     chest_mid: 'Middle/Lower Chest',
-    front_delt: 'Front Delts',
+    front_delt: 'Front/Side Delts',
     side_delt: 'Side Delts',
     rear_delt: 'Rear Delts',
     bicep: 'Biceps',
@@ -137,15 +137,18 @@
 
   function findMuscleFromEventTarget(target: EventTarget | null): MuscleId[] {
     const el = target as Element | null;
-    const group = el?.closest('g[data-name]');
-    const rawId = group?.getAttribute('data-name');
+    const group = el?.closest('g[id], g[data-name]');
+    const dataName = group?.getAttribute('data-name');
+    const idAttr = group?.getAttribute('id');
+    const rawId = dataName || idAttr;
+    
     if (!rawId) return [];
 
     let cleaned = normalizeGroupId(rawId);
     
     // We added the specific pecs mappings to replace standard 'pecs'
-    if (cleaned === 'chest') {
-        const idAttr = group?.getAttribute('id') || '';
+    // Also mid/lower chest and upper chest groups are sub-groups of another group, so check id explicitly if dataName failed to give the granular id.
+    if (cleaned === 'chest' && idAttr) {
         cleaned = normalizeGroupId(idAttr);
     }
     
@@ -155,8 +158,21 @@
   function setTooltipPosition(clientX: number, clientY: number) {
     if (!wrapperEl) return;
     const rect = wrapperEl.getBoundingClientRect();
-    tooltipX = clientX - rect.left;
-    tooltipY = clientY - rect.top;
+    const tooltipWidth = 224; // approx max-w-56 (14rem)
+    let left = clientX - rect.left;
+    let top = clientY - rect.top;
+
+    // keep within left boundary
+    if (left < tooltipWidth / 2) {
+      left = tooltipWidth / 2;
+    }
+    // keep within right boundary
+    if (left > rect.width - tooltipWidth / 2) {
+      left = rect.width - tooltipWidth / 2;
+    }
+    
+    tooltipX = left;
+    tooltipY = top;
   }
 
   function handlePointerMove(event: PointerEvent) {
@@ -204,13 +220,13 @@
   }
 </script>
 
-<div bind:this={wrapperEl} class="relative flex justify-center w-full max-w-lg mx-auto">
+<div bind:this={wrapperEl} class="relative flex justify-center w-full max-w-lg lg:max-w-3xl lg:h-[calc(100vh-14rem)] mx-auto">
 <svg
   id="Layer_2"
   data-name="Layer 2"
   xmlns="http://www.w3.org/2000/svg"
   viewBox="0 0 768.41 607.66"
-  class="block h-auto w-full max-w-lg touch-manipulation"
+  class="block h-auto w-full max-w-lg lg:max-w-none lg:w-full lg:h-full touch-manipulation focus:outline-none select-none"
   role="button"
   aria-label="Muscle activation map"
   tabindex="0"
@@ -332,8 +348,8 @@
   {@const tooltipMuscle = activeMuscleGroup.find((id) => details?.[id] || activations.some((a) => a.muscle === id)) ?? activeMuscle}
   {@const muscleInfo = details?.[tooltipMuscle]}
   <div
-    class="pointer-events-none absolute z-20 max-w-[14rem] -translate-x-1/2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-2.5 py-2 text-xs shadow-md"
-    style="left: {tooltipX}px; top: {tooltipY - 12}px;"
+    class="pointer-events-none absolute z-20 max-w-56 -translate-x-1/2 {tooltipY < 100 ? 'translate-y-4' : '-translate-y-[calc(100%+16px)]'} rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-2.5 py-2 text-xs shadow-md"
+    style="left: {tooltipX}px; top: {tooltipY}px;"
   >
     <p class="font-semibold text-[hsl(var(--foreground))]">{muscleLabels[tooltipMuscle]}</p>
     <p class="mt-0.5 text-[hsl(var(--muted-foreground))]">
