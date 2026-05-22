@@ -19,16 +19,15 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
+      const data = await res.json() as any;
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
         error = data.message ?? data.error ?? `Request failed (${res.status})`;
         return;
       }
-      const data = await res.json();
       userStore.login({ id: data.userId, email, token: data.token });
       goto('/');
-    } catch {
-      error = 'Network error — check your connection and try again.';
+    } catch (e) {
+      error = (e as Error).message ?? 'An unexpected error occurred';
     } finally {
       loading = false;
     }
@@ -43,10 +42,8 @@
   <div class="w-full max-w-sm">
     <!-- Logo -->
     <div class="mb-8 text-center">
-      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--accent))] shadow-lg">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round">
-          <path d="M6.5 6.5h11M6.5 12h11M6.5 17.5h11"/>
-        </svg>
+      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[hsl(var(--foreground))] text-[hsl(var(--background))] shadow-lg">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/></svg>
       </div>
       <h1 class="text-3xl font-bold text-[hsl(var(--foreground))]">Logbook</h1>
       <p class="mt-1 text-sm text-[hsl(var(--muted-foreground))]">log ur sessions broski</p>
@@ -86,19 +83,12 @@
           <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">{error}</p>
         {/if}
 
-        <button
-          type="submit"
+        <button 
+          type="submit" 
           disabled={loading}
-          class="mt-1 w-full rounded-xl bg-[hsl(var(--primary))] py-3 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 disabled:opacity-60 active:scale-[0.98]"
+          class="mt-1 w-full rounded-xl bg-[hsl(var(--foreground))] text-[hsl(var(--background))] py-3 text-sm font-semibold shadow-sm transition-all hover:opacity-90 disabled:opacity-60 active:scale-[0.98] cursor-pointer"
         >
-          {#if loading}
-            <span class="flex items-center justify-center gap-2">
-              <div class="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
-              {mode === 'login' ? 'Signing in...' : 'Creating account...'}
-            </span>
-          {:else}
-            {mode === 'login' ? 'Sign In' : 'Create Account'}
-          {/if}
+          {loading ? 'Please wait...' : (mode === 'login' ? 'Sign In' : 'Create Account')}
         </button>
       </form>
 

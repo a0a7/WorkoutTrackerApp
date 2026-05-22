@@ -644,17 +644,18 @@
   ontouchcancel={handleRowSwipeEnd}
 >
   <!-- Set number / select -->
-  <td class="w-10 pl-3 pr-0 py-0 text-center">
+  <td class="w-10 py-0 align-middle">
+    <div class="h-[100%] w-[calc(100%+16px)] -ml-6">
     {#if isEmpty}
       {#if hasDraftContent()}
         <button
           type="button"
-          class="flex h-full min-h-8 w-full items-center justify-center text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] transition-colors"
+          class="cursor-pointer flex h-full min-h-8 w-full items-center justify-center text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors"
           onclick={clearDraftRow}
           aria-label="Clear draft set row"
           title="Clear"
         >
-          <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <svg class="translate-x-4" viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <path d="M4 4l8 8M12 4l-8 8"/>
           </svg>
         </button>
@@ -664,30 +665,31 @@
     {:else if selected}
       <button
         type="button"
-        class="flex h-full min-h-8 w-full items-center justify-center bg-[hsl(var(--primary)/0.1)]"
+        class="flex h-full min-h-8 w-full items-center justify-center cursor-pointer"
         onclick={(e) => onSelect?.(set.id, e.shiftKey)}
         ontouchstart={handleTouchStart}
         ontouchmove={handleTouchMove}
         ontouchend={handleTouchEnd}
         aria-label="Deselect set"
       >
-        <svg class="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none">
+        <svg class="h-3 w-3 text-[hsl(var(--foreground))] translate-x-4" viewBox="0 0 12 12" fill="none">
           <path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </button>
     {:else}
       <button
         type="button"
-        class="flex h-full min-h-8 w-full items-center justify-center text-xs font-semibold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--primary)/0.1)] hover:text-[hsl(var(--primary))] transition-colors"
+        class="flex h-full cursor-pointer min-h-8 w-full items-center justify-center right text-xs font-semibold text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] transition-colors"
         onclick={(e) => onSelect?.(set.id, e.shiftKey)}
         ontouchstart={handleTouchStart}
         ontouchmove={handleTouchMove}
         ontouchend={handleTouchEnd}
         aria-label="Select set"
       >
-        {setNumber ?? ''}
+        <span class="translate-x-4">{setNumber ?? ''}</span>
       </button>
     {/if}
+    </div>
   </td>
 
   <!-- Exercise -->
@@ -765,8 +767,8 @@
   </td>
 
   <!-- Delete / commit -->
-  <td class="w-12 pl-0 pr-3 py-0">
-    <div class={isEmpty ? 'px-4' : ''}>
+  <td class="w-12 py-0 align-middle">
+      <div class={isEmpty ? 'px-4 h-full min-h-[2rem]' : 'h-full min-h-[2rem] w-[calc(100%+32px)]'}>
     {#if !isEmpty}
       <div class="flex h-full items-center justify-center">
         <button
@@ -777,11 +779,11 @@
           onpointerup={handleDragHandlePointerEnd}
           onpointercancel={handleDragHandlePointerEnd}
           oncontextmenu={(e) => e.preventDefault()}
-          class="flex h-full min-h-8 w-full items-center justify-center text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] transition-colors cursor-grab active:cursor-grabbing touch-none select-none"
+          class="flex h-full min-h-8 w-full items-center justify-center text-[hsl(var(--muted-foreground))]  transition-colors cursor-grab active:cursor-grabbing touch-none select-none rounded-r-xl"
           title="Drag to reorder"
           aria-label="Drag to reorder set"
         >
-          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <svg class="-translate-x-4" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
             <path d="M3 4h10M3 8h10M3 12h10" />
           </svg>
         </button>
@@ -790,15 +792,12 @@
       <button
         type="button"
         onclick={() => flushEmptyRow()}
-        class="flex h-6 w-6 mx-auto items-center justify-center rounded
-               text-[hsl(var(--primary))]
-               hover:bg-[hsl(var(--primary)/0.1)]
-               transition-all"
+        class="flex h-8 w-8 mx-auto mt-1 items-center justify-center rounded-xl text-[hsl(var(--background))] hover:opacity-90 transition-all cursor-pointer"
         title="Add set"
         aria-label="Add set"
       >
-        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M2 8l4 4 8-8"/>
+        <svg class="h-3 w-3 text-[hsl(var(--foreground))]" viewBox="0 0 12 12" fill="none">
+          <path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </button>
     {/if}
@@ -811,3 +810,29 @@
     <td colspan="5" class="p-0"></td>
   </tr>
 {/if}
+
+<style>
+  /* Custom styles for SetRow component */
+  tr[data-set-row-index] {
+    position: relative;
+  }
+
+  /* Extend interactive targets into the visual margins on desktop */
+  @media (min-width: 640px) {
+    tr[data-set-row-index] td {
+      position: relative;
+      z-index: 1;
+    }
+
+    tr[data-set-row-index] td::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      z-index: -1;
+      border-radius: inherit;
+    }
+  }
+</style>

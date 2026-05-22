@@ -69,6 +69,26 @@
       stravaLoading = false;
     }
   }
+
+  async function disconnectStrava() {
+    if (!user || stravaLoading) return;
+    stravaLoading = true;
+    stravaError = '';
+    try {
+      const res = await fetch('/api/strava/status', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      stravaConnected = false;
+    } catch (e) {
+      stravaError = e instanceof Error ? e.message : 'Failed to disconnect Strava';
+    } finally {
+      stravaLoading = false;
+    }
+  }
+
+  let isCheckingStatus = $state(false);
 </script>
 
 <svelte:head>
@@ -87,10 +107,7 @@
           <p class="text-xs text-[hsl(var(--muted-foreground))]">Signed in as</p>
           <p class="font-medium text-[hsl(var(--foreground))]">{user.email}</p>
         </div>
-        <button
-          onclick={logout}
-          class="w-full px-4 py-3 text-left text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
-        >
+        <button class="block px-4 py-3 text-sm font-medium text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-colors w-full text-left cursor-pointer" onclick={logout}>
           Sign Out
         </button>
       {:else}
@@ -108,10 +125,12 @@
   <section class="mb-5">
     <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Appearance</h2>
     <div class="rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] overflow-hidden shadow-sm">
-      <div class="flex items-center justify-between px-4 py-3">
-        <span class="text-sm font-medium text-[hsl(var(--foreground))]">Dark Mode</span>
-        <ThemeToggle />
-      </div>
+      <button class="flex w-full items-center justify-between px-4 py-3 cursor-pointer text-left transition-colors hover:bg-[hsl(var(--muted))]" onclick={() => {
+        const isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      }}>
+        <span class="text-sm font-medium text-[hsl(var(--foreground))]">Toggle Dark Mode</span>
+      </button>
     </div>
   </section>
 
@@ -121,14 +140,15 @@
     <div class="rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] overflow-hidden shadow-sm">
       <div class="flex items-center justify-between px-4 py-3">
         <span class="text-sm font-medium text-[hsl(var(--foreground))]">Weight</span>
-        <div class="flex rounded-lg bg-[hsl(var(--muted))] p-0.5">
+        <div class="flex items-center gap-1 border border-[hsl(var(--border))] rounded bg-[hsl(var(--background))] shadow-sm overflow-hidden p-0">
           <button
             onclick={() => setUnit('lbs')}
-            class="rounded-md px-3 py-1 text-sm font-medium transition-all {unit === 'lbs' ? 'bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-sm' : 'text-[hsl(var(--muted-foreground))]'}"
+            class="px-3 py-1 cursor-pointer transition-colors text-xs font-semibold m-0 rounded-none {unit === 'lbs' ? 'bg-[hsl(var(--foreground))] text-[hsl(var(--background))]' : 'bg-transparent text-[hsl(var(--muted-foreground))]'}"
           >lbs</button>
+          <div class="w-[1px] h-3 bg-[hsl(var(--border))]"></div>
           <button
             onclick={() => setUnit('kg')}
-            class="rounded-md px-3 py-1 text-sm font-medium transition-all {unit === 'kg' ? 'bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-sm' : 'text-[hsl(var(--muted-foreground))]'}"
+            class="px-3 py-1 cursor-pointer transition-colors text-xs font-semibold m-0 rounded-none {unit === 'kg' ? 'bg-[hsl(var(--foreground))] text-[hsl(var(--background))]' : 'bg-transparent text-[hsl(var(--muted-foreground))]'}"
           >kg</button>
         </div>
       </div>
@@ -141,7 +161,7 @@
     <div class="rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] overflow-hidden shadow-sm">
       <div class="px-4 py-3 border-b border-[hsl(var(--border))]">
         <div class="flex items-center justify-between gap-3">
-          <div>
+          <div class="flex-1">
             <p class="text-sm font-medium text-[hsl(var(--foreground))]">Strava</p>
             <p class="text-xs text-[hsl(var(--muted-foreground))]">
               {#if stravaConnected || stravaConnectedNow}
@@ -153,12 +173,16 @@
           </div>
           {#if user}
             <button
-              onclick={connectStrava}
-              disabled={stravaLoading || stravaConnected}
-              class="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60
-                     {stravaConnected ? 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]' : 'bg-[hsl(var(--primary))] text-white'}"
+                     onclick={stravaConnected ? disconnectStrava : connectStrava}
+                     class="px-3 py-1.5 text-xs font-semibold border border-[hsl(var(--border))] bg-[hsl(var(--background))] hover:bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer rounded"
             >
-              {stravaConnected ? 'Connected' : (stravaLoading ? 'Connecting…' : 'Connect')}
+              {#if isCheckingStatus}
+                <span class="inline-block w-3 h-3 rounded-full border border-[hsl(var(--foreground))] border-t-transparent animate-spin"></span>
+              {:else if stravaConnected}
+                Disconnect
+              {:else}
+                Connect
+              {/if}
             </button>
           {/if}
         </div>

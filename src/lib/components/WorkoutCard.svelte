@@ -42,8 +42,12 @@
       <p class="text-sm text-[hsl(var(--muted-foreground))]">{timeLabel}</p>
     </div>
     <div class="text-right">
-      <p class="text-sm font-medium text-[hsl(var(--primary))]">
-        {durationMin >= 60 ? `${Math.floor(durationMin / 60)}h ${durationMin % 60}m` : `${durationMin}m`}
+      <p class="text-sm font-medium text-[hsl(var(--foreground))]">
+        {workout.endTime === null
+          ? 'In progress'
+          : durationMin >= 60
+          ? `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`
+          : `${durationMin}m`}
       </p>
       <p class="text-xs text-[hsl(var(--muted-foreground))]">{workout.sets.length} sets</p>
     </div>

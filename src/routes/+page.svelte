@@ -50,7 +50,7 @@
 
   // Stable session ID — one unique ID per app session (supports multiple sessions/day)
   // Defined inside onMount so each component mount gets a fresh session ID
-  // Workout start time is backdated by this offset to account for warmup before the first logged set
+  // Workout start time is backdated to this offset to account for warmup before the first logged set
   const WORKOUT_START_OFFSET_MS = 10 * 60_000; // 10 minutes
 
   // Geolocation options
@@ -373,13 +373,21 @@
     const reordered = newSets.map((s, i) => ({ ...s, order: i }));
     await persistSets(reordered);
   }
+
+  // --- Multi-select ---
+  function toggleRow(emptyId: string) {
+    const next = new Set(selected);
+    if (next.has(emptyId)) next.delete(emptyId);
+    else next.add(emptyId);
+    selected = next;
+  }
 </script>
 
 <svelte:head>
   <title>Logbook – Today</title>
 </svelte:head>
 
-<div class="px-4 pt-safe-top">
+<div class="px-4 pt-safe-top lg:pt-4 flex-1 flex flex-col">
   <!-- Header -->
   <div class="sticky top-0 z-10 bg-[hsl(var(--background)/0.9)] backdrop-blur-sm py-3 flex items-center justify-between">
     <div class="flex flex-col min-w-0">
@@ -387,104 +395,102 @@
       {#if sets.length > 0 && !editingTimes}
         <button
           onclick={beginEditTimes}
-          class="-ml-1 mt-0.5 w-fit rounded-md px-1 py-1 text-left text-sm text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] transition-colors"
+          class="-ml-1 mt-0.5 w-fit rounded-md px-1 py-1 text-left text-sm text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors cursor-pointer"
         >
           {timesLabel()}
         </button>
       {/if}
     </div>
     <div class="flex items-center gap-2">
+      <!-- Sync Status Button -->
       <button
         onclick={handleSyncTap}
-        class="flex items-center gap-1 px-0 text-xs font-medium transition-opacity hover:opacity-70 touch-manipulation
-               {syncError ? 'text-red-500' : 'text-[hsl(var(--muted-foreground))]'}"
+        class="flex items-center gap-1 rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1 text-xs font-medium cursor-pointer shadow-sm transition-all active:scale-95
+               {syncError ? 'text-red-500' : 'text-[hsl(var(--foreground))]'}"
         aria-label="Sync now"
         title={syncError
           ?? (hasPendingSync ? 'Changes pending sync' : (lastSync ? `Last synced ${formatLastSync(lastSync)}` : 'Not synced yet'))}
       >
         <span>Sync</span>
         {#if isSyncing}
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                class="animate-spin" style="animation-duration:1.2s">
             <polyline points="23 4 23 10 17 10"/>
             <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
           </svg>
         {:else if syncError}
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
             <line x1="12" y1="13" x2="12" y2="16"/>
             <circle cx="12" cy="18" r="0.5" fill="currentColor"/>
           </svg>
         {:else if hasPendingSync}
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
             <path d="M12 7v5l3 2"/>
           </svg>
         {:else if lastSync}
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
             <polyline points="9 16 11 18 15 14"/>
           </svg>
         {:else}
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
           </svg>
         {/if}
       </button>
-      <button
-        onclick={handleUndo}
-        disabled={!$hasUndo}
-        class="flex h-8 w-8 items-center justify-center rounded-full transition-colors disabled:opacity-30 {$hasUndo ? 'hover:bg-[hsl(var(--muted))]' : ''}"
-        aria-label="Undo"
-      >
-        <svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <path d="M2 6h8a4 4 0 010 8H6"/>
-          <polyline points="5 3 2 6 5 9"/>
-        </svg>
-      </button>
-      <button
-        onclick={handleRedo}
-        disabled={!$hasRedo}
-        class="flex h-8 w-8 items-center justify-center rounded-full transition-colors disabled:opacity-30 {$hasRedo ? 'hover:bg-[hsl(var(--muted))]' : ''}"
-        aria-label="Redo"
-      >
-        <svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <path d="M14 6H6a4 4 0 000 8h4"/>
-          <polyline points="11 3 14 6 11 9"/>
-        </svg>
-      </button>
+
+      <div class="flex items-center gap-1">
+        <button
+          class="rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] shadow-sm px-2 py-1 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+          disabled={!$hasUndo}
+          onclick={async () => { undo(sets); await persistSets($setsStore); }}
+          aria-label="Undo"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-[hsl(var(--foreground))]"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+        </button>
+        <button
+          class="rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] shadow-sm px-2 py-1 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+          disabled={!$hasRedo}
+          onclick={async () => { redo(sets); await persistSets($setsStore); }}
+          aria-label="Redo"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-[hsl(var(--foreground))]"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l.1.2"/></svg>
+        </button>
+      </div>
     </div>
   </div>
 
-  <!-- Time editing panel -->
+  <!-- Edit mode time selection -->
   {#if editingTimes}
-    <div class="mb-3 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 shadow-sm flex flex-col gap-2">
-      <div>
-        <p class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">Start</p>
+    <div class="mb-6 rounded-xl bg-[hsl(var(--card))] p-3 shadow-sm border border-[hsl(var(--border))]">
+      <div class="mb-4">
+        <label class="mb-1 block text-xs font-medium text-[hsl(var(--muted-foreground))]">Start Time</label>
         <div class="flex gap-2">
-          <input type="date" bind:value={editStartDate} class="flex-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
-          <input type="time" bind:value={editStartTime} class="w-28 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+          <input type="date" bind:value={editStartDate} class="flex-1 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-2 text-sm text-[hsl(var(--foreground))]" />
+          <input type="time" bind:value={editStartTime} class="flex-1 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-2 text-sm text-[hsl(var(--foreground))]" />
         </div>
       </div>
-      <div>
-        <p class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">End</p>
+      <div class="mb-4">
+        <label class="mb-1 block text-xs font-medium text-[hsl(var(--muted-foreground))]">End Time</label>
         <div class="flex gap-2">
-          <input type="date" bind:value={editEndDate} class="flex-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
-          <input type="time" bind:value={editEndTime} class="w-28 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+          <input type="date" bind:value={editEndDate} class="flex-1 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-2 text-sm text-[hsl(var(--foreground))]" />
+          <input type="time" bind:value={editEndTime} class="flex-1 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-2 text-sm text-[hsl(var,--foreground))]" />
         </div>
       </div>
       {#if timeEditError}
-        <p class="text-xs text-red-500">{timeEditError}</p>
+        <p class="mb-4 text-xs font-medium text-red-500">{timeEditError}</p>
       {/if}
       <div class="flex gap-2">
-        <button onclick={saveEditedTimes} class="flex-1 rounded-xl bg-[hsl(var(--primary))] text-white py-2 text-sm font-medium transition-colors">Save</button>
-        <button onclick={cancelEditTimes} class="flex-1 rounded-xl bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] py-2 text-sm font-medium transition-colors">Cancel</button>
+        <button onclick={cancelEditTimes} class="flex-1 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] py-2 text-sm font-medium transition-colors cursor-pointer block">Cancel</button>
+        <button onclick={saveEditedTimes} class="flex-1 rounded-lg bg-[hsl(var(--foreground))] text-[hsl(var(--background))] py-2 text-sm font-medium transition-colors cursor-pointer block">Save</button>
       </div>
     </div>
   {/if}
 
   <!-- Sets table -->
-  <div class="-mx-4 border-y border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm min-h-30">
+  <div class="border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm min-h-30 rounded-2xl relative overflow-visible z-0">
     <table class="w-full border-collapse">
       <thead>
         <tr class="border-b border-[hsl(var(--border))]">
@@ -534,19 +540,19 @@
   </div>
 
   {#if selected.size > 0}
-    <div class="mt-2 flex items-center justify-between rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2">
-      <span class="text-sm font-medium text-[hsl(var(--primary))]">{selected.size} selected</span>
+    <div class="mt-2 flex items-center justify-between rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2">
+      <span class="text-sm font-medium text-[hsl(var(--foreground))]">{selected.size} selected</span>
       <div class="flex items-center gap-2">
         <button
           onclick={clearSelection}
-          class="rounded-lg px-3 py-1.5 text-xs font-medium text-[hsl(var(--muted-foreground))] bg-[hsl(var(--muted))] hover:bg-[hsl(var(--border))]"
+          class="rounded-lg px-3 py-1.5 text-xs font-medium text-[hsl(var(--muted-foreground))] bg-[hsl(var(--muted))] hover:bg-[hsl(var(--border))] cursor-pointer block"
           aria-label="Clear selection"
         >
           Deselect
         </button>
         <button
           onclick={handleDeleteSelected}
-          class="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(var(--destructive)/0.12)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.2)]"
+          class="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(var(--destructive)/0.12)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.2)] cursor-pointer block"
           aria-label="Delete selected sets"
           title="Delete selected"
         >
@@ -570,7 +576,7 @@
       📍 Location access denied — workout won't be geotagged.
     </p>
   {/if}
-</div>
 
-<!-- Custom numeric keypad — rendered at root so it sits above all row content -->
-<NumericKeypad />
+  <!-- Custom numeric keypad — rendered at root so it sits above all row content -->
+  <NumericKeypad />
+</div>

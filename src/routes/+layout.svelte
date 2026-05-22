@@ -2,7 +2,6 @@
   import '../app.css';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
-  import { goto } from '$app/navigation';
   import { get } from 'svelte/store';
   import { initDB } from '$lib/db';
   import { userStore } from '$lib/stores/userStore';
@@ -141,56 +140,113 @@
       pullSyncing = false;
     }
   }
+
+  import { CalendarDays, Home, Settings, Sun, Moon } from 'lucide-svelte';
+  import { unitPreference } from '$lib/stores/userStore';
+
+  function toggleMode() {
+    const isDark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  }
+
+  function toggleUnit() {
+    unitPreference.set($unitPreference === 'lbs' ? 'kg' : 'lbs');
+  }
 </script>
 
-<div class="flex min-h-screen flex-col bg-[hsl(var(--background))]">
-  <!-- Main content area: no bottom padding on login page -->
+<svelte:head>
+  <title>Logbook</title>
+  <meta name="description" content="Track your workouts and progress" />
+  <link rel="icon" type="image/png" href="/favicon.png" />
+</svelte:head>
+
+<div class="flex min-h-screen lg:flex-row flex-col bg-[hsl(var(--background))]">
+  <!-- Desktop Sidebar -->
+  {#if currentPath !== '/login'}
+    <aside class="hidden lg:flex w-52 flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+      <div class="px-4 py-4 flex items-center justify-between">
+        <p class="text-sm font-semibold tracking-tight text-[hsl(var(--foreground))]">
+          Logbook <span class="text-xs font-normal text-[hsl(var(--muted-foreground))]">v0.1</span>
+        </p>
+      </div>
+      <nav class="flex-1 space-y-1 px-2">
+        {#each navItems as pt}
+          <a
+            href={pt.href}
+            class="flex items-center gap-3 px-2 py-1.5 text-sm transition-colors {isActive(pt.href) ? 'text-[hsl(var(--foreground))] font-bold' : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'}"
+          >
+            {#if pt.icon === 'today'}
+              <Home class="w-4 h-4" />
+            {:else if pt.icon === 'history'}
+              <CalendarDays class="w-4 h-4" />
+            {:else if pt.icon === 'settings'}
+              <Settings class="w-4 h-4" />
+            {/if}
+            {pt.label}
+          </a>
+        {/each}
+      </nav>
+      <div class="px-3 pb-3 flex items-center gap-2 justify-between">
+        <div class="flex items-center border border-[hsl(var(--border))] rounded bg-[hsl(var(--background))] shadow-sm overflow-hidden p-0">
+          <button
+            onclick={() => { unitPreference.set($unitPreference === 'lbs' ? 'kg' : 'lbs'); }}
+            class="px-3 py-1 cursor-pointer transition-colors text-xs font-semibold m-0 rounded-none {$unitPreference === 'lbs' ? 'bg-[hsl(var(--foreground))] text-[hsl(var(--background))]' : 'bg-transparent text-[hsl(var(--muted-foreground))]'}"
+          >lbs</button>
+          <div class="w-[1px] h-3 bg-[hsl(var(--border))]"></div>
+          <button
+            onclick={() => { unitPreference.set($unitPreference === 'lbs' ? 'kg' : 'lbs'); }}
+            class="px-3 py-1 cursor-pointer transition-colors text-xs font-semibold m-0 rounded-none {$unitPreference === 'kg' ? 'bg-[hsl(var(--foreground))] text-[hsl(var(--background))]' : 'bg-transparent text-[hsl(var(--muted-foreground))]'}"
+          >kg</button>
+        </div>
+        <button onclick={toggleMode} class="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors p-1.5 border border-[hsl(var(--border))] rounded bg-[hsl(var(--background))] shadow-sm cursor-pointer">
+          <span class="sr-only">Toggle theme</span>
+          <div class="relative w-4 h-4">
+            <Sun class="absolute inset-0 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 w-4 h-4" />
+            <Moon class="absolute inset-0 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 w-4 h-4" />
+          </div>
+        </button>
+      </div>
+    </aside>
+  {/if}
+
+  <!-- Main content area: no bottom padding on login page, flex-1 to fill adjacent to sidebar -->
   <main
     bind:this={mainEl}
     ontouchstart={handlePullStart}
     ontouchmove={handlePullMove}
     ontouchend={handlePullEnd}
-    class="flex-1 overflow-y-auto {currentPath !== '/login' ? 'pb-[calc(4rem+env(safe-area-inset-bottom,0px))]' : ''}"
+    class="flex-1 flex flex-col relative {currentPath !== '/login' ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0' : ''} overflow-y-auto"
   >
+    {#if pullDistance > 0 && currentPath !== '/login'}
+      <div class="absolute inset-x-0 top-0 z-50 flex h-16 items-center justify-center bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow-md">
+        <span class="text-sm font-medium">Release to sync</span>
+      </div>
+    {/if}
     {@render children()}
   </main>
 
-  <!-- Bottom Navigation — hidden on the login page -->
+  <!-- Mobile Bottom Navigation (Hidden on LG) -->
   {#if currentPath !== '/login'}
-  <nav
-    class="fixed bottom-0 left-0 right-0 z-50 glass border-t border-[hsl(var(--border))]"
-    style="padding-bottom: env(safe-area-inset-bottom, 0px)"
-  >
-    <div class="flex h-16 items-center justify-around px-4">
+    <nav
+      class="fixed bottom-0 left-0 right-0 z-50 flex h-[calc(4rem+env(safe-area-inset-bottom))] items-start justify-around border-t border-[hsl(var(--border))] bg-[hsl(var(--card))] pb-[env(safe-area-inset-bottom)] pt-2 sm:px-6 lg:hidden"
+    >
       {#each navItems as item}
         <a
           href={item.href}
-          class="flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-colors {isActive(item.href)
-            ? 'text-[hsl(var(--primary))]'
-            : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'}"
-          aria-label={item.label}
+          class="flex flex-col items-center justify-center gap-1 px-4 py-1 transition-colors {isActive(item.href) ? 'text-[hsl(var(--foreground))] font-bold' : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'}"
         >
           {#if item.icon === 'today'}
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{isActive(item.href) ? 2.5 : 2}" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-              <line x1="16" y1="2" x2="16" y2="6"/>
-              <line x1="8" y1="2" x2="8" y2="6"/>
-              <line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
+            <Home class="w-[1.4rem] h-[1.4rem]" strokeWidth={isActive(item.href) ? 2.5 : 2} />
           {:else if item.icon === 'history'}
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{isActive(item.href) ? 2.5 : 2}" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-            </svg>
-          {:else}
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{isActive(item.href) ? 2.5 : 2}" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-              <circle cx="12" cy="7" r="4"/>
-            </svg>
+            <CalendarDays class="w-[1.4rem] h-[1.4rem]" strokeWidth={isActive(item.href) ? 2.5 : 2} />
+          {:else if item.icon === 'settings'}
+            <Settings class="w-[1.4rem] h-[1.4rem]" strokeWidth={isActive(item.href) ? 2.5 : 2} />
           {/if}
-          <span class="text-xs font-medium">{item.label}</span>
+          <span class="text-[0.65rem] font-medium {isActive(item.href) ? 'font-semibold' : ''}"
+            >{item.label}</span
+          >
         </a>
       {/each}
-    </div>
-  </nav>
+    </nav>
   {/if}
 </div>

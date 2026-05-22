@@ -58,6 +58,8 @@
     if (cfg.onNext) await handleNext();
     else await handleDone();
   }
+
+  let keys = ['1','2','3','4','5','6','7','8','9','0','.','<'];
 </script>
 
 <svelte:window
@@ -66,12 +68,27 @@
     if (e.key === 'Enter') {
       e.preventDefault();
       handleEnter().catch(() => {});
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancel();
+    } else if (e.key === 'Backspace') {
+      e.preventDefault();
+      handleKey('⌫');
+    } else if (/^[0-9]$/.test(e.key)) {
+      e.preventDefault();
+      handleKey(e.key);
+    } else if (e.key === '.') {
+      e.preventDefault();
+      handleKey('.');
+    } else if (e.key.toLowerCase() === 'x') {
+      e.preventDefault();
+      handleKey('x');
     }
   }}
 />
 
+<!-- Backdrop — tap anywhere outside to dismiss. Use a full-screen button so it's keyboard-focusable -->
 {#if $keypadConfig}
-  <!-- Backdrop — tap anywhere outside to dismiss. Use a full-screen button so it's keyboard-focusable -->
   <button
     type="button"
     aria-label="Close keypad"
@@ -91,9 +108,9 @@
       {#each ['1','2','3','4','5','6','7','8','9'] as key (key)}
         <button
           onclick={() => handleKey(key)}
-          class="h-12 rounded-2xl p-1 transition-transform select-none touch-manipulation active:scale-95"
+          class="h-12 rounded-2xl p-1 transition-transform select-none touch-manipulation active:scale-95 cursor-pointer block w-full text-center"
         >
-          <span class="flex h-full w-full items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-lg font-medium text-[hsl(var(--foreground))] active:bg-[hsl(var(--border))]">
+          <span class="flex h-full w-full flex-col justify-center items-center rounded-xl bg-[hsl(var(--muted))] text-lg font-medium text-[hsl(var(--foreground))] active:bg-[hsl(var(--border))]">
             {key}
           </span>
         </button>
@@ -103,35 +120,35 @@
         <button
           onclick={() => handleKey('.')}
           disabled={localValue.includes('.')}
-          class="h-12 rounded-2xl p-1 transition-transform select-none touch-manipulation active:scale-95 disabled:opacity-25"
+          class="h-12 rounded-2xl p-1 transition-transform select-none touch-manipulation active:scale-95 disabled:opacity-25 cursor-pointer block w-full text-center"
         >
-          <span class="flex h-full w-full items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-lg font-medium text-[hsl(var(--foreground))] active:bg-[hsl(var(--border))]">.</span>
+          <span class="flex h-full w-full flex-col items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-lg font-medium text-[hsl(var(--foreground))] active:bg-[hsl(var(--border))]">.</span>
         </button>
       {:else if $keypadConfig.allowShorthand}
         <button
           onclick={() => handleKey('x')}
           disabled={localValue.startsWith('x') || (localValue.match(/[xX×*]/g)?.length ?? 0) >= 2}
-          class="h-12 rounded-2xl p-1 transition-transform select-none touch-manipulation active:scale-95 disabled:opacity-25"
+          class="h-12 rounded-2xl p-1 transition-transform select-none touch-manipulation active:scale-95 disabled:opacity-25 cursor-pointer block w-full text-center"
         >
-          <span class="flex h-full w-full items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-lg font-medium text-[hsl(var(--foreground))] active:bg-[hsl(var(--border))]">x</span>
+          <span class="flex h-full w-full flex-col items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-lg font-medium text-[hsl(var(--foreground))] active:bg-[hsl(var(--border))]">x</span>
         </button>
       {:else}
-        <div class="h-12"></div>
+        <div class="h-12 w-full text-center"></div>
       {/if}
 
       <button
         onclick={() => handleKey('0')}
-        class="h-12 rounded-2xl p-1 transition-transform select-none touch-manipulation active:scale-95"
+        class="h-12 rounded-2xl p-1 transition-transform select-none touch-manipulation active:scale-95 cursor-pointer block w-full text-center"
       >
-        <span class="flex h-full w-full items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-lg font-medium text-[hsl(var(--foreground))] active:bg-[hsl(var(--border))]">0</span>
+        <span class="flex h-full w-full flex-col items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-lg font-medium text-[hsl(var(--foreground))] active:bg-[hsl(var(--border))]">0</span>
       </button>
 
       <button
         onclick={() => handleKey('⌫')}
-        class="h-12 rounded-2xl p-1 transition-transform select-none touch-manipulation active:scale-95"
+        class="h-12 rounded-2xl p-1 transition-transform select-none touch-manipulation active:scale-95 cursor-pointer block w-full text-center"
         aria-label="Backspace"
       >
-        <span class="flex h-full w-full items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] active:bg-[hsl(var(--border))]">
+        <span class="flex h-full w-full items-center flex-col justify-center rounded-xl bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] active:bg-[hsl(var(--border))]">
           <svg class="mx-auto" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/>
             <line x1="18" y1="9" x2="12" y2="15"/>
@@ -144,10 +161,10 @@
     <div class="grid grid-cols-3 gap-1 px-2 pb-2">
       <button
         onclick={handleCancel}
-        class="h-12 rounded-2xl p-1 transition-transform select-none touch-manipulation active:scale-95"
+        class="h-12 rounded-2xl p-1 transition-transform select-none touch-manipulation active:scale-95 cursor-pointer block w-full text-center"
         aria-label="Close keyboard"
       >
-        <span class="flex h-full w-full items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] active:bg-[hsl(var(--border))]">
+        <span class="flex h-full w-full flex-col items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] active:bg-[hsl(var(--border))]">
           <svg class="mx-auto" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="6 9 12 15 18 9"/>
           </svg>
@@ -157,16 +174,12 @@
       {#if $keypadConfig.onNext}
         <button
           onclick={handleNext}
-          class="col-span-2 h-12 rounded-xl bg-[hsl(var(--primary))]
-                 text-sm font-semibold text-white
-                  active:scale-95 transition-transform select-none touch-manipulation"
+          class="col-span-2 h-12 rounded-xl bg-[hsl(var(--foreground))] text-[hsl(var(--background))] text-sm font-semibold active:scale-95 transition-transform select-none touch-manipulation cursor-pointer block w-full text-center flex items-center justify-center"
         >Next &#8594;</button>
       {:else}
         <button
           onclick={handleDone}
-          class="col-span-2 h-12 rounded-xl bg-[hsl(var(--primary))]
-                 text-sm font-semibold text-white
-                  active:scale-95 transition-transform select-none touch-manipulation"
+          class="col-span-2 h-12 rounded-xl bg-[hsl(var(--foreground))] text-[hsl(var(--background))] text-sm font-semibold active:scale-95 transition-transform select-none touch-manipulation cursor-pointer flex items-center justify-center w-full"
         >Done &#10003;</button>
       {/if}
     </div>

@@ -145,7 +145,7 @@
 
   {#if loading}
     <div class="flex items-center justify-center py-16">
-      <div class="h-8 w-8 animate-spin rounded-full border-2 border-[hsl(var(--primary))] border-t-transparent"></div>
+      <div class="h-8 w-8 animate-spin rounded-full border-2 border-[hsl(var(--foreground))] border-t-transparent"></div>
     </div>
   {:else if grouped().length === 0}
     <div class="flex flex-col items-center gap-3 py-16 text-center">
@@ -178,7 +178,7 @@
                     {workout.sets.length} sets
                   </p>
                 </div>
-                <p class="shrink-0 text-xs font-medium text-[hsl(var(--primary))]">
+                <p class="shrink-0 text-xs font-medium text-[hsl(var(--foreground))]">
                   {(() => {
                     const mins = Math.round((workout.endTime - workout.startTime) / 60000);
                     return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
@@ -200,8 +200,8 @@
               <p class="truncate text-xs text-[hsl(var(--muted-foreground))]">{getExerciseNamesString(workout)}</p>
             </div>
             <div class="flex flex-col items-end shrink-0 ml-3">
-              <p class="text-xs font-medium text-[hsl(var(--primary))]">{(() => { const mins = Math.round((workout.endTime - workout.startTime) / 60000); return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`; })()}</p>
-              <p class="text-xs text-[hsl(var(--muted-foreground))]">{workout.sets.length} sets</p>
+              <p class="text-xs font-medium text-[hsl(var(--foreground))]">{(() => { const mins = Math.round((workout.endTime - workout.startTime) / 60000); return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`; })()}</p>
+              <WorkoutVolume sets={workout.sets} />
             </div>
           </div>
         </a>

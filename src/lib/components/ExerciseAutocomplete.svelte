@@ -97,7 +97,7 @@
   }
 </script>
 
-<div class="relative z-20 w-full">
+<div class="relative z-20 -ml-5 w-full">
   <input
     bind:this={inputEl}
     type="text"
@@ -111,7 +111,7 @@
            focus:bg-[hsl(var(--muted)/0.5)]
            placeholder:text-[hsl(var(--muted-foreground)/0.35)]
            transition-colors truncate"
-    style="font-size:16px"
+    style="font-size:14px"
     autocomplete="off"
     autocorrect="off"
     spellcheck="false"
