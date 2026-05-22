@@ -3,7 +3,8 @@
   import { onMount } from 'svelte';
   import WorkoutCard from '$lib/components/WorkoutCard.svelte';
   import { getAllWorkouts } from '$lib/db';
-  import type { Workout } from '$lib/types';
+  import type { Workout, WorkoutSet } from '$lib/types';
+  import { unitPreference, initUnitPreference } from '$lib/stores/userStore';
 
   let workouts = $state<Workout[]>([]);
   let loading = $state(true);
@@ -11,8 +12,10 @@
   let fromDate = $state('');
   let toDate = $state('');
   let compactness = $state<'card' | 'compact'>('card');
+  const unit = $derived($unitPreference);
 
   onMount(async () => {
+    initUnitPreference();
     const savedCompactness = localStorage.getItem('history-compactness');
     if (savedCompactness === 'card' || savedCompactness === 'compact') {
       compactness = savedCompactness;
@@ -95,6 +98,23 @@
       minute: '2-digit',
     })}`;
   }
+
+  function computeTotalVolume(sets: WorkoutSet[]) {
+    let total = 0;
+    for (const s of sets) {
+      if (typeof s.reps === 'number' && typeof s.weight === 'number' && s.reps > 0 && s.weight > 0) {
+        total += s.reps * s.weight;
+      }
+    }
+    return Math.round(total);
+  }
+
+  function formatVolume(sets: WorkoutSet[]) {
+    const total = computeTotalVolume(sets);
+    if (!total) return `0 ${unit === 'kg' ? 'kg' : 'lbs'}`;
+    const formatted = new Intl.NumberFormat('en-US').format(total);
+    return `${formatted} ${unit === 'kg' ? 'kg' : 'lbs'}`;
+  }
 </script>
 
 <svelte:head>
@@ -168,6 +188,7 @@
             {:else}
               <a
                 href="/workout/{workout.id}"
+                data-sveltekit-preload-data="off"
                 class="flex items-center justify-between rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2 active:scale-[0.99] transition-transform"
               >
                 <div class="min-w-0">
@@ -201,7 +222,7 @@
             </div>
             <div class="flex flex-col items-end shrink-0 ml-3">
               <p class="text-xs font-medium text-[hsl(var(--foreground))]">{(() => { const mins = Math.round((workout.endTime - workout.startTime) / 60000); return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`; })()}</p>
-              <WorkoutVolume sets={workout.sets} />
+              <p class="text-xs text-[hsl(var(--muted-foreground))]">{formatVolume(workout.sets)}</p>
             </div>
           </div>
         </a>

@@ -34,6 +34,7 @@
 
 <a
   href="/workout/{workout.id}"
+  data-sveltekit-preload-data="off"
   class="block rounded-2xl bg-[hsl(var(--card))] p-4 shadow-sm border border-[hsl(var(--border))] active:scale-[0.98] transition-transform"
 >
   <div class="flex items-center justify-between mb-2">

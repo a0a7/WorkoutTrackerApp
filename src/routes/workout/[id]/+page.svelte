@@ -9,7 +9,7 @@
   import NumericKeypad from '$lib/components/NumericKeypad.svelte';
   import { deleteSet, deleteWorkout, getWorkout, saveSets, saveWorkout } from '$lib/db';
   import { EXERCISE_MAP } from '$lib/exercises';
-  import { unitPreference, initUnitPreference, userStore } from '$lib/stores/userStore';
+  import { unitPreference, initUnitPreference, userStore, tertiaryActivationPreference, initTertiaryActivationPreference } from '$lib/stores/userStore';
   import { syncToServer } from '$lib/sync';
   import type { Workout, MuscleActivation, WorkoutSet } from '$lib/types';
 
@@ -20,6 +20,7 @@
 
   // Reactive unit preference — auto-subscribes and updates when the store changes
   const unit = $derived($unitPreference);
+  const showTertiary = $derived($tertiaryActivationPreference);
 
   // Time editing state
   let editingTimes = $state(false);
@@ -325,6 +326,7 @@
 
   onMount(async () => {
     initUnitPreference();
+    initTertiaryActivationPreference();
     if (workoutId) {
       workout = await getWorkout(workoutId) ?? null;
     }
@@ -349,6 +351,7 @@
       const ex = EXERCISE_MAP.get(s.exerciseId);
       if (!ex) continue;
       for (const ma of ex.muscleActivations) {
+        if (!showTertiary && ma.activation === 'tertiary') continue;
         const existing = map.get(ma.muscle);
         const incomingRank = ACTIVATION_RANK[ma.activation] ?? 0;
         const existingRank = existing ? (ACTIVATION_RANK[existing] ?? 0) : 0;
@@ -371,6 +374,7 @@
       const ex = EXERCISE_MAP.get(s.exerciseId);
       if (!ex) continue;
       for (const ma of ex.muscleActivations) {
+        if (!showTertiary && ma.activation === 'tertiary') continue;
         const existing = details.get(ma.muscle);
         const incomingRank = ACTIVATION_RANK[ma.activation] ?? 0;
         const existingRank = existing ? (ACTIVATION_RANK[existing.activation] ?? 0) : 0;
@@ -510,7 +514,7 @@
 
         <!-- Mobile-first: Muscle map first (no header above it) -->
         <section class="order-1 lg:order-2">
-          <MuscleMap activations={allActivations()} details={muscleDetails()} />
+          <MuscleMap activations={allActivations()} details={muscleDetails()} showTertiary={showTertiary} />
         </section>
 
         <!-- Info block: name, start time, duration · # sets · total volume, Edit/Delete buttons -->

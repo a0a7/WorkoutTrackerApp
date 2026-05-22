@@ -37,6 +37,7 @@ export const userStore = createUserStore();
 export const isLoggedIn = derived(userStore, ($u) => $u !== null);
 
 export const unitPreference = writable<'lbs' | 'kg'>('lbs');
+export const tertiaryActivationPreference = writable<boolean>(true);
 
 // Locales/regions that use lbs by convention (US, Liberia, Myanmar)
 const LBS_LOCALE_PREFIXES = [
@@ -67,6 +68,18 @@ export function initUnitPreference() {
       const detected = detectRegionUnit();
       unitPreference.set(detected);
       localStorage.setItem('unit_preference', detected);
+    }
+  }
+}
+
+export function initTertiaryActivationPreference() {
+  if (typeof localStorage !== 'undefined') {
+    const saved = localStorage.getItem('show_tertiary_activations');
+    if (saved === 'true' || saved === 'false') {
+      tertiaryActivationPreference.set(saved === 'true');
+    } else {
+      tertiaryActivationPreference.set(true);
+      localStorage.setItem('show_tertiary_activations', 'true');
     }
   }
 }

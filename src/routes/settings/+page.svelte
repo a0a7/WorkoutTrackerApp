@@ -4,11 +4,12 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { userStore } from '$lib/stores/userStore';
-  import { unitPreference, initUnitPreference } from '$lib/stores/userStore';
+  import { unitPreference, initUnitPreference, tertiaryActivationPreference, initTertiaryActivationPreference } from '$lib/stores/userStore';
   import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 
   let user = $state<{ id: string; email: string; token: string } | null>(null);
   let unit = $state<'lbs' | 'kg'>('lbs');
+  let showTertiary = $state(true);
   let stravaConnected = $state(false);
   let stravaLoading = $state(false);
   let stravaError = $state('');
@@ -33,12 +34,14 @@
 
   onMount(() => {
     initUnitPreference();
+    initTertiaryActivationPreference();
     const unsub = userStore.subscribe((u) => {
       user = u;
       loadStravaStatus();
     });
     const unsub2 = unitPreference.subscribe((u) => { unit = u; });
-    return () => { unsub(); unsub2(); };
+    const unsub3 = tertiaryActivationPreference.subscribe((value) => { showTertiary = value; });
+    return () => { unsub(); unsub2(); unsub3(); };
   });
 
   function logout() {
@@ -50,6 +53,14 @@
     unit = u;
     unitPreference.set(u);
     localStorage.setItem('unit_preference', u);
+  }
+
+  function setTertiaryActivation(value: boolean) {
+    showTertiary = value;
+    tertiaryActivationPreference.set(value);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('show_tertiary_activations', value ? 'true' : 'false');
+    }
   }
 
   async function connectStrava() {
@@ -151,6 +162,23 @@
             class="px-3 py-1 cursor-pointer transition-colors text-xs font-semibold m-0 rounded-none {unit === 'kg' ? 'bg-[hsl(var(--foreground))] text-[hsl(var(--background))]' : 'bg-transparent text-[hsl(var(--muted-foreground))]'}"
           >kg</button>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Muscle Map -->
+  <section class="mb-5">
+    <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Muscle Map</h2>
+    <div class="rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] overflow-hidden shadow-sm">
+      <div class="flex items-center justify-between px-4 py-3">
+        <span class="text-sm font-medium text-[hsl(var(--foreground))]">Show tertiary activations</span>
+        <button
+          onclick={() => setTertiaryActivation(!showTertiary)}
+          class="px-3 py-1.5 text-xs font-semibold border border-[hsl(var(--border))] bg-[hsl(var(--background))] hover:bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer rounded"
+          aria-pressed={showTertiary}
+        >
+          {showTertiary ? 'On' : 'Off'}
+        </button>
       </div>
     </div>
   </section>
