@@ -1,6 +1,6 @@
 <script lang="ts">
 
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { get } from 'svelte/store';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
@@ -37,6 +37,9 @@
   let stravaConnected = $state(false);
   let stravaSyncing = $state(false);
   let stravaMessage = $state('');
+  let shareGenerating = $state(false);
+  let shareMessage = $state('');
+  let shareMapWrapper = $state<HTMLDivElement | null>(null);
 
   function toDateInput(ts: number) {
     const d = new Date(ts);
@@ -322,6 +325,112 @@
     } finally {
       stravaSyncing = false;
     }
+
+    async function buildShareImage(): Promise<Blob> {
+      await tick();
+      if (!workout || !shareMapWrapper) throw new Error('Share preview not ready.');
+      const svg = shareMapWrapper.querySelector('svg') as SVGSVGElement | null;
+      if (!svg) throw new Error('Share preview not ready.');
+
+      const viewBoxAttr = svg.getAttribute('viewBox') ?? '0 0 768.41 607.66';
+      const viewBoxParts = viewBoxAttr.split(' ').map((v) => Number.parseFloat(v));
+      const viewWidth = Number.isFinite(viewBoxParts[2]) ? viewBoxParts[2] : 768.41;
+      const viewHeight = Number.isFinite(viewBoxParts[3]) ? viewBoxParts[3] : 607.66;
+
+      const shareWidth = 1080;
+      const paddingX = 80;
+      const paddingTop = 40;
+      const gapAfterMap = 48;
+      const lineFontSize = 64;
+      const lineSpacing = 82;
+      const footerFontSize = 44;
+      const footerSpacing = 60;
+      const paddingBottom = 48;
+      const mapWidth = shareWidth - paddingX * 2;
+      const mapHeight = mapWidth * (viewHeight / viewWidth);
+      const totalHeight = Math.ceil(
+        paddingTop + mapHeight + gapAfterMap + lineSpacing * 3 + footerSpacing + paddingBottom
+      );
+
+      const clonedSvg = svg.cloneNode(true) as SVGSVGElement;
+      clonedSvg.setAttribute('width', String(mapWidth));
+      clonedSvg.setAttribute('height', String(mapHeight));
+
+      const svgData = new XMLSerializer().serializeToString(clonedSvg);
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const svgUrl = URL.createObjectURL(svgBlob);
+      const image = new Image();
+      const imageLoaded = new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error('Failed to render share image.'));
+      });
+      image.src = svgUrl;
+      await imageLoaded;
+      URL.revokeObjectURL(svgUrl);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = shareWidth;
+      canvas.height = totalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas not supported.');
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const mapX = (shareWidth - mapWidth) / 2;
+      ctx.drawImage(image, mapX, paddingTop, mapWidth, mapHeight);
+
+      const fontFamily = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif";
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      let textY = paddingTop + mapHeight + gapAfterMap + lineFontSize / 2;
+      ctx.font = `700 ${lineFontSize}px ${fontFamily}`;
+      ctx.fillText(shareHeadline, shareWidth / 2, textY);
+      textY += lineSpacing;
+      ctx.fillText(shareVolumeLabel, shareWidth / 2, textY);
+      textY += lineSpacing;
+      ctx.fillText(shareTimeLabel, shareWidth / 2, textY);
+      textY += footerSpacing;
+      ctx.font = `600 ${footerFontSize}px ${fontFamily}`;
+      ctx.fillText(shareFooterLabel, shareWidth / 2, textY);
+
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('Failed to generate share image.');
+      return blob;
+    }
+
+    async function shareWorkout() {
+      if (!workout || shareGenerating) return;
+      shareGenerating = true;
+      shareMessage = '';
+      try {
+        const blob = await buildShareImage();
+        const fileName = `logbook-${new Date(workout.startTime).toISOString().slice(0, 10)}.png`;
+        const file = new File([blob], fileName, { type: 'image/png' });
+        if (navigator.share && (navigator.canShare?.({ files: [file] }) ?? true)) {
+          await navigator.share({ files: [file] });
+          shareMessage = 'Share sheet opened.';
+        } else {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+          shareMessage = 'Image downloaded.';
+        }
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          shareMessage = '';
+        } else {
+          shareMessage = err instanceof Error ? err.message : 'Failed to share workout.';
+        }
+      } finally {
+        shareGenerating = false;
+      }
+    }
   }
 
   onMount(async () => {
@@ -343,15 +452,13 @@
 
   const ACTIVATION_RANK: Record<string, number> = { primary: 3, secondary: 2, tertiary: 1 };
 
-  const allActivations = $derived(() => {
-    if (!workout) return [];
-    const sourceSets = editingWorkout ? draftSets : workout.sets;
+  function buildActivations(sourceSets: WorkoutSet[], includeTertiary: boolean) {
     const map = new Map<string, 'primary' | 'secondary' | 'tertiary'>();
     for (const s of sourceSets) {
       const ex = EXERCISE_MAP.get(s.exerciseId);
       if (!ex) continue;
       for (const ma of ex.muscleActivations) {
-        if (!showTertiary && ma.activation === 'tertiary') continue;
+        if (!includeTertiary && ma.activation === 'tertiary') continue;
         const existing = map.get(ma.muscle);
         const incomingRank = ACTIVATION_RANK[ma.activation] ?? 0;
         const existingRank = existing ? (ACTIVATION_RANK[existing] ?? 0) : 0;
@@ -364,17 +471,15 @@
       muscle: muscle as MuscleActivation['muscle'],
       activation,
     }));
-  });
+  }
 
-  const muscleDetails = $derived(() => {
-    if (!workout) return {};
-    const sourceSets = editingWorkout ? draftSets : workout.sets;
+  function buildMuscleDetails(sourceSets: WorkoutSet[], includeTertiary: boolean) {
     const details = new Map<string, { activation: 'primary' | 'secondary' | 'tertiary'; exercises: Set<string> }>();
     for (const s of sourceSets) {
       const ex = EXERCISE_MAP.get(s.exerciseId);
       if (!ex) continue;
       for (const ma of ex.muscleActivations) {
-        if (!showTertiary && ma.activation === 'tertiary') continue;
+        if (!includeTertiary && ma.activation === 'tertiary') continue;
         const existing = details.get(ma.muscle);
         const incomingRank = ACTIVATION_RANK[ma.activation] ?? 0;
         const existingRank = existing ? (ACTIVATION_RANK[existing.activation] ?? 0) : 0;
@@ -389,6 +494,23 @@
     return Object.fromEntries(
       [...details.entries()].map(([muscle, value]) => [muscle, { activation: value.activation, exercises: [...value.exercises] }])
     );
+  }
+
+  const allActivations = $derived(() => {
+    if (!workout) return [];
+    const sourceSets = editingWorkout ? draftSets : workout.sets;
+    return buildActivations(sourceSets, showTertiary);
+  });
+
+  const shareActivations = $derived(() => {
+    if (!workout) return [];
+    return buildActivations(workout.sets, false);
+  });
+
+  const muscleDetails = $derived(() => {
+    if (!workout) return {};
+    const sourceSets = editingWorkout ? draftSets : workout.sets;
+    return buildMuscleDetails(sourceSets, showTertiary);
   });
 
   // Group sets by exercise
@@ -416,6 +538,30 @@
       ? `${new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} – ${new Date(workout.endTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
       : ''
   );
+
+  const shareHeadline = $derived(() => {
+    if (!workout) return '';
+    const liftCount = new Set(workout.sets.map((s) => s.exerciseId).filter(Boolean)).size;
+    const setCount = workout.sets.length;
+    return `${liftCount} lifts • ${setCount} sets`;
+  });
+
+  const shareVolumeLabel = $derived(() => {
+    if (!workout) return '';
+    const formatted = new Intl.NumberFormat('en-US').format(computeTotalVolume());
+    const unitLabel = unit === 'kg' ? 'kg' : 'lbs';
+    return `Volume ${formatted} ${unitLabel}`;
+  });
+
+  const shareTimeLabel = $derived(() => (workout ? `Time ${durationLabel}` : ''));
+
+  const shareDateLabel = $derived(
+    workout
+      ? new Date(workout.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : ''
+  );
+
+  const shareFooterLabel = $derived(() => (workout ? `${shareDateLabel} • LOGBOOK` : ''));
 
   const draftEmptyRows = $derived(
     workout
@@ -540,12 +686,22 @@
                   {stravaSyncing ? 'Pushing…' : 'Push to Strava'}
                 </button>
               {/if}
+              <button
+                class="text-sm text-right text-[hsl(var(--primary))]"
+                disabled={shareGenerating || editingWorkout}
+                onclick={shareWorkout}
+              >
+                {shareGenerating ? 'Preparing…' : 'Share'}
+              </button>
               <button class="text-sm text-right text-[hsl(var(--primary))]" onclick={() => { beginEditWorkout(); beginEditTimes(); }}>Edit</button>
               <button class="text-sm text-right text-red-500" onclick={() => { confirmDelete = true; }}>Delete</button>
             </div>
           </div>
           {#if stravaMessage}
             <p class="mt-2 text-xs text-[hsl(var(--muted-foreground))]">{stravaMessage}</p>
+          {/if}
+          {#if shareMessage}
+            <p class="mt-2 text-xs text-[hsl(var(--muted-foreground))]">{shareMessage}</p>
           {/if}
 
           {#if editingTimes}
