@@ -839,10 +839,10 @@
               </div>
             </div>
             <div class="flex text-right flex-col">
-              {#if stravaConnected}
+              <!--{#if stravaConnected}
                 <button class="text-sm text-[hsl(var(--primary))]" disabled={stravaSyncing} onclick={pushWorkoutToStrava}>
                   {stravaSyncing ? 'Pushing…' : 'Push to Strava'}
-                </button>
+                </button>-->
               {/if}
             </div>
           </div>
