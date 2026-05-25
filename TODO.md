@@ -8,12 +8,16 @@
 - [ ] Push the 6000+ migrated `sets` up to remote D1. 
   - *Next step: Generate `push_sets.sql` using a JS file instead of a CLI command to avoid PowerShell escaping issues.*
 
-- [ ] Implement Strava Sync (Import/Export).
-here's the strava application info, make it so that every new workout is pushed to strava if the user connects their strava account. It should be smartly pushed whenever the workout is over (like an hour after the last set). The name should be Weightlifting, with this description style:
-Sets: 
-Hack Squat, 6x245
-Hack Squat, 5x245
-Leg Press, 3x8,245
+- [ ] Implement Strava Sync (Export)
+here's the strava application info, make it so that every new workout is pushed to strava if the user connects their strava account. It should be smartly pushed whenever the workout is over (like 1.5 hours after the last set), and be updated whenever the workout is updated. There should also be a button on the workout page to push to strava (if the user has connected their strava account), which should also update it if it's already been pushed.
+
+The title of the exercises should be Morning/Afternoon/Evening/Night Weightlifting - [xy] Sets
+With the following description format: 
+Hack Squat: 3x6x245
+Leg Extension: 5x245, 4x245, 5x225
+Leg Press: 3x8x245
+
+Units: lbs · Automatically synced from Logbook
 
  client id: 98135 client secret: e68774c5e3710da6669e94e8ab10a642399272ba refresh token: 7025877b7ffbe72833107ac0b381e5b227510909
  
