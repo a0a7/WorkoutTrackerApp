@@ -5,10 +5,12 @@
     activations = [],
     details = {},
     showTertiary = true,
+    showLegend = true,
   }: {
     activations: MuscleActivation[];
     details?: Partial<Record<MuscleId, { activation: 'primary' | 'secondary' | 'tertiary'; exercises: string[] }>>;
     showTertiary?: boolean;
+    showLegend?: boolean;
   } = $props();
 
   const muscleColors: Record<string, string> = {
@@ -374,7 +376,7 @@
 </div>
 
 <!-- Legend -->
-{#if activations.length > 0}
+{#if showLegend && activations.length > 0}
   <div class="mt-3 flex items-center gap-3 justify-center flex-wrap">
     <div class="flex items-center gap-1.5">
       <div class="h-3 w-3 rounded-full" style="background: #c73e36"></div>

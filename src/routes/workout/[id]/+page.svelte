@@ -325,111 +325,132 @@
     } finally {
       stravaSyncing = false;
     }
+  }
 
-    async function buildShareImage(): Promise<Blob> {
-      await tick();
-      if (!workout || !shareMapWrapper) throw new Error('Share preview not ready.');
-      const svg = shareMapWrapper.querySelector('svg') as SVGSVGElement | null;
-      if (!svg) throw new Error('Share preview not ready.');
+  async function buildShareImage(): Promise<Blob> {
+    await tick();
+    if (!workout || !shareMapWrapper) throw new Error('Share preview not ready.');
+    const svg = shareMapWrapper.querySelector('svg') as SVGSVGElement | null;
+    if (!svg) throw new Error('Share preview not ready.');
 
-      const viewBoxAttr = svg.getAttribute('viewBox') ?? '0 0 768.41 607.66';
-      const viewBoxParts = viewBoxAttr.split(' ').map((v) => Number.parseFloat(v));
-      const viewWidth = Number.isFinite(viewBoxParts[2]) ? viewBoxParts[2] : 768.41;
-      const viewHeight = Number.isFinite(viewBoxParts[3]) ? viewBoxParts[3] : 607.66;
+    const viewBoxAttr = svg.getAttribute('viewBox') ?? '0 0 768.41 607.66';
+    const viewBoxParts = viewBoxAttr.split(' ').map((v) => Number.parseFloat(v));
+    const viewWidth = Number.isFinite(viewBoxParts[2]) ? viewBoxParts[2] : 768.41;
+    const viewHeight = Number.isFinite(viewBoxParts[3]) ? viewBoxParts[3] : 607.66;
 
-      const shareWidth = 1080;
-      const paddingX = 80;
-      const paddingTop = 40;
-      const gapAfterMap = 48;
-      const lineFontSize = 64;
-      const lineSpacing = 82;
-      const footerFontSize = 44;
-      const footerSpacing = 60;
-      const paddingBottom = 48;
-      const mapWidth = shareWidth - paddingX * 2;
-      const mapHeight = mapWidth * (viewHeight / viewWidth);
-      const totalHeight = Math.ceil(
-        paddingTop + mapHeight + gapAfterMap + lineSpacing * 3 + footerSpacing + paddingBottom
-      );
+    const shareWidth = 1080;
+    const paddingX = 80;
+    const paddingTop = 40;
+    const gapAfterMap = 48;
+    const lineFontSize = 64;
+    const lineSpacing = 82;
+    const footerFontSize = 44;
+    const footerSmallCapsSize = Math.round(footerFontSize * 0.72);
+    const footerSpacing = 60;
+    const paddingBottom = 48;
+    const mapWidth = shareWidth - paddingX * 2;
+    const mapHeight = mapWidth * (viewHeight / viewWidth);
+    const totalHeight = Math.ceil(
+      paddingTop + mapHeight + gapAfterMap + lineSpacing * 3 + footerSpacing + paddingBottom
+    );
 
-      const clonedSvg = svg.cloneNode(true) as SVGSVGElement;
-      clonedSvg.setAttribute('width', String(mapWidth));
-      clonedSvg.setAttribute('height', String(mapHeight));
+    const clonedSvg = svg.cloneNode(true) as SVGSVGElement;
+    clonedSvg.setAttribute('width', String(mapWidth));
+    clonedSvg.setAttribute('height', String(mapHeight));
 
-      const svgData = new XMLSerializer().serializeToString(clonedSvg);
-      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-      const svgUrl = URL.createObjectURL(svgBlob);
-      const image = new Image();
-      const imageLoaded = new Promise<void>((resolve, reject) => {
-        image.onload = () => resolve();
-        image.onerror = () => reject(new Error('Failed to render share image.'));
-      });
-      image.src = svgUrl;
-      await imageLoaded;
-      URL.revokeObjectURL(svgUrl);
+    const svgData = new XMLSerializer().serializeToString(clonedSvg);
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const svgUrl = URL.createObjectURL(svgBlob);
+    const image = new Image();
+    const imageLoaded = new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error('Failed to render share image.'));
+    });
+    image.src = svgUrl;
+    await imageLoaded;
+    URL.revokeObjectURL(svgUrl);
 
-      const canvas = document.createElement('canvas');
-      canvas.width = shareWidth;
-      canvas.height = totalHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Canvas not supported.');
+    const canvas = document.createElement('canvas');
+    canvas.width = shareWidth;
+    canvas.height = totalHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas not supported.');
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const mapX = (shareWidth - mapWidth) / 2;
-      ctx.drawImage(image, mapX, paddingTop, mapWidth, mapHeight);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const mapX = (shareWidth - mapWidth) / 2;
+    ctx.drawImage(image, mapX, paddingTop, mapWidth, mapHeight);
 
-      const fontFamily = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif";
-      ctx.fillStyle = '#ffffff';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
+    const fontFamily = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif";
+    const headline = shareHeadline();
+    const volumeLabel = shareVolumeLabel();
+    const timeLabel = shareTimeLabel();
+    const dateLabel = shareDateLabel();
+    const logbookLabel = 'LOGBOOK';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
 
-      let textY = paddingTop + mapHeight + gapAfterMap + lineFontSize / 2;
-      ctx.font = `700 ${lineFontSize}px ${fontFamily}`;
-      ctx.fillText(shareHeadline, shareWidth / 2, textY);
-      textY += lineSpacing;
-      ctx.fillText(shareVolumeLabel, shareWidth / 2, textY);
-      textY += lineSpacing;
-      ctx.fillText(shareTimeLabel, shareWidth / 2, textY);
-      textY += footerSpacing;
-      ctx.font = `600 ${footerFontSize}px ${fontFamily}`;
-      ctx.fillText(shareFooterLabel, shareWidth / 2, textY);
+    let textY = paddingTop + mapHeight + gapAfterMap + lineFontSize / 2;
+    ctx.font = `700 ${lineFontSize}px ${fontFamily}`;
+    ctx.fillText(headline, shareWidth / 2, textY);
+    textY += lineSpacing;
+    ctx.fillText(volumeLabel, shareWidth / 2, textY);
+    textY += lineSpacing;
+    ctx.fillText(timeLabel, shareWidth / 2, textY);
+    textY += footerSpacing;
 
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-      if (!blob) throw new Error('Failed to generate share image.');
-      return blob;
-    }
+    const footerFont = `600 ${footerFontSize}px ${fontFamily}`;
+    const footerSmallCapsFont = `600 ${footerSmallCapsSize}px ${fontFamily}`;
+    const bullet = ' • ';
+    ctx.font = footerFont;
+    const dateWidth = ctx.measureText(dateLabel).width;
+    const bulletWidth = ctx.measureText(bullet).width;
+    ctx.font = footerSmallCapsFont;
+    const logbookWidth = ctx.measureText(logbookLabel).width;
+    const footerTotalWidth = dateWidth + bulletWidth + logbookWidth;
+    const footerStartX = (shareWidth - footerTotalWidth) / 2;
+    ctx.textAlign = 'left';
+    ctx.font = footerFont;
+    ctx.fillText(dateLabel, footerStartX, textY);
+    ctx.fillText(bullet, footerStartX + dateWidth, textY);
+    ctx.font = footerSmallCapsFont;
+    ctx.fillText(logbookLabel, footerStartX + dateWidth + bulletWidth, textY);
 
-    async function shareWorkout() {
-      if (!workout || shareGenerating) return;
-      shareGenerating = true;
-      shareMessage = '';
-      try {
-        const blob = await buildShareImage();
-        const fileName = `logbook-${new Date(workout.startTime).toISOString().slice(0, 10)}.png`;
-        const file = new File([blob], fileName, { type: 'image/png' });
-        if (navigator.share && (navigator.canShare?.({ files: [file] }) ?? true)) {
-          await navigator.share({ files: [file] });
-          shareMessage = 'Share sheet opened.';
-        } else {
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = fileName;
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-          URL.revokeObjectURL(url);
-          shareMessage = 'Image downloaded.';
-        }
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') {
-          shareMessage = '';
-        } else {
-          shareMessage = err instanceof Error ? err.message : 'Failed to share workout.';
-        }
-      } finally {
-        shareGenerating = false;
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (!blob) throw new Error('Failed to generate share image.');
+    return blob;
+  }
+
+  async function shareWorkout() {
+    if (!workout || shareGenerating) return;
+    shareGenerating = true;
+    shareMessage = '';
+    try {
+      const blob = await buildShareImage();
+      const fileName = `logbook-${new Date(workout.startTime).toISOString().slice(0, 10)}.png`;
+      const file = new File([blob], fileName, { type: 'image/png' });
+      if (navigator.share && (navigator.canShare?.({ files: [file] }) ?? true)) {
+        await navigator.share({ files: [file] });
+        shareMessage = 'Share sheet opened.';
+      } else {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        shareMessage = 'Image downloaded.';
       }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        shareMessage = '';
+      } else {
+        shareMessage = err instanceof Error ? err.message : 'Failed to share workout.';
+      }
+    } finally {
+      shareGenerating = false;
     }
   }
 
@@ -553,15 +574,14 @@
     return `Volume ${formatted} ${unitLabel}`;
   });
 
-  const shareTimeLabel = $derived(() => (workout ? `Time ${durationLabel}` : ''));
+  const shareTimeLabel = $derived(() => (workout ? `Time ${durationLabel()}` : ''));
 
-  const shareDateLabel = $derived(
+  const shareDateLabel = $derived(() =>
     workout
       ? new Date(workout.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
       : ''
   );
 
-  const shareFooterLabel = $derived(() => (workout ? `${shareDateLabel} • LOGBOOK` : ''));
 
   const draftEmptyRows = $derived(
     workout
@@ -847,3 +867,9 @@
 
 <!-- Custom numeric keypad — rendered at root so it sits above all row content -->
 <NumericKeypad />
+
+{#if workout}
+  <div bind:this={shareMapWrapper} class="sr-only" aria-hidden="true">
+    <MuscleMap activations={shareActivations()} showTertiary={false} showLegend={false} />
+  </div>
+{/if}
