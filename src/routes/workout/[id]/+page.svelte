@@ -842,8 +842,8 @@
               <!--{#if stravaConnected}
                 <button class="text-sm text-[hsl(var(--primary))]" disabled={stravaSyncing} onclick={pushWorkoutToStrava}>
                   {stravaSyncing ? 'Pushing…' : 'Push to Strava'}
-                </button>-->
-              {/if}
+                </button>
+              {/if}-->
             </div>
           </div>
           {#if stravaMessage}
