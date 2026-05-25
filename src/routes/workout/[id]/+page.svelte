@@ -348,10 +348,12 @@
     const footerSmallCapsSize = Math.round(footerFontSize * 0.72);
     const footerSpacing = 60;
     const paddingBottom = 48;
-    const mapWidth = shareWidth - paddingX * 2;
+    const mapScale = 0.5;
+    const mapWidth = (shareWidth - paddingX * 2) * mapScale;
     const mapHeight = mapWidth * (viewHeight / viewWidth);
+    const shareLines = [shareSetLabel(), shareLiftLabel(), shareVolumeLabel(), shareTimeLabel()].filter(Boolean);
     const totalHeight = Math.ceil(
-      paddingTop + mapHeight + gapAfterMap + lineSpacing * 3 + footerSpacing + paddingBottom
+      paddingTop + mapHeight + gapAfterMap + lineSpacing * shareLines.length + footerSpacing + paddingBottom
     );
 
     const clonedSvg = svg.cloneNode(true) as SVGSVGElement;
@@ -381,9 +383,6 @@
     ctx.drawImage(image, mapX, paddingTop, mapWidth, mapHeight);
 
     const fontFamily = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif";
-    const headline = shareHeadline();
-    const volumeLabel = shareVolumeLabel();
-    const timeLabel = shareTimeLabel();
     const dateLabel = shareDateLabel();
     const logbookLabel = 'LOGBOOK';
     ctx.fillStyle = '#ffffff';
@@ -392,25 +391,22 @@
 
     let textY = paddingTop + mapHeight + gapAfterMap + lineFontSize / 2;
     ctx.font = `700 ${lineFontSize}px ${fontFamily}`;
-    ctx.fillText(headline, shareWidth / 2, textY);
-    textY += lineSpacing;
-    ctx.fillText(volumeLabel, shareWidth / 2, textY);
-    textY += lineSpacing;
-    ctx.fillText(timeLabel, shareWidth / 2, textY);
-    textY += footerSpacing;
+    for (const line of shareLines) {
+      ctx.fillText(line, shareWidth / 2, textY);
+      textY += lineSpacing;
+    }
+    textY += footerSpacing - lineSpacing;
 
-    const footerFont = `600 ${footerFontSize}px ${fontFamily}`;
     const footerSmallCapsFont = `600 ${footerSmallCapsSize}px ${fontFamily}`;
     const bullet = ' • ';
-    ctx.font = footerFont;
+    ctx.font = footerSmallCapsFont;
     const dateWidth = ctx.measureText(dateLabel).width;
     const bulletWidth = ctx.measureText(bullet).width;
-    ctx.font = footerSmallCapsFont;
     const logbookWidth = ctx.measureText(logbookLabel).width;
     const footerTotalWidth = dateWidth + bulletWidth + logbookWidth;
     const footerStartX = (shareWidth - footerTotalWidth) / 2;
     ctx.textAlign = 'left';
-    ctx.font = footerFont;
+    ctx.font = footerSmallCapsFont;
     ctx.fillText(dateLabel, footerStartX, textY);
     ctx.fillText(bullet, footerStartX + dateWidth, textY);
     ctx.font = footerSmallCapsFont;
@@ -431,7 +427,6 @@
       const file = new File([blob], fileName, { type: 'image/png' });
       if (navigator.share && (navigator.canShare?.({ files: [file] }) ?? true)) {
         await navigator.share({ files: [file] });
-        shareMessage = 'Share sheet opened.';
       } else {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -560,21 +555,22 @@
       : ''
   );
 
-  const shareHeadline = $derived(() => {
+  const shareSetLabel = $derived(() => (workout ? `${workout.sets.length} sets` : ''));
+
+  const shareLiftLabel = $derived(() => {
     if (!workout) return '';
     const liftCount = new Set(workout.sets.map((s) => s.exerciseId).filter(Boolean)).size;
-    const setCount = workout.sets.length;
-    return `${liftCount} lifts • ${setCount} sets`;
+    return `${liftCount} lifts`;
   });
 
   const shareVolumeLabel = $derived(() => {
     if (!workout) return '';
     const formatted = new Intl.NumberFormat('en-US').format(computeTotalVolume());
     const unitLabel = unit === 'kg' ? 'kg' : 'lbs';
-    return `Volume ${formatted} ${unitLabel}`;
+    return `${formatted} ${unitLabel}`;
   });
 
-  const shareTimeLabel = $derived(() => (workout ? `Time ${durationLabel()}` : ''));
+  const shareTimeLabel = $derived(() => (workout ? durationLabel() : ''));
 
   const shareDateLabel = $derived(() =>
     workout
