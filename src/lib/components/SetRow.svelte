@@ -500,6 +500,10 @@
   let swipeOffsetX = $state(0);
   let swipingToDelete = $state(false);
   let swipeActive = $state(false);
+  const SWIPE_DELETE_THRESHOLD_PX = 180;
+  const SWIPE_MAX_OFFSET_PX = 240;
+  const SWIPE_ACTIVATION_PX = 14;
+  const SWIPE_DAMPING = 0.85;
   function handleTouchStart(e: TouchEvent) {
     touchStartY = e.touches[0].clientY;
     touchDragging = false;
@@ -597,7 +601,7 @@
     const absDx = Math.abs(dx);
     const absDy = Math.abs(dy);
     if (!swipeActive) {
-      if (absDx < 10 && absDy < 10) return;
+      if (absDx < SWIPE_ACTIVATION_PX && absDy < SWIPE_ACTIVATION_PX) return;
       if (absDy > absDx) {
         handleRowSwipeEnd();
         return;
@@ -605,8 +609,9 @@
       swipeActive = true;
     }
     e.preventDefault();
-    swipeOffsetX = Math.max(-160, Math.min(160, dx));
-    swipingToDelete = Math.abs(swipeOffsetX) >= 96;
+    const damped = dx * SWIPE_DAMPING;
+    swipeOffsetX = Math.max(-SWIPE_MAX_OFFSET_PX, Math.min(0, damped));
+    swipingToDelete = Math.abs(swipeOffsetX) >= SWIPE_DELETE_THRESHOLD_PX;
   }
 
   function handleRowSwipeEnd() {
@@ -631,7 +636,7 @@
     {handleDragging ? 'z-20 bg-[hsl(var(--card))] shadow-2xl ring-2 ring-[hsl(var(--primary)/0.45)] scale-[1.01]' : ''}
     {isEmpty || editingExercise ? 'z-10' : ''}"
   draggable="false"
-  style:transition-duration={handleDragging ? '0ms' : undefined}
+  style:transition-duration={(handleDragging || swipeActive) ? '0ms' : undefined}
   style="transform: translateX({handleDragging ? 0 : swipeOffsetX}px) translateY({handleDragging ? dragOffsetY : 0}px) translateZ({handleDragging ? 16 : 0}px);"
   onfocusin={handleRowFocusIn}
   onfocusout={handleRowFocusOut}

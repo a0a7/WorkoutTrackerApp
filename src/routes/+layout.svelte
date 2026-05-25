@@ -2,7 +2,7 @@
   import '../app.css';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
-  import { get } from 'svelte/store';
+0  import { get } from 'svelte/store';
   import { initDB } from '$lib/db';
   import { userStore } from '$lib/stores/userStore';
   import { refreshSyncStatus, setupSyncListeners, syncFromServer, syncToServer } from '$lib/sync';
@@ -215,7 +215,7 @@
     ontouchstart={handlePullStart}
     ontouchmove={handlePullMove}
     ontouchend={handlePullEnd}
-    class="flex-1 flex flex-col relative {currentPath !== '/login' ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0' : ''} overflow-y-auto"
+    class="flex-1 flex flex-col relative pt-[env(safe-area-inset-top)] {currentPath !== '/login' ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0' : ''} overflow-y-auto"
   >
     {#if pullDistance > 0 && currentPath !== '/login'}
       <div class="absolute inset-x-0 top-0 z-50 flex h-16 items-center justify-center bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow-md">

@@ -34,6 +34,10 @@
   let draftSelected = $state<Set<string>>(new Set());
   let draftDragFromIndex = $state<number | null>(null);
   let draftDragToIndex = $state<number | null>(null);
+  let dragPreviewActive = $state(false);
+  let dragPreviewOriginal = $state<WorkoutSet[] | null>(null);
+  let dragPreviewDirty = $state(false);
+  let dragItemId = $state<string | null>(null);
   let stravaConnected = $state(false);
   let stravaSyncing = $state(false);
   let stravaMessage = $state('');
@@ -199,32 +203,46 @@
   }
 
   function handleDraftDragStart(index: number) {
+    const target = draftSets[index];
+    if (!target) return;
+    dragItemId = target.id;
+    dragPreviewOriginal = draftSets.map((s) => ({ ...s }));
+    dragPreviewDirty = false;
+    dragPreviewActive = true;
     draftDragFromIndex = index;
   }
 
   function handleDraftDragOver(index: number) {
     draftDragToIndex = index;
+    if (!dragPreviewActive || !dragItemId) return;
+    const currentIndex = draftSets.findIndex((s) => s.id === dragItemId);
+    if (currentIndex < 0 || currentIndex === index) return;
+    const next = [...draftSets];
+    const [moved] = next.splice(currentIndex, 1);
+    next.splice(index, 0, moved);
+    dragPreviewDirty = true;
+    persistDraftSets(next);
   }
 
   function handleDraftDrop() {
-    if (
-      draftDragFromIndex === null ||
-      draftDragToIndex === null ||
-      draftDragFromIndex === draftDragToIndex
-    ) {
-      draftDragFromIndex = null;
-      draftDragToIndex = null;
-      return;
+    if (dragPreviewActive) {
+      if (!dragPreviewDirty && dragPreviewOriginal) {
+        persistDraftSets(dragPreviewOriginal);
+      }
+      dragPreviewActive = false;
+      dragPreviewOriginal = null;
+      dragPreviewDirty = false;
+      dragItemId = null;
     }
-    const newSets = [...draftSets];
-    const [moved] = newSets.splice(draftDragFromIndex, 1);
-    newSets.splice(draftDragToIndex, 0, moved);
     draftDragFromIndex = null;
     draftDragToIndex = null;
-    persistDraftSets(newSets);
   }
 
   function handleDraftTouchReorder(fromIndex: number, toIndex: number) {
+    if (dragPreviewActive) {
+      handleDraftDrop();
+      return;
+    }
     if (
       fromIndex === toIndex ||
       fromIndex < 0 ||
@@ -529,16 +547,79 @@
     return buildMuscleDetails(sourceSets, showTertiary);
   });
 
-  // Group sets by exercise
-  const setsByExercise = $derived(() => {
-    if (!workout) return [];
-    const sourceSets = editingWorkout ? draftSets : workout.sets;
-    const map = new Map<string, typeof sourceSets>();
-    for (const s of sourceSets) {
-      if (!map.has(s.exerciseName)) map.set(s.exerciseName, []);
-      map.get(s.exerciseName)!.push(s);
+  type SetSegment = { exerciseId: string; exerciseName: string; sets: WorkoutSet[] };
+
+  function sortSetsInOrder(sets: WorkoutSet[]) {
+    return [...sets].sort((a, b) => {
+      const orderDiff = (a.order ?? 0) - (b.order ?? 0);
+      if (orderDiff !== 0) return orderDiff;
+      return (a.createdAt ?? 0) - (b.createdAt ?? 0);
+    });
+  }
+
+  function buildSegments(sourceSets: WorkoutSet[]): SetSegment[] {
+    const ordered = sortSetsInOrder(sourceSets);
+    const segments: SetSegment[] = [];
+    for (const s of ordered) {
+      const last = segments[segments.length - 1];
+      if (last && last.exerciseId === s.exerciseId && last.exerciseName === s.exerciseName) {
+        last.sets.push(s);
+      } else {
+        segments.push({ exerciseId: s.exerciseId, exerciseName: s.exerciseName, sets: [s] });
+      }
     }
-    return [...map.entries()];
+    return segments;
+  }
+
+  function buildSupersetGroups(segments: SetSegment[]) {
+    const indicesByExercise = new Map<string, number[]>();
+    segments.forEach((seg, idx) => {
+      const key = seg.exerciseId || seg.exerciseName;
+      if (!indicesByExercise.has(key)) indicesByExercise.set(key, []);
+      indicesByExercise.get(key)!.push(idx);
+    });
+    const rawGroups = [] as { start: number; end: number }[];
+    for (const indices of indicesByExercise.values()) {
+      if (indices.length > 1) {
+        const start = indices[0];
+        const end = indices[indices.length - 1];
+        if (end > start) rawGroups.push({ start, end });
+      }
+    }
+    rawGroups.sort((a, b) => a.start - b.start);
+    const merged: { start: number; end: number }[] = [];
+    for (const group of rawGroups) {
+      const last = merged[merged.length - 1];
+      if (!last || group.start > last.end) merged.push({ ...group });
+      else last.end = Math.max(last.end, group.end);
+    }
+    return merged;
+  }
+
+  function buildDisplayBlocks(segments: SetSegment[]) {
+    const groups = buildSupersetGroups(segments);
+    const blocks: { type: 'superset' | 'single'; segments: SetSegment[] }[] = [];
+    let i = 0;
+    let g = 0;
+    while (i < segments.length) {
+      const group = groups[g];
+      if (group && i === group.start) {
+        blocks.push({ type: 'superset', segments: segments.slice(group.start, group.end + 1) });
+        i = group.end + 1;
+        g += 1;
+      } else {
+        blocks.push({ type: 'single', segments: [segments[i]] });
+        i += 1;
+      }
+    }
+    return blocks;
+  }
+
+  const setDisplayBlocks = $derived(() => {
+    if (!workout) return [] as { type: 'superset' | 'single'; segments: SetSegment[] }[];
+    const sourceSets = editingWorkout ? draftSets : workout.sets;
+    const segments = buildSegments(sourceSets);
+    return buildDisplayBlocks(segments);
   });
 
   const dateLabel = $derived(
@@ -611,7 +692,8 @@
   function formatExerciseCompact(exName: string, setsArr: any[]) {
     // Determine if all sets have same reps and same weight (and weight > 0)
     if (!setsArr || setsArr.length === 0) return '';
-    const parts = setsArr.map((s) => ({ reps: s.reps, weight: s.weight }));
+    const ordered = sortSetsInOrder(setsArr);
+    const parts = ordered.map((s) => ({ reps: s.reps, weight: s.weight }));
     const allSameReps = parts.every((p) => p.reps === parts[0].reps);
     const allSameWeight = parts.every((p) => p.weight === parts[0].weight);
 
@@ -744,14 +826,34 @@
             <hr class="my-3 border-[hsl(var(--border))]" />
             <!-- Compact exercises list -->
             <div class="flex flex-col gap-3">
-              {#each setsByExercise() as [exName, setsArr]}
-                <div>
-                  <div class="flex items-baseline gap-2">
-                    <p class="text-sm font-medium text-[hsl(var(--foreground))] truncate">{exName}</p>
-                    <span class="text-xs text-[hsl(var(--muted-foreground))]">({setsArr.length})</span>
+              {#each setDisplayBlocks() as block}
+                {#if block.type === 'superset'}
+                  <div class="relative rounded-2xl border border-[hsl(var(--border))] px-3 pb-3 pt-4">
+                    <span class="absolute -top-2 left-3 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-2 py-0.5 text-[0.6rem] font-semibold tracking-wide text-[hsl(var(--muted-foreground))]">
+                      SUPERSET
+                    </span>
+                    <div class="flex flex-col gap-3">
+                      {#each block.segments as seg}
+                        <div>
+                          <div class="flex items-baseline gap-2">
+                            <p class="text-sm font-medium text-[hsl(var(--foreground))] truncate">{seg.exerciseName}</p>
+                            <span class="text-xs text-[hsl(var(--muted-foreground))]">({seg.sets.length})</span>
+                          </div>
+                          <p class="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">{formatExerciseCompact(seg.exerciseName, seg.sets)}</p>
+                        </div>
+                      {/each}
+                    </div>
                   </div>
-                  <p class="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">{formatExerciseCompact(exName, setsArr)}</p>
-                </div>
+                {:else}
+                  {@const seg = block.segments[0]}
+                  <div>
+                    <div class="flex items-baseline gap-2">
+                      <p class="text-sm font-medium text-[hsl(var(--foreground))] truncate">{seg.exerciseName}</p>
+                      <span class="text-xs text-[hsl(var(--muted-foreground))]">({seg.sets.length})</span>
+                    </div>
+                    <p class="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">{formatExerciseCompact(seg.exerciseName, seg.sets)}</p>
+                  </div>
+                {/if}
               {/each}
             </div>
           {/if}
