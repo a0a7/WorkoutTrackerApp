@@ -9,7 +9,8 @@
   import NumericKeypad from '$lib/components/NumericKeypad.svelte';
   import { deleteSet, deleteWorkout, getWorkout, saveSets, saveWorkout } from '$lib/db';
   import { EXERCISE_MAP } from '$lib/exercises';
-  import { unitPreference, initUnitPreference, userStore, tertiaryActivationPreference, initTertiaryActivationPreference } from '$lib/stores/userStore';
+  import { unitPreference, initUnitPreference, userStore, tertiaryActivationPreference, initTertiaryActivationPreference, timeFormatPreference, initTimeFormatPreference } from '$lib/stores/userStore';
+  import { Share2, Pencil, Trash2 } from 'lucide-svelte';
   import { syncToServer } from '$lib/sync';
   import type { Workout, MuscleActivation, WorkoutSet } from '$lib/types';
 
@@ -21,6 +22,7 @@
   // Reactive unit preference — auto-subscribes and updates when the store changes
   const unit = $derived($unitPreference);
   const showTertiary = $derived($tertiaryActivationPreference);
+  const timeFormat = $derived($timeFormatPreference);
 
   // Time editing state
   let editingTimes = $state(false);
@@ -104,6 +106,7 @@
     editingWorkout = false;
     draftSets = [];
     draftSelected = new Set();
+    cancelEditTimes();
   }
 
   function persistDraftSets(newSets: WorkoutSet[]) {
@@ -470,6 +473,7 @@
   onMount(async () => {
     initUnitPreference();
     initTertiaryActivationPreference();
+    initTimeFormatPreference();
     if (workoutId) {
       workout = await getWorkout(workoutId) ?? null;
     }
@@ -622,17 +626,19 @@
     return buildDisplayBlocks(segments);
   });
 
+  function formatTime(ts: number) {
+    return new Date(ts).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: timeFormat === '12h',
+    });
+  }
+
   const dateLabel = $derived(
     workout
       ? new Date(workout.startTime).toLocaleDateString('en-US', {
           weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
         })
-      : ''
-  );
-
-  const timeLabel = $derived(
-    workout
-      ? `${new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} – ${new Date(workout.endTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
       : ''
   );
 
@@ -765,18 +771,47 @@
         <section class="order-2 lg:order-1 min-w-0">
           <div class="flex items-center justify-between gap-3">
             <div class="min-w-0">
-              <h1 class="text-lg font-black text-[hsl(var(--foreground))] truncate">{new Date(workout.startTime).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} at {new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</h1>
-              <p class="text-md font-bold text-[hsl(var(--foreground))] mt-1">
-                {(() => {
-                  const mins = Math.round((workout.endTime - workout.startTime) / 60000);
-                  const setsCount = workout.sets.length;
-                  const vol = computeTotalVolume();
-                  const minsLabel = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
-                  const unitLabel = $unitPreference === 'kg' ? 'kg' : 'lbs';
-                  const formatted = new Intl.NumberFormat('en-US').format(vol);
-                  return `${minsLabel} · ${setsCount} sets · ${formatted} ${unitLabel}`;
-                })()}
-              </p>
+              <h1 class="text-lg font-black text-[hsl(var(--foreground))] truncate">{new Date(workout.startTime).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} at {formatTime(workout.startTime)}</h1>
+              <div class="mt-1 flex flex-wrap items-center gap-3">
+                <p class="text-md font-bold text-[hsl(var(--foreground))]">
+                  {(() => {
+                    const mins = Math.round((workout.endTime - workout.startTime) / 60000);
+                    const setsCount = workout.sets.length;
+                    const vol = computeTotalVolume();
+                    const minsLabel = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+                    const unitLabel = $unitPreference === 'kg' ? 'kg' : 'lbs';
+                    const formatted = new Intl.NumberFormat('en-US').format(vol);
+                    return `${minsLabel} · ${setsCount} sets · ${formatted} ${unitLabel}`;
+                  })()}
+                </p>
+                <div class="flex items-center gap-1">
+                  <button
+                    class="rounded-lg p-1.5 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-colors"
+                    disabled={shareGenerating || editingWorkout}
+                    onclick={shareWorkout}
+                    aria-label="Share workout"
+                    title="Share"
+                  >
+                    <Share2 class="h-4 w-4" />
+                  </button>
+                  <button
+                    class="rounded-lg p-1.5 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-colors"
+                    onclick={() => { beginEditWorkout(); beginEditTimes(); }}
+                    aria-label="Edit workout"
+                    title="Edit"
+                  >
+                    <Pencil class="h-4 w-4" />
+                  </button>
+                  <button
+                    class="rounded-lg p-1.5 text-red-500 hover:text-red-600 hover:bg-[hsl(var(--muted))] transition-colors"
+                    onclick={() => { confirmDelete = true; }}
+                    aria-label="Delete workout"
+                    title="Delete"
+                  >
+                    <Trash2 class="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
             </div>
             <div class="flex text-right flex-col">
               {#if stravaConnected}
@@ -784,15 +819,6 @@
                   {stravaSyncing ? 'Pushing…' : 'Push to Strava'}
                 </button>
               {/if}
-              <button
-                class="text-sm text-right text-[hsl(var(--primary))]"
-                disabled={shareGenerating || editingWorkout}
-                onclick={shareWorkout}
-              >
-                {shareGenerating ? 'Preparing…' : 'Share'}
-              </button>
-              <button class="text-sm text-right text-[hsl(var(--primary))]" onclick={() => { beginEditWorkout(); beginEditTimes(); }}>Edit</button>
-              <button class="text-sm text-right text-red-500" onclick={() => { confirmDelete = true; }}>Delete</button>
             </div>
           </div>
           {#if stravaMessage}
@@ -803,19 +829,17 @@
           {/if}
 
           {#if editingTimes}
-            <div class="mt-3 flex flex-wrap items-center gap-2">
-              <div class="flex items-center gap-1.5">
-                <span class="text-xs font-medium text-[hsl(var(--muted-foreground))]">Start</span>
-                <input type="date" bind:value={editStartDate} class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
-                <input type="time" bind:value={editStartTime} class="w-24 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+              <div class="flex items-center gap-1">
+                <span class="text-[0.7rem] font-medium text-[hsl(var(--muted-foreground))]">Start</span>
+                <input type="date" bind:value={editStartDate} class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1 text-[0.7rem] outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+                <input type="time" bind:value={editStartTime} class="w-20 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1 text-[0.7rem] outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
               </div>
-              <div class="flex items-center gap-1.5">
-                <span class="text-xs font-medium text-[hsl(var(--muted-foreground))]">End</span>
-                <input type="date" bind:value={editEndDate} class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
-                <input type="time" bind:value={editEndTime} class="w-24 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+              <div class="flex items-center gap-1">
+                <span class="text-[0.7rem] font-medium text-[hsl(var(--muted-foreground))]">End</span>
+                <input type="date" bind:value={editEndDate} class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1 text-[0.7rem] outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
+                <input type="time" bind:value={editEndTime} class="w-20 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1 text-[0.7rem] outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]" />
               </div>
-              <button onclick={saveEditedTimes} class="rounded-xl bg-[hsl(var(--primary))] px-3 py-1.5 text-xs font-medium text-white">Save</button>
-              <button onclick={cancelEditTimes} class="rounded-xl bg-[hsl(var(--muted))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--muted-foreground))]">Cancel</button>
             </div>
             {#if timeEditError}
               <p class="mt-2 text-xs text-red-500">{timeEditError}</p>
@@ -867,23 +891,23 @@
 
 <!-- Divider between workout info and sets table (editing mode) -->
 {#if editingWorkout}
-  <hr class="my-4 border-[hsl(var(--border))]" />
+  <hr class="my-3 border-[hsl(var(--border))]" />
 {/if}
 
 {#if editingWorkout && workout}
   <div class="px-4 pb-6">
-    <div class="mb-3 flex items-center justify-between gap-2">
-      <p class="text-sm font-medium text-[hsl(var(--foreground))]">Editing sets</p>
+    <div class="mb-2 flex items-center justify-between gap-2">
+      <p class="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Editing</p>
       <div class="flex items-center gap-2">
         <button
           onclick={cancelEditWorkout}
-          class="rounded-xl bg-[hsl(var(--muted))] px-3 py-2 text-xs font-medium text-[hsl(var(--muted-foreground))]"
+          class="rounded-lg bg-[hsl(var(--muted))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--muted-foreground))]"
         >
           Cancel
         </button>
         <button
           onclick={saveWorkoutEdits}
-          class="rounded-xl bg-[hsl(var(--primary))] px-3 py-2 text-xs font-medium text-white"
+          class="rounded-lg bg-[hsl(var(--primary))] px-3 py-1.5 text-xs font-medium text-white"
         >
           Save changes
         </button>

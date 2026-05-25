@@ -4,7 +4,7 @@
   import WorkoutCard from '$lib/components/WorkoutCard.svelte';
   import { getAllWorkouts } from '$lib/db';
   import type { Workout, WorkoutSet } from '$lib/types';
-  import { unitPreference, initUnitPreference } from '$lib/stores/userStore';
+  import { unitPreference, initUnitPreference, timeFormatPreference, initTimeFormatPreference } from '$lib/stores/userStore';
 
   let workouts = $state<Workout[]>([]);
   let loading = $state(true);
@@ -13,9 +13,11 @@
   let toDate = $state('');
   let compactness = $state<'card' | 'compact'>('card');
   const unit = $derived($unitPreference);
+  const timeFormat = $derived($timeFormatPreference);
 
   onMount(async () => {
     initUnitPreference();
+    initTimeFormatPreference();
     const savedCompactness = localStorage.getItem('history-compactness');
     if (savedCompactness === 'card' || savedCompactness === 'compact') {
       compactness = savedCompactness;
@@ -90,13 +92,15 @@
   }
 
   function formatCompactDateTime(startTime: number): string {
+    const time = new Date(startTime).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: timeFormat === '12h',
+    });
     return `${new Date(startTime).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-    })}, ${new Date(startTime).toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-    })}`;
+    })}, ${time}`;
   }
 
   function computeTotalVolume(sets: WorkoutSet[]) {
@@ -193,7 +197,7 @@
               >
                 <div class="min-w-0">
                   <p class="truncate text-sm font-semibold text-[hsl(var(--foreground))]">
-                    {new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                    {new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: timeFormat === '12h' })}
                   </p>
                   <p class="truncate text-xs text-[hsl(var(--muted-foreground))]">
                     {workout.sets.length} sets

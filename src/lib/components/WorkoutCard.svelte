@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Workout } from '../types';
   import { EXERCISE_MAP } from '../exercises';
+  import { timeFormatPreference } from '$lib/stores/userStore';
 
   let { workout }: { workout: Workout } = $props();
 
@@ -27,7 +28,9 @@
 
   const timeLabel = $derived(
     new Date(workout.startTime).toLocaleTimeString('en-US', {
-      hour: 'numeric', minute: '2-digit',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: $timeFormatPreference === '12h',
     })
   );
 </script>

@@ -6,7 +6,7 @@
   import NumericKeypad from '$lib/components/NumericKeypad.svelte';
   import { setsStore, selectedIds, pushUndo, undo, redo, hasUndo, hasRedo } from '$lib/stores/workoutStore';
   import { getTodaySets, saveSets, deleteSet as dbDeleteSet, saveWorkout } from '$lib/db';
-  import { unitPreference, initUnitPreference, userStore } from '$lib/stores/userStore';
+  import { unitPreference, initUnitPreference, userStore, timeFormatPreference, initTimeFormatPreference } from '$lib/stores/userStore';
   import { syncToServer, syncFromServer, syncStore, markSyncPending, refreshSyncStatus } from '$lib/sync';
   import type { WorkoutSet } from '$lib/types';
 
@@ -21,6 +21,7 @@
 
   // Reactive unit preference — auto-subscribes and updates when the store changes
   const unit = $derived($unitPreference);
+  const timeFormat = $derived($timeFormatPreference);
 
   // Sync state for the header button
   const isSyncing = $derived($syncStore.syncing);
@@ -96,7 +97,7 @@
   const timesLabel = $derived(() => {
     if (sets.length === 0) return '';
     const fmt = (ts: number) =>
-      new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: timeFormat === '12h' });
     const sorted = [...sets].sort((a, b) => a.createdAt - b.createdAt);
     const s = fmt(customStartTime ?? (sorted[0].createdAt - WORKOUT_START_OFFSET_MS));
     const e = fmt(customEndTime ?? sorted[sorted.length - 1].createdAt);
@@ -112,6 +113,7 @@
 
   onMount(() => {
     initUnitPreference();
+    initTimeFormatPreference();
 
     loadSets();
     refreshSyncStatus().catch(() => {});
