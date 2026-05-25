@@ -38,6 +38,21 @@ type StravaConfig = {
 const STRAVA_TOKEN_URL = 'https://www.strava.com/oauth/token';
 const STRAVA_API_BASE = 'https://www.strava.com/api/v3';
 const WORKOUT_GAP_MS = 90 * 60 * 1000;
+const STRAVA_CALLBACK_PATH = '/api/strava/callback';
+
+function normalizeRedirectUri(value: string): string {
+	try {
+		const url = new URL(value);
+		if (url.pathname === '/' || url.pathname === '') {
+			url.pathname = STRAVA_CALLBACK_PATH;
+		} else if (!url.pathname.endsWith(STRAVA_CALLBACK_PATH)) {
+			url.pathname = `${url.pathname.replace(/\/$/, '')}${STRAVA_CALLBACK_PATH}`;
+		}
+		return url.toString();
+	} catch {
+		return value;
+	}
+}
 
 function requiredStravaConfig(platform: App.Platform | undefined): StravaConfig {
 	const env = platform?.env;
@@ -48,7 +63,7 @@ function requiredStravaConfig(platform: App.Platform | undefined): StravaConfig 
 	if (!clientId || !clientSecret || !redirectUri) {
 		throw error(503, 'Strava integration is not configured');
 	}
-	return { clientId, clientSecret, redirectUri };
+	return { clientId, clientSecret, redirectUri: normalizeRedirectUri(redirectUri) };
 }
 
 async function getStoredToken(db: D1Database, userId: string): Promise<StravaTokenRow | null> {
