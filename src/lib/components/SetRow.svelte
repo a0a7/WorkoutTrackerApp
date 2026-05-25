@@ -534,6 +534,7 @@
 
   function handleDragHandlePointerMove(e: PointerEvent) {
     if (!maybeActivateDrag(e)) return;
+    e.preventDefault();
     const targetEl = document
       .elementsFromPoint(e.clientX, e.clientY)
       .map((el) => el.closest('tr[data-set-row-index]'))

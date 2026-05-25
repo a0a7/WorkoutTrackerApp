@@ -12,6 +12,7 @@
   let pullStartY = $state<number | null>(null);
   let pullDistance = $state(0);
   let pullSyncing = $state(false);
+  let isStandalone = $state(false);
   const PULL_SYNC_THRESHOLD_PX = 84;
 
   const navItems = [
@@ -34,6 +35,14 @@
   }
 
   onMount(() => {
+    const standaloneQuery = window.matchMedia('(display-mode: standalone)');
+    const updateStandalone = () => {
+      const iosStandalone = (navigator as Navigator & { standalone?: boolean }).standalone === true;
+      isStandalone = standaloneQuery.matches || iosStandalone;
+    };
+    updateStandalone();
+    standaloneQuery.addEventListener('change', updateStandalone);
+
     // 1. Theme (synchronous — avoid flash of wrong theme)
     const saved = localStorage.getItem('theme');
     if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -100,6 +109,7 @@
       if (dueSyncTimer) clearInterval(dueSyncTimer);
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('online', handleOnline);
+      standaloneQuery.removeEventListener('change', updateStandalone);
     };
   });
 
@@ -215,7 +225,7 @@
     ontouchstart={handlePullStart}
     ontouchmove={handlePullMove}
     ontouchend={handlePullEnd}
-    class="flex-1 flex flex-col relative pt-[env(safe-area-inset-top)] {currentPath !== '/login' ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0' : ''} overflow-y-auto"
+    class="flex-1 flex flex-col relative {isStandalone ? 'pt-[env(safe-area-inset-top)]' : ''} {currentPath !== '/login' ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0' : ''} overflow-y-auto"
   >
     {#if pullDistance > 0 && currentPath !== '/login'}
       <div class="absolute inset-x-0 top-0 z-50 flex h-16 items-center justify-center bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow-md">

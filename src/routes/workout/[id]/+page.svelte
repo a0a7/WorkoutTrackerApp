@@ -40,6 +40,8 @@
   let dragPreviewOriginal = $state<WorkoutSet[] | null>(null);
   let dragPreviewDirty = $state(false);
   let dragItemId = $state<string | null>(null);
+  let dragPreviewRaf: number | null = null;
+  let pendingDragTargetIndex: number | null = null;
   let stravaConnected = $state(false);
   let stravaSyncing = $state(false);
   let stravaMessage = $state('');
@@ -213,21 +215,35 @@
     dragPreviewDirty = false;
     dragPreviewActive = true;
     draftDragFromIndex = index;
+    pendingDragTargetIndex = null;
   }
 
   function handleDraftDragOver(index: number) {
     draftDragToIndex = index;
     if (!dragPreviewActive || !dragItemId) return;
-    const currentIndex = draftSets.findIndex((s) => s.id === dragItemId);
-    if (currentIndex < 0 || currentIndex === index) return;
-    const next = [...draftSets];
-    const [moved] = next.splice(currentIndex, 1);
-    next.splice(index, 0, moved);
-    dragPreviewDirty = true;
-    persistDraftSets(next);
+    pendingDragTargetIndex = index;
+    if (dragPreviewRaf !== null) return;
+    dragPreviewRaf = requestAnimationFrame(() => {
+      dragPreviewRaf = null;
+      if (!dragPreviewActive || !dragItemId || pendingDragTargetIndex === null) return;
+      const targetIndex = pendingDragTargetIndex;
+      pendingDragTargetIndex = null;
+      const currentIndex = draftSets.findIndex((s) => s.id === dragItemId);
+      if (currentIndex < 0 || currentIndex === targetIndex) return;
+      const next = [...draftSets];
+      const [moved] = next.splice(currentIndex, 1);
+      next.splice(targetIndex, 0, moved);
+      dragPreviewDirty = true;
+      persistDraftSets(next);
+    });
   }
 
   function handleDraftDrop() {
+    if (dragPreviewRaf !== null) {
+      cancelAnimationFrame(dragPreviewRaf);
+      dragPreviewRaf = null;
+    }
+    pendingDragTargetIndex = null;
     if (dragPreviewActive) {
       if (!dragPreviewDirty && dragPreviewOriginal) {
         persistDraftSets(dragPreviewOriginal);
@@ -575,44 +591,54 @@
     return segments;
   }
 
-  function buildSupersetGroups(segments: SetSegment[]) {
-    const indicesByExercise = new Map<string, number[]>();
-    segments.forEach((seg, idx) => {
-      const key = seg.exerciseId || seg.exerciseName;
-      if (!indicesByExercise.has(key)) indicesByExercise.set(key, []);
-      indicesByExercise.get(key)!.push(idx);
-    });
-    const rawGroups = [] as { start: number; end: number }[];
-    for (const indices of indicesByExercise.values()) {
-      if (indices.length > 1) {
-        const start = indices[0];
-        const end = indices[indices.length - 1];
-        if (end > start) rawGroups.push({ start, end });
+  function buildExerciseGroups(sourceSets: WorkoutSet[]) {
+    const ordered = sortSetsInOrder(sourceSets);
+    const map = new Map<string, SetSegment>();
+    const order: string[] = [];
+    for (const s of ordered) {
+      const key = `${s.exerciseId}::${s.exerciseName}`;
+      if (!map.has(key)) {
+        map.set(key, { exerciseId: s.exerciseId, exerciseName: s.exerciseName, sets: [] });
+        order.push(key);
       }
+      map.get(key)!.sets.push(s);
     }
-    rawGroups.sort((a, b) => a.start - b.start);
-    const merged: { start: number; end: number }[] = [];
-    for (const group of rawGroups) {
-      const last = merged[merged.length - 1];
-      if (!last || group.start > last.end) merged.push({ ...group });
-      else last.end = Math.max(last.end, group.end);
-    }
-    return merged;
+    return order.map((key) => map.get(key)!).filter(Boolean);
   }
 
-  function buildDisplayBlocks(segments: SetSegment[]) {
-    const groups = buildSupersetGroups(segments);
+  function getSupersetExerciseKeys(sourceSets: WorkoutSet[]) {
+    const segments = buildSegments(sourceSets);
+    const counts = new Map<string, number>();
+    for (const seg of segments) {
+      const key = `${seg.exerciseId}::${seg.exerciseName}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const supersetKeys = new Set<string>();
+    for (const [key, count] of counts.entries()) {
+      if (count > 1) supersetKeys.add(key);
+    }
+    return supersetKeys;
+  }
+
+  function buildDisplayBlocks(sourceSets: WorkoutSet[]) {
+    const groups = buildExerciseGroups(sourceSets);
+    const supersetKeys = getSupersetExerciseKeys(sourceSets);
     const blocks: { type: 'superset' | 'single'; segments: SetSegment[] }[] = [];
     let i = 0;
-    let g = 0;
-    while (i < segments.length) {
-      const group = groups[g];
-      if (group && i === group.start) {
-        blocks.push({ type: 'superset', segments: segments.slice(group.start, group.end + 1) });
-        i = group.end + 1;
-        g += 1;
+    while (i < groups.length) {
+      const key = `${groups[i].exerciseId}::${groups[i].exerciseName}`;
+      if (supersetKeys.has(key)) {
+        const start = i;
+        let end = i;
+        while (end < groups.length) {
+          const nextKey = `${groups[end].exerciseId}::${groups[end].exerciseName}`;
+          if (!supersetKeys.has(nextKey)) break;
+          end += 1;
+        }
+        blocks.push({ type: 'superset', segments: groups.slice(start, end) });
+        i = end;
       } else {
-        blocks.push({ type: 'single', segments: [segments[i]] });
+        blocks.push({ type: 'single', segments: [groups[i]] });
         i += 1;
       }
     }
@@ -622,8 +648,7 @@
   const setDisplayBlocks = $derived(() => {
     if (!workout) return [] as { type: 'superset' | 'single'; segments: SetSegment[] }[];
     const sourceSets = editingWorkout ? draftSets : workout.sets;
-    const segments = buildSegments(sourceSets);
-    return buildDisplayBlocks(segments);
+    return buildDisplayBlocks(sourceSets);
   });
 
   function formatTime(ts: number) {
