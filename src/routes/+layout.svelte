@@ -2,7 +2,7 @@
   import '../app.css';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
-0  import { get } from 'svelte/store';
+  import { get } from 'svelte/store';
   import { initDB } from '$lib/db';
   import { userStore } from '$lib/stores/userStore';
   import { refreshSyncStatus, setupSyncListeners, syncFromServer, syncToServer } from '$lib/sync';
