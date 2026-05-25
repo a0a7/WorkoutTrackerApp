@@ -222,6 +222,7 @@ export async function exchangeCodeAndStoreToken(
 	const body = new URLSearchParams({
 		client_id: config.clientId,
 		client_secret: config.clientSecret,
+		redirect_uri: config.redirectUri,
 		code,
 		grant_type: 'authorization_code'
 	});
