@@ -58,6 +58,7 @@
   let shareActiveVariant = $state<ShareVariant | null>(null);
   let sharePreviewRequestId = 0;
   let shareMapWrapper = $state<HTMLDivElement | null>(null);
+  type ShareExerciseBlock = { type: 'superset' | 'single'; lines: string[] };
 
   function toDateInput(ts: number) {
     const d = new Date(ts);
@@ -399,16 +400,13 @@
     ctx.closePath();
   }
 
-  function buildShareExerciseLines() {
-    if (!workout) return [] as { text: string; superset: boolean }[];
+  function buildShareExerciseBlocks(): ShareExerciseBlock[] {
+    if (!workout) return [];
     const blocks = buildDisplayBlocks(workout.sets);
-    return blocks.flatMap((block) =>
-      block.segments.map((seg) => {
-        const countLabel = `${seg.sets.length}x`;
-        const text = `${countLabel} ${seg.exerciseName}`;
-        return { text, superset: block.type === 'superset' };
-      })
-    );
+    return blocks.map((block) => ({
+      type: block.type,
+      lines: block.segments.map((seg) => `${seg.sets.length}x ${seg.exerciseName}`)
+    }));
   }
 
   function clearSharePreviews() {
@@ -483,13 +481,30 @@
     const mapHeight = mapWidth * (viewHeight / viewWidth);
     const summaryParts = [shareSetLabel(), shareTimeLabel()].filter(Boolean);
     const shareLines = summaryParts.length ? [summaryParts.join(' • ')] : [];
-    const exerciseLines = variant === 'detailed' ? buildShareExerciseLines() : [];
+    const exerciseBlocks = variant === 'detailed' ? buildShareExerciseBlocks() : [];
+    const supersetLabel = 'SUPERSET';
+    const supersetLabelFontSize = Math.round(detailFontSize * 0.5);
+    const supersetLabelPaddingX = Math.round(supersetLabelFontSize * 0.6);
+    const supersetLabelPaddingY = Math.round(supersetLabelFontSize * 0.3);
+    const supersetLabelGap = Math.round(detailFontSize * 0.3);
+    const supersetLabelHeight = supersetLabelFontSize + supersetLabelPaddingY * 2;
+    const supersetBlockPaddingX = Math.round(detailFontSize * 0.6);
+    const supersetBlockPaddingY = Math.round(detailFontSize * 0.5);
+    const supersetBlockRadius = Math.round(detailFontSize * 0.6);
+    const supersetBlockHeight = (lineCount: number) =>
+      supersetBlockPaddingY * 2 + supersetLabelHeight + supersetLabelGap + detailSpacing * lineCount;
+    const exerciseSectionHeight = exerciseBlocks.length
+      ? detailGap + exerciseBlocks.reduce(
+        (sum, block) => sum + (block.type === 'superset' ? supersetBlockHeight(block.lines.length) : detailSpacing * block.lines.length),
+        0
+      )
+      : 0;
     const totalHeight = Math.ceil(
       paddingTop
       + mapHeight
       + gapAfterMap
       + lineSpacing * shareLines.length
-      + (exerciseLines.length ? detailGap + detailSpacing * exerciseLines.length : 0)
+      + exerciseSectionHeight
       + footerSpacing
       + paddingBottom
     );
@@ -533,42 +548,57 @@
       ctx.fillText(line, shareWidth / 2, textY);
       textY += lineSpacing;
     }
-    if (exerciseLines.length) {
+    if (exerciseBlocks.length) {
       const detailFont = `600 ${detailFontSize}px ${fontFamily}`;
-      const badgeFont = `700 ${Math.round(detailFontSize * 0.5)}px ${fontFamily}`;
-      const badgeSize = Math.round(detailFontSize * 0.9);
-      const badgeRadius = Math.round(badgeSize * 0.35);
-      const badgeGap = 16;
+      const supersetLabelFont = `700 ${supersetLabelFontSize}px ${fontFamily}`;
       textY += detailGap;
       ctx.font = detailFont;
-      for (const line of exerciseLines) {
-        const maxTextWidth = shareWidth - paddingX * 2 - (line.superset ? badgeSize + badgeGap : 0);
-        const lineText = truncateTextToWidth(ctx, line.text, maxTextWidth);
+      for (const block of exerciseBlocks) {
         ctx.fillStyle = '#ffffff';
-        if (line.superset) {
-          const textWidth = ctx.measureText(lineText).width;
-          const totalWidth = badgeSize + badgeGap + textWidth;
-          const startX = (shareWidth - totalWidth) / 2;
-          const badgeX = startX;
-          const badgeY = textY - badgeSize / 2;
-          drawRoundedRect(ctx, badgeX, badgeY, badgeSize, badgeSize, badgeRadius);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+        if (block.type === 'superset') {
+          const maxBlockWidth = shareWidth - paddingX * 2;
+          const maxTextWidth = maxBlockWidth - supersetBlockPaddingX * 2;
+          const blockLines = block.lines.map((line) => truncateTextToWidth(ctx, line, maxTextWidth));
+          const lineWidths = blockLines.map((line) => ctx.measureText(line).width);
+          ctx.font = supersetLabelFont;
+          const labelTextWidth = ctx.measureText(supersetLabel).width;
+          const labelWidth = labelTextWidth + supersetLabelPaddingX * 2;
+          const contentWidth = Math.max(labelWidth, ...lineWidths);
+          const blockWidth = Math.min(maxBlockWidth, contentWidth + supersetBlockPaddingX * 2);
+          const blockHeight = supersetBlockHeight(blockLines.length);
+          const blockX = (shareWidth - blockWidth) / 2;
+          const blockY = textY - detailSpacing / 2;
+          drawRoundedRect(ctx, blockX, blockY, blockWidth, blockHeight, supersetBlockRadius);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+          ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = '#ffffff';
+          ctx.stroke();
+          const labelX = blockX + supersetBlockPaddingX;
+          const labelY = blockY + supersetBlockPaddingY;
+          drawRoundedRect(ctx, labelX, labelY, labelWidth, supersetLabelHeight, supersetLabelHeight / 2);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
           ctx.fill();
           ctx.lineWidth = 2;
           ctx.strokeStyle = '#ffffff';
           ctx.stroke();
           ctx.fillStyle = '#ffffff';
-          ctx.font = badgeFont;
-          ctx.textAlign = 'center';
-          ctx.fillText('SS', badgeX + badgeSize / 2, textY);
+          ctx.font = supersetLabelFont;
+          ctx.textAlign = 'left';
+          ctx.fillText(supersetLabel, labelX + supersetLabelPaddingX, labelY + supersetLabelHeight / 2);
           ctx.font = detailFont;
           ctx.textAlign = 'left';
-          ctx.fillText(lineText, badgeX + badgeSize + badgeGap, textY);
+          const lineStartY = labelY + supersetLabelHeight + supersetLabelGap + detailSpacing / 2;
+          for (let i = 0; i < blockLines.length; i += 1) {
+            ctx.fillText(blockLines[i], labelX, lineStartY + detailSpacing * i);
+          }
+          textY = blockY + blockHeight + detailSpacing / 2;
         } else {
+          const lineText = truncateTextToWidth(ctx, block.lines[0], shareWidth - paddingX * 2);
           ctx.textAlign = 'center';
           ctx.fillText(lineText, shareWidth / 2, textY);
+          textY += detailSpacing;
         }
-        textY += detailSpacing;
       }
       textY += footerSpacing - detailSpacing;
     } else {
