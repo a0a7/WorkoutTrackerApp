@@ -402,8 +402,8 @@
     const blocks = buildDisplayBlocks(workout.sets);
     return blocks.flatMap((block) =>
       block.segments.map((seg) => {
-        const detail = formatExerciseCompact(seg.exerciseName, seg.sets);
-        const text = detail ? `${seg.exerciseName} • ${detail}` : seg.exerciseName;
+        const countLabel = `${seg.sets.length}x`;
+        const text = `${countLabel} ${seg.exerciseName}`;
         return { text, superset: block.type === 'superset' };
       })
     );
@@ -479,7 +479,8 @@
     const mapScale = 0.5;
     const mapWidth = (shareWidth - paddingX * 2) * mapScale;
     const mapHeight = mapWidth * (viewHeight / viewWidth);
-    const shareLines = [shareSetLabel(), shareLiftLabel(), shareVolumeLabel(), shareTimeLabel()].filter(Boolean);
+    const summaryParts = [shareSetLabel(), shareTimeLabel()].filter(Boolean);
+    const shareLines = summaryParts.length ? [summaryParts.join(' • ')] : [];
     const exerciseLines = variant === 'detailed' ? buildShareExerciseLines() : [];
     const totalHeight = Math.ceil(
       paddingTop
@@ -533,19 +534,20 @@
     if (exerciseLines.length) {
       const detailFont = `600 ${detailFontSize}px ${fontFamily}`;
       const badgeFont = `700 ${Math.round(detailFontSize * 0.5)}px ${fontFamily}`;
-      const hasSuperset = exerciseLines.some((line) => line.superset);
       const badgeSize = Math.round(detailFontSize * 0.9);
       const badgeRadius = Math.round(badgeSize * 0.35);
       const badgeGap = 16;
-      const textStartX = paddingX + (hasSuperset ? badgeSize + badgeGap : 0);
-      const maxTextWidth = shareWidth - paddingX - textStartX;
       textY += detailGap - lineSpacing;
-      ctx.textAlign = 'left';
       ctx.font = detailFont;
       for (const line of exerciseLines) {
+        const maxTextWidth = shareWidth - paddingX * 2 - (line.superset ? badgeSize + badgeGap : 0);
         const lineText = truncateTextToWidth(ctx, line.text, maxTextWidth);
+        ctx.fillStyle = '#ffffff';
         if (line.superset) {
-          const badgeX = paddingX;
+          const textWidth = ctx.measureText(lineText).width;
+          const totalWidth = badgeSize + badgeGap + textWidth;
+          const startX = (shareWidth - totalWidth) / 2;
+          const badgeX = startX;
           const badgeY = textY - badgeSize / 2;
           drawRoundedRect(ctx, badgeX, badgeY, badgeSize, badgeSize, badgeRadius);
           ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
@@ -559,9 +561,11 @@
           ctx.fillText('SS', badgeX + badgeSize / 2, textY);
           ctx.font = detailFont;
           ctx.textAlign = 'left';
+          ctx.fillText(lineText, badgeX + badgeSize + badgeGap, textY);
+        } else {
+          ctx.textAlign = 'center';
+          ctx.fillText(lineText, shareWidth / 2, textY);
         }
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(lineText, textStartX, textY);
         textY += detailSpacing;
       }
       textY += footerSpacing - detailSpacing;
@@ -825,7 +829,11 @@
     return `${formatted} ${unitLabel}`;
   });
 
-  const shareTimeLabel = $derived(() => (workout ? durationLabel() : ''));
+  const shareTimeLabel = $derived(() => {
+    if (!workout) return '';
+    const min = Math.round((workout.endTime - workout.startTime) / 60000);
+    return `${min} min`;
+  });
 
   const shareDateLabel = $derived(() =>
     workout
@@ -1065,7 +1073,7 @@
       aria-label="Close share menu"
     ></button>
     <div
-      class="relative z-10 w-full max-w-md rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-xl"
+      class="relative z-10 w-full max-w-md lg:max-w-4xl rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-xl"
       role="dialog"
       aria-modal="true"
       aria-label="Share workout"
@@ -1079,9 +1087,9 @@
           Close
         </button>
       </div>
-      <div class="space-y-4">
+      <div class="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 lg:mx-0 lg:grid lg:grid-cols-2 lg:gap-4 lg:overflow-visible lg:px-0 lg:pb-0">
         {#each shareVariants as variant}
-          <div class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-3">
+          <div class="min-w-full shrink-0 snap-center rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-3 lg:min-w-0">
             <div class="mb-2 flex items-center justify-between">
               <p class="text-[0.7rem] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
                 {variant === 'simple' ? 'Simple' : 'Detailed'}
