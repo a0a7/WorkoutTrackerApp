@@ -504,6 +504,7 @@
   const SWIPE_MAX_OFFSET_PX = 240;
   const SWIPE_ACTIVATION_PX = 14;
   const SWIPE_DAMPING = 0.85;
+  const SWIPE_SMOOTHING = 0.35;
   function handleTouchStart(e: TouchEvent) {
     touchStartY = e.touches[0].clientY;
     touchDragging = false;
@@ -611,8 +612,9 @@
     }
     e.preventDefault();
     const damped = dx * SWIPE_DAMPING;
-    swipeOffsetX = Math.max(-SWIPE_MAX_OFFSET_PX, Math.min(0, damped));
-    swipingToDelete = Math.abs(swipeOffsetX) >= SWIPE_DELETE_THRESHOLD_PX;
+    const targetOffset = Math.max(-SWIPE_MAX_OFFSET_PX, Math.min(0, damped));
+    swipeOffsetX += (targetOffset - swipeOffsetX) * SWIPE_SMOOTHING;
+    swipingToDelete = Math.abs(targetOffset) >= SWIPE_DELETE_THRESHOLD_PX;
   }
 
   function handleRowSwipeEnd() {

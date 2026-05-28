@@ -47,18 +47,23 @@
   let stravaConnected = $state(false);
   let stravaSyncing = $state(false);
   let stravaMessage = $state('');
-  type ShareVariant = 'simple' | 'detailed';
-  const shareVariants: ShareVariant[] = ['simple', 'detailed'];
+  type ShareVariant = 'simple' | 'stats' | 'detailed';
+  const shareVariants: ShareVariant[] = ['simple', 'stats', 'detailed'];
   let shareGenerating = $state(false);
   let shareMessage = $state('');
   let shareMenuOpen = $state(false);
   let sharePreviewLoading = $state(false);
-  let sharePreviewUrls = $state<{ simple?: string; detailed?: string }>({});
-  let sharePreviewBlobs = $state<{ simple?: Blob; detailed?: Blob }>({});
+  let sharePreviewUrls = $state<Partial<Record<ShareVariant, string>>>({});
+  let sharePreviewBlobs = $state<Partial<Record<ShareVariant, Blob>>>({});
   let shareActiveVariant = $state<ShareVariant | null>(null);
   let sharePreviewRequestId = 0;
   let shareMapWrapper = $state<HTMLDivElement | null>(null);
   type ShareExerciseBlock = { type: 'superset' | 'single'; lines: string[] };
+  const shareVariantLabels: Record<ShareVariant, string> = {
+    simple: 'Simple',
+    stats: 'Stats',
+    detailed: 'Detailed',
+  };
 
   function toDateInput(ts: number) {
     const d = new Date(ts);
@@ -409,6 +414,22 @@
     }));
   }
 
+  function buildShareSummaryLines(variant: ShareVariant): string[] {
+    const parts = variant === 'stats'
+      ? [shareSetLabel(), shareLiftLabel(), shareVolumeLabel(), shareTimeLabel()]
+      : [shareSetLabel(), shareTimeLabel()];
+    const filtered = parts.filter((value): value is string => Boolean(value));
+    if (filtered.length === 0) return [];
+    if (variant !== 'stats' || filtered.length <= 2) {
+      return [filtered.join(' • ')];
+    }
+    const splitIndex = Math.ceil(filtered.length / 2);
+    return [
+      filtered.slice(0, splitIndex).join(' • '),
+      filtered.slice(splitIndex).join(' • '),
+    ];
+  }
+
   function clearSharePreviews() {
     for (const url of Object.values(sharePreviewUrls)) {
       if (url) URL.revokeObjectURL(url);
@@ -424,16 +445,19 @@
     const requestId = sharePreviewRequestId;
     clearSharePreviews();
     try {
-      const [simpleBlob, detailedBlob] = await Promise.all([
-        buildShareImage('simple'),
-        buildShareImage('detailed'),
-      ]);
+      const blobs: Partial<Record<ShareVariant, Blob>> = {};
+      await Promise.all(
+        shareVariants.map(async (variant) => {
+          blobs[variant] = await buildShareImage(variant);
+        })
+      );
       if (!shareMenuOpen || requestId !== sharePreviewRequestId) return;
-      sharePreviewBlobs = { simple: simpleBlob, detailed: detailedBlob };
-      sharePreviewUrls = {
-        simple: URL.createObjectURL(simpleBlob),
-        detailed: URL.createObjectURL(detailedBlob),
-      };
+      sharePreviewBlobs = blobs;
+      const urls: Partial<Record<ShareVariant, string>> = {};
+      for (const [variant, blob] of Object.entries(blobs)) {
+        if (blob) urls[variant as ShareVariant] = URL.createObjectURL(blob);
+      }
+      sharePreviewUrls = urls;
     } catch (err) {
       shareMessage = err instanceof Error ? err.message : 'Failed to build share preview.';
     } finally {
@@ -479,8 +503,7 @@
     const mapScale = 0.5;
     const mapWidth = (shareWidth - paddingX * 2) * mapScale;
     const mapHeight = mapWidth * (viewHeight / viewWidth);
-    const summaryParts = [shareSetLabel(), shareTimeLabel()].filter(Boolean);
-    const shareLines = summaryParts.length ? [summaryParts.join(' • ')] : [];
+    const shareLines = buildShareSummaryLines(variant);
     const exerciseBlocks = variant === 'detailed' ? buildShareExerciseBlocks() : [];
     const supersetLabel = 'SUPERSET';
     const supersetLabelFontSize = Math.round(detailFontSize * 0.5);
@@ -1119,12 +1142,12 @@
           Close
         </button>
       </div>
-      <div class="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 lg:mx-0 lg:grid lg:grid-cols-2 lg:gap-4 lg:overflow-visible lg:px-0 lg:pb-0">
+      <div class="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 lg:mx-0 lg:grid lg:grid-cols-3 lg:gap-4 lg:overflow-visible lg:px-0 lg:pb-0">
         {#each shareVariants as variant}
           <div class="min-w-full shrink-0 snap-center rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-3 lg:min-w-0">
             <div class="mb-2 flex items-center justify-between">
               <p class="text-[0.7rem] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
-                {variant === 'simple' ? 'Simple' : 'Detailed'}
+                {shareVariantLabels[variant]}
               </p>
               <button
                 class="rounded-lg bg-[hsl(var(--primary))] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
@@ -1137,7 +1160,7 @@
             {#if sharePreviewUrls[variant]}
               <img
                 src={sharePreviewUrls[variant]}
-                alt={`${variant === 'simple' ? 'Simple' : 'Detailed'} share preview`}
+                alt={`${shareVariantLabels[variant]} share preview`}
                 class="mx-auto h-auto w-full max-h-[65vh] rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))] object-contain"
               />
             {:else}
