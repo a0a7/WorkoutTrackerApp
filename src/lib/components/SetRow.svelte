@@ -700,7 +700,7 @@
 
   <!-- Exercise -->
   <td class="min-w-0 py-0.5 px-0" onfocusin={closeKeypad}>
-    <div class={isEmpty ? 'px-4' : ''}>
+    <div class={`min-w-0 ${isEmpty ? 'px-4' : ''}`}>
     {#if isEmpty || editingExercise}
       <ExerciseAutocomplete
         value={isEmpty ? draftExerciseName : (set.exerciseName ?? '')}

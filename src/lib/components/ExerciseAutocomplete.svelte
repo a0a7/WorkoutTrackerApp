@@ -97,7 +97,7 @@
   }
 </script>
 
-<div class="relative z-20 -ml-5 w-full">
+<div class="relative z-20 -ml-5 w-full min-w-0">
   <input
     bind:this={inputEl}
     type="text"
@@ -107,7 +107,7 @@
     onfocus={() => { focused = true; }}
     onblur={() => { setTimeout(() => { focused = false; }, 150); }}
     onkeydown={handleKeydown}
-    class="w-full bg-transparent py-1.5 px-1 text-sm font-medium outline-none rounded
+    class="w-full min-w-0 bg-transparent py-1.5 px-1 text-sm font-medium outline-none rounded
            focus:bg-[hsl(var(--muted)/0.5)]
            placeholder:text-[hsl(var(--muted-foreground)/0.35)]
            transition-colors truncate"

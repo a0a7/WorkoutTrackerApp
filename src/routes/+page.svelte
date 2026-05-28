@@ -493,11 +493,11 @@
 
   <!-- Sets table -->
   <div class="border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm min-h-30 rounded-2xl relative overflow-visible z-0">
-    <table class="w-full border-collapse">
+    <table class="w-full table-fixed border-collapse">
       <thead>
         <tr class="border-b border-[hsl(var(--border))]">
           <th class="w-10 pl-4 pr-0 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">#</th>
-          <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Exercise</th>
+          <th class="w-full px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Exercise</th>
           <th class="w-12 px-0.5 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Reps</th>
           <th class="w-14 px-0.5 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">{unit}</th>
           <th class="w-12 pl-0 pr-4 py-2"></th>

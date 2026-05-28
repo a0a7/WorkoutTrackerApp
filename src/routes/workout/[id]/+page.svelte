@@ -45,8 +45,16 @@
   let stravaConnected = $state(false);
   let stravaSyncing = $state(false);
   let stravaMessage = $state('');
+  type ShareVariant = 'simple' | 'detailed';
+  const shareVariants: ShareVariant[] = ['simple', 'detailed'];
   let shareGenerating = $state(false);
   let shareMessage = $state('');
+  let shareMenuOpen = $state(false);
+  let sharePreviewLoading = $state(false);
+  let sharePreviewUrls = $state<{ simple?: string; detailed?: string }>({});
+  let sharePreviewBlobs = $state<{ simple?: Blob; detailed?: Blob }>({});
+  let shareActiveVariant = $state<ShareVariant | null>(null);
+  let sharePreviewRequestId = 0;
   let shareMapWrapper = $state<HTMLDivElement | null>(null);
 
   function toDateInput(ts: number) {
@@ -364,7 +372,87 @@
     }
   }
 
-  async function buildShareImage(): Promise<Blob> {
+  function truncateTextToWidth(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
+    if (ctx.measureText(text).width <= maxWidth) return text;
+    const ellipsis = '…';
+    let truncated = text;
+    while (truncated.length > 0 && ctx.measureText(`${truncated}${ellipsis}`).width > maxWidth) {
+      truncated = truncated.slice(0, -1);
+    }
+    return truncated ? `${truncated}${ellipsis}` : ellipsis;
+  }
+
+  function drawRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  function buildShareExerciseLines() {
+    if (!workout) return [] as { text: string; superset: boolean }[];
+    const blocks = buildDisplayBlocks(workout.sets);
+    return blocks.flatMap((block) =>
+      block.segments.map((seg) => {
+        const detail = formatExerciseCompact(seg.exerciseName, seg.sets);
+        const text = detail ? `${seg.exerciseName} • ${detail}` : seg.exerciseName;
+        return { text, superset: block.type === 'superset' };
+      })
+    );
+  }
+
+  function clearSharePreviews() {
+    for (const url of Object.values(sharePreviewUrls)) {
+      if (url) URL.revokeObjectURL(url);
+    }
+    sharePreviewUrls = {};
+    sharePreviewBlobs = {};
+  }
+
+  async function loadSharePreviews() {
+    if (!workout) return;
+    sharePreviewLoading = true;
+    sharePreviewRequestId += 1;
+    const requestId = sharePreviewRequestId;
+    clearSharePreviews();
+    try {
+      const [simpleBlob, detailedBlob] = await Promise.all([
+        buildShareImage('simple'),
+        buildShareImage('detailed'),
+      ]);
+      if (!shareMenuOpen || requestId !== sharePreviewRequestId) return;
+      sharePreviewBlobs = { simple: simpleBlob, detailed: detailedBlob };
+      sharePreviewUrls = {
+        simple: URL.createObjectURL(simpleBlob),
+        detailed: URL.createObjectURL(detailedBlob),
+      };
+    } catch (err) {
+      shareMessage = err instanceof Error ? err.message : 'Failed to build share preview.';
+    } finally {
+      if (requestId === sharePreviewRequestId) sharePreviewLoading = false;
+    }
+  }
+
+  function openShareMenu() {
+    if (!workout || shareGenerating) return;
+    shareMenuOpen = true;
+    void loadSharePreviews();
+  }
+
+  function closeShareMenu() {
+    shareMenuOpen = false;
+    clearSharePreviews();
+  }
+
+  async function buildShareImage(variant: ShareVariant): Promise<Blob> {
     await tick();
     if (!workout || !shareMapWrapper) throw new Error('Share preview not ready.');
     const svg = shareMapWrapper.querySelector('svg') as SVGSVGElement | null;
@@ -381,6 +469,9 @@
     const gapAfterMap = 48;
     const lineFontSize = 64;
     const lineSpacing = 82;
+    const detailFontSize = 40;
+    const detailSpacing = 56;
+    const detailGap = 32;
     const footerFontSize = 44;
     const footerSmallCapsSize = Math.round(footerFontSize * 0.72);
     const footerSpacing = 60;
@@ -389,8 +480,15 @@
     const mapWidth = (shareWidth - paddingX * 2) * mapScale;
     const mapHeight = mapWidth * (viewHeight / viewWidth);
     const shareLines = [shareSetLabel(), shareLiftLabel(), shareVolumeLabel(), shareTimeLabel()].filter(Boolean);
+    const exerciseLines = variant === 'detailed' ? buildShareExerciseLines() : [];
     const totalHeight = Math.ceil(
-      paddingTop + mapHeight + gapAfterMap + lineSpacing * shareLines.length + footerSpacing + paddingBottom
+      paddingTop
+      + mapHeight
+      + gapAfterMap
+      + lineSpacing * shareLines.length
+      + (exerciseLines.length ? detailGap + detailSpacing * exerciseLines.length : 0)
+      + footerSpacing
+      + paddingBottom
     );
 
     const clonedSvg = svg.cloneNode(true) as SVGSVGElement;
@@ -432,35 +530,79 @@
       ctx.fillText(line, shareWidth / 2, textY);
       textY += lineSpacing;
     }
-    textY += footerSpacing - lineSpacing;
+    if (exerciseLines.length) {
+      const detailFont = `600 ${detailFontSize}px ${fontFamily}`;
+      const badgeFont = `700 ${Math.round(detailFontSize * 0.5)}px ${fontFamily}`;
+      const hasSuperset = exerciseLines.some((line) => line.superset);
+      const badgeSize = Math.round(detailFontSize * 0.9);
+      const badgeRadius = Math.round(badgeSize * 0.35);
+      const badgeGap = 16;
+      const textStartX = paddingX + (hasSuperset ? badgeSize + badgeGap : 0);
+      const maxTextWidth = shareWidth - paddingX - textStartX;
+      textY += detailGap - lineSpacing;
+      ctx.textAlign = 'left';
+      ctx.font = detailFont;
+      for (const line of exerciseLines) {
+        const lineText = truncateTextToWidth(ctx, line.text, maxTextWidth);
+        if (line.superset) {
+          const badgeX = paddingX;
+          const badgeY = textY - badgeSize / 2;
+          drawRoundedRect(ctx, badgeX, badgeY, badgeSize, badgeSize, badgeRadius);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+          ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = '#ffffff';
+          ctx.stroke();
+          ctx.fillStyle = '#ffffff';
+          ctx.font = badgeFont;
+          ctx.textAlign = 'center';
+          ctx.fillText('SS', badgeX + badgeSize / 2, textY);
+          ctx.font = detailFont;
+          ctx.textAlign = 'left';
+        }
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(lineText, textStartX, textY);
+        textY += detailSpacing;
+      }
+      textY += footerSpacing - detailSpacing;
+    } else {
+      textY += footerSpacing - lineSpacing;
+    }
 
     const footerSmallCapsFont = `600 ${footerSmallCapsSize}px ${fontFamily}`;
-    const bullet = ' • ';
     ctx.font = footerSmallCapsFont;
     const dateWidth = ctx.measureText(dateLabel).width;
-    const bulletWidth = ctx.measureText(bullet).width;
     const logbookWidth = ctx.measureText(logbookLabel).width;
-    const footerTotalWidth = dateWidth + bulletWidth + logbookWidth;
+    const bulletChar = '•';
+    const bulletWidth = ctx.measureText(bulletChar).width;
+    const bulletGap = Math.round(footerSmallCapsSize * 0.6);
+    const bulletBlockWidth = bulletWidth + bulletGap * 2;
+    const sideWidth = Math.max(dateWidth, logbookWidth);
+    const footerTotalWidth = sideWidth * 2 + bulletBlockWidth;
     const footerStartX = (shareWidth - footerTotalWidth) / 2;
+    ctx.font = footerSmallCapsFont;
+    ctx.textAlign = 'right';
+    ctx.fillText(dateLabel, footerStartX + sideWidth, textY);
+    ctx.textAlign = 'center';
+    ctx.fillText(bulletChar, footerStartX + sideWidth + bulletBlockWidth / 2, textY);
     ctx.textAlign = 'left';
-    ctx.font = footerSmallCapsFont;
-    ctx.fillText(dateLabel, footerStartX, textY);
-    ctx.fillText(bullet, footerStartX + dateWidth, textY);
-    ctx.font = footerSmallCapsFont;
-    ctx.fillText(logbookLabel, footerStartX + dateWidth + bulletWidth, textY);
+    ctx.fillText(logbookLabel, footerStartX + sideWidth + bulletBlockWidth, textY);
 
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
     if (!blob) throw new Error('Failed to generate share image.');
     return blob;
   }
 
-  async function shareWorkout() {
+  async function shareWorkout(variant: ShareVariant) {
     if (!workout || shareGenerating) return;
     shareGenerating = true;
+    shareActiveVariant = variant;
     shareMessage = '';
     try {
-      const blob = await buildShareImage();
-      const fileName = `logbook-${new Date(workout.startTime).toISOString().slice(0, 10)}.png`;
+      const blob = sharePreviewBlobs[variant] ?? await buildShareImage(variant);
+      const dateTag = new Date(workout.startTime).toISOString().slice(0, 10);
+      const suffix = variant === 'detailed' ? '-detailed' : '';
+      const fileName = `logbook-${dateTag}${suffix}.png`;
       const file = new File([blob], fileName, { type: 'image/png' });
       if (navigator.share && (navigator.canShare?.({ files: [file] }) ?? true)) {
         await navigator.share({ files: [file] });
@@ -483,6 +625,7 @@
       }
     } finally {
       shareGenerating = false;
+      shareActiveVariant = null;
     }
   }
 
@@ -813,7 +956,7 @@
                   <button
                     class="rounded-lg p-1.5 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-colors"
                     disabled={shareGenerating || editingWorkout}
-                    onclick={shareWorkout}
+                    onclick={openShareMenu}
                     aria-label="Share workout"
                     title="Share"
                   >
@@ -914,6 +1057,61 @@
   {/if}
 </div>
 
+{#if shareMenuOpen}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">
+    <button
+      class="absolute inset-0 h-full w-full cursor-default"
+      onclick={closeShareMenu}
+      aria-label="Close share menu"
+    ></button>
+    <div
+      class="relative z-10 w-full max-w-md rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-xl"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Share workout"
+    >
+      <div class="mb-3 flex items-center justify-between">
+        <p class="text-sm font-semibold text-[hsl(var(--foreground))]">Share</p>
+        <button
+          class="rounded-lg px-2 py-1 text-xs font-semibold text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"
+          onclick={closeShareMenu}
+        >
+          Close
+        </button>
+      </div>
+      <div class="space-y-4">
+        {#each shareVariants as variant}
+          <div class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-3">
+            <div class="mb-2 flex items-center justify-between">
+              <p class="text-[0.7rem] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+                {variant === 'simple' ? 'Simple' : 'Detailed'}
+              </p>
+              <button
+                class="rounded-lg bg-[hsl(var(--primary))] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                disabled={shareGenerating}
+                onclick={() => shareWorkout(variant)}
+              >
+                {shareGenerating && shareActiveVariant === variant ? 'Preparing…' : 'Share'}
+              </button>
+            </div>
+            {#if sharePreviewUrls[variant]}
+              <img
+                src={sharePreviewUrls[variant]}
+                alt={`${variant === 'simple' ? 'Simple' : 'Detailed'} share preview`}
+                class="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))] object-contain"
+              />
+            {:else}
+              <div class="flex h-40 items-center justify-center rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))] text-xs text-[hsl(var(--muted-foreground))]">
+                {sharePreviewLoading ? 'Generating preview…' : 'Preview unavailable.'}
+              </div>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    </div>
+  </div>
+{/if}
+
 <!-- Divider between workout info and sets table (editing mode) -->
 {#if editingWorkout}
   <hr class="my-3 border-[hsl(var(--border))]" />
@@ -940,11 +1138,11 @@
     </div>
 
     <div class="-mx-4 border-y border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm min-h-30">
-      <table class="w-full border-collapse">
+      <table class="w-full table-fixed border-collapse">
         <thead>
           <tr class="border-b border-[hsl(var(--border))]">
             <th class="w-10 pl-4 pr-0 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">#</th>
-            <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Exercise</th>
+            <th class="w-full px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Exercise</th>
             <th class="w-12 px-0.5 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Reps</th>
             <th class="w-14 px-0.5 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">{unit}</th>
             <th class="w-12 pl-0 pr-4 py-2"></th>
