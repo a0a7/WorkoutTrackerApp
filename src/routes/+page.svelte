@@ -5,6 +5,7 @@
   import SetRow from '$lib/components/SetRow.svelte';
   import NumericKeypad from '$lib/components/NumericKeypad.svelte';
   import { setsStore, selectedIds, pushUndo, undo, redo, hasUndo, hasRedo } from '$lib/stores/workoutStore';
+  import { keypadConfig } from '$lib/stores/keypadStore';
   import { getTodaySets, saveSets, deleteSet as dbDeleteSet, saveWorkout } from '$lib/db';
   import { unitPreference, initUnitPreference, userStore, timeFormatPreference, initTimeFormatPreference } from '$lib/stores/userStore';
   import { syncToServer, syncFromServer, syncStore, markSyncPending, refreshSyncStatus } from '$lib/sync';
@@ -28,6 +29,7 @@
   const syncError = $derived($syncStore.error);
   const lastSync = $derived($syncStore.lastSync);
   const hasPendingSync = $derived($syncStore.hasPending);
+  const keypadTableMargin = $derived($keypadConfig ? 'calc(18rem + env(safe-area-inset-bottom))' : '0px');
 
   async function handleSyncTap() {
     const u = get(userStore);
@@ -492,7 +494,10 @@
   {/if}
 
   <!-- Sets table -->
-  <div class="border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm min-h-30 rounded-2xl relative overflow-visible z-0">
+  <div
+    class="border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm min-h-30 rounded-2xl relative overflow-visible z-0"
+    style={`margin-bottom: ${keypadTableMargin};`}
+  >
     <table class="w-full table-fixed border-collapse">
       <thead>
         <tr class="border-b border-[hsl(var(--border))]">

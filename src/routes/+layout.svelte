@@ -13,6 +13,7 @@
   let pullDistance = $state(0);
   let pullSyncing = $state(false);
   let isStandalone = $state(false);
+  let keyboardVisible = $state(false);
   const PULL_SYNC_THRESHOLD_PX = 84;
 
   const navItems = [
@@ -42,6 +43,27 @@
     };
     updateStandalone();
     standaloneQuery.addEventListener('change', updateStandalone);
+
+    const KEYBOARD_THRESHOLD_PX = 140;
+    const isTextInput = (el: Element | null) =>
+      !!el
+      && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable);
+    const updateKeyboardVisibility = () => {
+      const vv = window.visualViewport;
+      const viewportHeight = vv?.height ?? window.innerHeight;
+      const heightDiff = window.innerHeight - viewportHeight;
+      keyboardVisible = isTextInput(document.activeElement) && heightDiff > KEYBOARD_THRESHOLD_PX;
+    };
+    const handleFocusChange = () => {
+      setTimeout(updateKeyboardVisibility, 0);
+    };
+    const handleViewportChange = () => updateKeyboardVisibility();
+    window.addEventListener('focusin', handleFocusChange);
+    window.addEventListener('focusout', handleFocusChange);
+    window.addEventListener('resize', handleViewportChange);
+    window.visualViewport?.addEventListener('resize', handleViewportChange);
+    window.visualViewport?.addEventListener('scroll', handleViewportChange);
+    updateKeyboardVisibility();
 
     // 1. Theme (synchronous — avoid flash of wrong theme)
     const saved = localStorage.getItem('theme');
@@ -110,6 +132,11 @@
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('online', handleOnline);
       standaloneQuery.removeEventListener('change', updateStandalone);
+      window.removeEventListener('focusin', handleFocusChange);
+      window.removeEventListener('focusout', handleFocusChange);
+      window.removeEventListener('resize', handleViewportChange);
+      window.visualViewport?.removeEventListener('resize', handleViewportChange);
+      window.visualViewport?.removeEventListener('scroll', handleViewportChange);
     };
   });
 
@@ -225,7 +252,7 @@
     ontouchstart={handlePullStart}
     ontouchmove={handlePullMove}
     ontouchend={handlePullEnd}
-    class="flex-1 flex flex-col relative {isStandalone ? 'pt-[env(safe-area-inset-top)]' : ''} {currentPath !== '/login' ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0' : ''} overflow-y-auto"
+    class="flex-1 flex flex-col relative {isStandalone ? 'pt-[env(safe-area-inset-top)]' : ''} {currentPath !== '/login' && !keyboardVisible ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0' : ''} overflow-y-auto"
   >
     {#if pullDistance > 0 && currentPath !== '/login'}
       <div class="absolute inset-x-0 top-0 z-50 flex h-16 items-center justify-center bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow-md">
@@ -236,7 +263,7 @@
   </main>
 
   <!-- Mobile Bottom Navigation (Hidden on LG) -->
-  {#if currentPath !== '/login'}
+  {#if currentPath !== '/login' && !keyboardVisible}
     <nav
       class="fixed bottom-0 left-0 right-0 z-50 flex h-[calc(4rem+env(safe-area-inset-bottom))] items-start justify-around border-t border-[hsl(var(--border))] bg-[hsl(var(--card))] pb-[env(safe-area-inset-bottom)] pt-2 sm:px-6 lg:hidden"
     >

@@ -10,6 +10,7 @@
   import { deleteSet, deleteWorkout, getWorkout, saveSets, saveWorkout } from '$lib/db';
   import { EXERCISE_MAP } from '$lib/exercises';
   import { unitPreference, initUnitPreference, userStore, tertiaryActivationPreference, initTertiaryActivationPreference, timeFormatPreference, initTimeFormatPreference } from '$lib/stores/userStore';
+  import { keypadConfig } from '$lib/stores/keypadStore';
   import { Share2, Pencil, Trash2 } from 'lucide-svelte';
   import { syncToServer } from '$lib/sync';
   import type { Workout, MuscleActivation, WorkoutSet } from '$lib/types';
@@ -23,6 +24,7 @@
   const unit = $derived($unitPreference);
   const showTertiary = $derived($tertiaryActivationPreference);
   const timeFormat = $derived($timeFormatPreference);
+  const keypadTableMargin = $derived($keypadConfig ? 'calc(18rem + env(safe-area-inset-bottom))' : '0px');
 
   // Time editing state
   let editingTimes = $state(false);
@@ -537,7 +539,7 @@
       const badgeSize = Math.round(detailFontSize * 0.9);
       const badgeRadius = Math.round(badgeSize * 0.35);
       const badgeGap = 16;
-      textY += detailGap - lineSpacing;
+      textY += detailGap;
       ctx.font = detailFont;
       for (const line of exerciseLines) {
         const maxTextWidth = shareWidth - paddingX * 2 - (line.superset ? badgeSize + badgeGap : 0);
@@ -1106,7 +1108,7 @@
               <img
                 src={sharePreviewUrls[variant]}
                 alt={`${variant === 'simple' ? 'Simple' : 'Detailed'} share preview`}
-                class="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))] object-contain"
+                class="mx-auto h-auto w-full max-h-[65vh] rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))] object-contain"
               />
             {:else}
               <div class="flex h-40 items-center justify-center rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))] text-xs text-[hsl(var(--muted-foreground))]">
@@ -1145,7 +1147,10 @@
       </div>
     </div>
 
-    <div class="-mx-4 border-y border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm min-h-30">
+    <div
+      class="-mx-4 border-y border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm min-h-30"
+      style={`margin-bottom: ${keypadTableMargin};`}
+    >
       <table class="w-full table-fixed border-collapse">
         <thead>
           <tr class="border-b border-[hsl(var(--border))]">
