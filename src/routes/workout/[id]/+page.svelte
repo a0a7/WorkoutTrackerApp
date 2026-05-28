@@ -58,7 +58,16 @@
   let shareActiveVariant = $state<ShareVariant | null>(null);
   let sharePreviewRequestId = 0;
   let shareMapWrapper = $state<HTMLDivElement | null>(null);
-  type ShareExerciseBlock = { type: 'superset' | 'single'; lines: string[] };
+  const THIN_SPACE = '\u2009';
+  type ShareExerciseLine = { count: number; name: string };
+  type ShareExerciseLineLayout = {
+    prefix: string;
+    prefixWidth: number;
+    name: string;
+    nameWidth: number;
+    totalWidth: number;
+  };
+  type ShareExerciseBlock = { type: 'superset' | 'single'; lines: ShareExerciseLine[] };
   const shareVariantLabels: Record<ShareVariant, string> = {
     simple: 'Simple',
     stats: 'Stats',
@@ -390,6 +399,39 @@
     return truncated ? `${truncated}${ellipsis}` : ellipsis;
   }
 
+  function layoutShareExerciseLine(
+    ctx: CanvasRenderingContext2D,
+    line: ShareExerciseLine,
+    maxWidth: number,
+    numberFont: string,
+    exerciseFont: string,
+  ): ShareExerciseLineLayout {
+    const prefix = `${line.count}${THIN_SPACE}x${THIN_SPACE}`;
+    ctx.font = numberFont;
+    const prefixWidth = ctx.measureText(prefix).width;
+    ctx.font = exerciseFont;
+    const name = truncateTextToWidth(ctx, line.name, Math.max(0, maxWidth - prefixWidth));
+    const nameWidth = ctx.measureText(name).width;
+    return { prefix, prefixWidth, name, nameWidth, totalWidth: prefixWidth + nameWidth };
+  }
+
+  function drawShareExerciseLine(
+    ctx: CanvasRenderingContext2D,
+    layout: ShareExerciseLineLayout,
+    x: number,
+    y: number,
+    align: 'left' | 'center',
+    numberFont: string,
+    exerciseFont: string,
+  ) {
+    const startX = align === 'center' ? x - layout.totalWidth / 2 : x;
+    ctx.textAlign = 'left';
+    ctx.font = numberFont;
+    ctx.fillText(layout.prefix, startX, y);
+    ctx.font = exerciseFont;
+    ctx.fillText(layout.name, startX + layout.prefixWidth, y);
+  }
+
   function drawRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
     const r = Math.min(radius, width / 2, height / 2);
     ctx.beginPath();
@@ -410,7 +452,7 @@
     const blocks = buildDisplayBlocks(workout.sets);
     return blocks.map((block) => ({
       type: block.type,
-      lines: block.segments.map((seg) => `${seg.sets.length}x ${seg.exerciseName}`)
+      lines: block.segments.map((seg) => ({ count: seg.sets.length, name: seg.exerciseName }))
     }));
   }
 
@@ -494,8 +536,8 @@
     const lineFontSize = 64;
     const lineSpacing = 82;
     const detailFontSize = 40;
-    const detailSpacing = 56;
-    const detailGap = 32;
+    const detailSpacing = 48;
+    const detailGap = 20;
     const footerFontSize = 44;
     const footerSmallCapsSize = Math.round(footerFontSize * 0.72);
     const footerSpacing = 60;
@@ -506,14 +548,12 @@
     const shareLines = buildShareSummaryLines(variant);
     const exerciseBlocks = variant === 'detailed' ? buildShareExerciseBlocks() : [];
     const supersetLabel = 'SUPERSET';
-    const supersetLabelFontSize = Math.round(detailFontSize * 0.5);
-    const supersetLabelPaddingX = Math.round(supersetLabelFontSize * 0.6);
-    const supersetLabelPaddingY = Math.round(supersetLabelFontSize * 0.3);
-    const supersetLabelGap = Math.round(detailFontSize * 0.3);
-    const supersetLabelHeight = supersetLabelFontSize + supersetLabelPaddingY * 2;
-    const supersetBlockPaddingX = Math.round(detailFontSize * 0.6);
-    const supersetBlockPaddingY = Math.round(detailFontSize * 0.5);
-    const supersetBlockRadius = Math.round(detailFontSize * 0.6);
+    const supersetLabelFontSize = Math.round(detailFontSize * 0.45);
+    const supersetLabelGap = Math.round(detailFontSize * 0.2);
+    const supersetLabelHeight = supersetLabelFontSize;
+    const supersetBlockPaddingX = Math.round(detailFontSize * 0.45);
+    const supersetBlockPaddingY = Math.round(detailFontSize * 0.4);
+    const supersetBlockRadius = Math.round(detailFontSize * 0.5);
     const supersetBlockHeight = (lineCount: number) =>
       supersetBlockPaddingY * 2 + supersetLabelHeight + supersetLabelGap + detailSpacing * lineCount;
     const exerciseSectionHeight = exerciseBlocks.length
@@ -572,23 +612,24 @@
       textY += lineSpacing;
     }
     if (exerciseBlocks.length) {
-      const detailFont = `600 ${detailFontSize}px ${fontFamily}`;
+      const detailNumberSize = Math.round(detailFontSize * 0.82);
+      const detailExerciseFont = `600 small-caps ${detailFontSize}px ${fontFamily}`;
+      const detailNumberFont = `600 ${detailNumberSize}px ${fontFamily}`;
       const supersetLabelFont = `700 ${supersetLabelFontSize}px ${fontFamily}`;
       textY += detailGap;
-      ctx.font = detailFont;
       for (const block of exerciseBlocks) {
         ctx.fillStyle = '#ffffff';
         if (block.type === 'superset') {
           const maxBlockWidth = shareWidth - paddingX * 2;
           const maxTextWidth = maxBlockWidth - supersetBlockPaddingX * 2;
-          const blockLines = block.lines.map((line) => truncateTextToWidth(ctx, line, maxTextWidth));
-          const lineWidths = blockLines.map((line) => ctx.measureText(line).width);
+          const lineLayouts = block.lines.map((line) =>
+            layoutShareExerciseLine(ctx, line, maxTextWidth, detailNumberFont, detailExerciseFont)
+          );
           ctx.font = supersetLabelFont;
           const labelTextWidth = ctx.measureText(supersetLabel).width;
-          const labelWidth = labelTextWidth + supersetLabelPaddingX * 2;
-          const contentWidth = Math.max(labelWidth, ...lineWidths);
+          const contentWidth = Math.max(labelTextWidth, ...lineLayouts.map((line) => line.totalWidth));
           const blockWidth = Math.min(maxBlockWidth, contentWidth + supersetBlockPaddingX * 2);
-          const blockHeight = supersetBlockHeight(blockLines.length);
+          const blockHeight = supersetBlockHeight(lineLayouts.length);
           const blockX = (shareWidth - blockWidth) / 2;
           const blockY = textY - detailSpacing / 2;
           drawRoundedRect(ctx, blockX, blockY, blockWidth, blockHeight, supersetBlockRadius);
@@ -598,28 +639,19 @@
           ctx.strokeStyle = '#ffffff';
           ctx.stroke();
           const labelX = blockX + supersetBlockPaddingX;
-          const labelY = blockY + supersetBlockPaddingY;
-          drawRoundedRect(ctx, labelX, labelY, labelWidth, supersetLabelHeight, supersetLabelHeight / 2);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
-          ctx.fill();
-          ctx.lineWidth = 2;
-          ctx.strokeStyle = '#ffffff';
-          ctx.stroke();
+          const labelY = blockY + supersetBlockPaddingY + supersetLabelHeight / 2;
           ctx.fillStyle = '#ffffff';
           ctx.font = supersetLabelFont;
           ctx.textAlign = 'left';
-          ctx.fillText(supersetLabel, labelX + supersetLabelPaddingX, labelY + supersetLabelHeight / 2);
-          ctx.font = detailFont;
-          ctx.textAlign = 'left';
-          const lineStartY = labelY + supersetLabelHeight + supersetLabelGap + detailSpacing / 2;
-          for (let i = 0; i < blockLines.length; i += 1) {
-            ctx.fillText(blockLines[i], labelX, lineStartY + detailSpacing * i);
+          ctx.fillText(supersetLabel, labelX, labelY);
+          const lineStartY = blockY + supersetBlockPaddingY + supersetLabelHeight + supersetLabelGap + detailSpacing / 2;
+          for (let i = 0; i < lineLayouts.length; i += 1) {
+            drawShareExerciseLine(ctx, lineLayouts[i], labelX, lineStartY + detailSpacing * i, 'left', detailNumberFont, detailExerciseFont);
           }
           textY = blockY + blockHeight + detailSpacing / 2;
         } else {
-          const lineText = truncateTextToWidth(ctx, block.lines[0], shareWidth - paddingX * 2);
-          ctx.textAlign = 'center';
-          ctx.fillText(lineText, shareWidth / 2, textY);
+          const lineLayout = layoutShareExerciseLine(ctx, block.lines[0], shareWidth - paddingX * 2, detailNumberFont, detailExerciseFont);
+          drawShareExerciseLine(ctx, lineLayout, shareWidth / 2, textY, 'center', detailNumberFont, detailExerciseFont);
           textY += detailSpacing;
         }
       }
@@ -1161,7 +1193,7 @@
               <img
                 src={sharePreviewUrls[variant]}
                 alt={`${shareVariantLabels[variant]} share preview`}
-                class="mx-auto h-auto w-full max-h-[65vh] rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))] object-contain"
+                class="mx-auto h-auto w-full max-h-[55vh] max-w-[85vw] rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))] object-contain lg:max-h-[60vh] lg:max-w-full"
               />
             {:else}
               <div class="flex h-40 items-center justify-center rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))] text-xs text-[hsl(var(--muted-foreground))]">
