@@ -1,6 +1,7 @@
 <script lang="ts">
 
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
   import WorkoutCard from '$lib/components/WorkoutCard.svelte';
   import { getAllWorkouts } from '$lib/db';
   import type { Workout, WorkoutSet } from '$lib/types';
@@ -30,6 +31,7 @@
   let sortMode = $state<'newest' | 'oldest' | 'duration-desc' | 'duration-asc' | 'volume-desc' | 'volume-asc'>('newest');
   let onlyWithLocation = $state(false);
   let compactness = $state<'card' | 'compact'>('card');
+  let queryHydrated = $state(false);
   const unit = $derived($unitPreference);
   const timeFormat = $derived($timeFormatPreference);
 
@@ -52,10 +54,34 @@
   onMount(async () => {
     initUnitPreference();
     initTimeFormatPreference();
-    const savedCompactness = localStorage.getItem('history-compactness');
-    if (savedCompactness === 'card' || savedCompactness === 'compact') {
-      compactness = savedCompactness;
+    const params = new URLSearchParams(window.location.search);
+
+    const q = params.get('q');
+    if (q) filterQuery = q;
+
+    const dateParam = params.get('date');
+    if (dateParam && DATE_WINDOWS.includes(dateParam as DateWindow)) {
+      dateWindow = dateParam as DateWindow;
     }
+
+    const sortParam = params.get('sort');
+    if (sortParam && ['newest', 'oldest', 'duration-desc', 'duration-asc', 'volume-desc', 'volume-asc'].includes(sortParam)) {
+      sortMode = sortParam as typeof sortMode;
+    }
+
+    onlyWithLocation = params.get('loc') === '1';
+
+    const viewParam = params.get('view');
+    if (viewParam === 'card' || viewParam === 'compact') {
+      compactness = viewParam;
+    } else {
+      const savedCompactness = localStorage.getItem('history-compactness');
+      if (savedCompactness === 'card' || savedCompactness === 'compact') {
+        compactness = savedCompactness;
+      }
+    }
+
+    queryHydrated = true;
     workouts = await getAllWorkouts();
     loading = false;
   });
@@ -64,6 +90,42 @@
     compactness = mode;
     localStorage.setItem('history-compactness', mode);
   }
+
+  function syncQueryParams() {
+    if (!browser || !queryHydrated) return;
+    const url = new URL(window.location.href);
+    const q = filterQuery.trim();
+    if (q) url.searchParams.set('q', q);
+    else url.searchParams.delete('q');
+
+    if (dateWindow !== 'all') url.searchParams.set('date', dateWindow);
+    else url.searchParams.delete('date');
+
+    if (sortMode !== 'newest') url.searchParams.set('sort', sortMode);
+    else url.searchParams.delete('sort');
+
+    if (onlyWithLocation) url.searchParams.set('loc', '1');
+    else url.searchParams.delete('loc');
+
+    if (compactness !== 'card') url.searchParams.set('view', compactness);
+    else url.searchParams.delete('view');
+
+    const next = `${url.pathname}${url.search}${url.hash}`;
+    const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (next !== current) {
+      window.history.replaceState(window.history.state, '', next);
+    }
+  }
+
+  $effect(() => {
+    if (!queryHydrated) return;
+    filterQuery;
+    dateWindow;
+    sortMode;
+    onlyWithLocation;
+    compactness;
+    syncQueryParams();
+  });
 
   function getWorkoutDurationMinutes(workout: Workout) {
     return Math.max(0, Math.round((workout.endTime - workout.startTime) / 60000));
