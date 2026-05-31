@@ -517,13 +517,13 @@ function buildWorkoutUploadPayload(workout: WorkoutRow, sets: SetRow[]): { paylo
 	}
 
 	const title = `${dayPeriodTitlePart(workout.start_time)} Strength Training - ${sets.length} Sets`;
-	const description = `${lines.join('\n')}\n\nSynced from WorkoutTrackerApp`;
+	const description = `${lines.join('\n')}\n\nsynced from logbook`;
 	const payload: StrengthTrainingUpload = {
 		version: '1.0',
 		start_time: new Date(workout.start_time).toISOString(),
 		utc_offset: 0,
 		elapsed_time: Math.max(1, Math.round((workout.end_time - workout.start_time) / 1000)),
-		creator: { name: 'WorkoutTrackerApp' },
+		creator: { name: 'logbook' },
 		sets: uploadSets,
 		description
 	};
