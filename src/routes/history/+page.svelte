@@ -36,19 +36,19 @@
   const timeFormat = $derived($timeFormatPreference);
 
   const DAY_TILE_STYLES: Record<DayCategory, string> = {
-    rest: 'bg-slate-200 text-slate-700 border-slate-300',
-    push: 'bg-red-600 text-white border-red-700',
-    pull: 'bg-blue-600 text-white border-blue-700',
-    legs: 'bg-emerald-700 text-white border-emerald-800',
-    'antagonist pull': 'bg-blue-700 text-white border-blue-800',
-    'antagonist push': 'bg-red-700 text-white border-red-800',
-    upper: 'bg-violet-700 text-white border-violet-800',
-    abs: 'bg-amber-600 text-white border-amber-700',
-    back: 'bg-cyan-700 text-white border-cyan-800',
-    chest: 'bg-rose-700 text-white border-rose-800',
-    arms: 'bg-fuchsia-700 text-white border-fuchsia-800',
-    shoulders: 'bg-orange-700 text-white border-orange-800',
-    'full body': 'bg-lime-700 text-white border-lime-800',
+    rest: 'bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600',
+    push: 'bg-red-600 text-white border-red-700 dark:bg-red-500 dark:border-red-400',
+    pull: 'bg-blue-600 text-white border-blue-700 dark:bg-blue-500 dark:border-blue-400',
+    legs: 'bg-emerald-600 text-white border-emerald-700 dark:bg-emerald-500 dark:border-emerald-400',
+    'antagonist pull': 'bg-blue-700 text-white border-blue-800 dark:bg-blue-600 dark:border-blue-500',
+    'antagonist push': 'bg-red-700 text-white border-red-800 dark:bg-red-600 dark:border-red-500',
+    upper: 'bg-violet-700 text-white border-violet-800 dark:bg-violet-600 dark:border-violet-500',
+    abs: 'bg-amber-600 text-white border-amber-700 dark:bg-amber-500 dark:border-amber-400',
+    back: 'bg-cyan-700 text-white border-cyan-800 dark:bg-cyan-600 dark:border-cyan-500',
+    chest: 'bg-rose-700 text-white border-rose-800 dark:bg-rose-600 dark:border-rose-500',
+    arms: 'bg-fuchsia-700 text-white border-fuchsia-800 dark:bg-fuchsia-600 dark:border-fuchsia-500',
+    shoulders: 'bg-orange-700 text-white border-orange-800 dark:bg-orange-600 dark:border-orange-500',
+    'full body': 'bg-lime-700 text-white border-lime-800 dark:bg-lime-600 dark:border-lime-500',
   };
 
   const DAY_TILE_LABELS: Record<DayCategory, string> = {
@@ -319,11 +319,10 @@
 </svelte:head>
 
 <div class="px-4 pt-4">
-  <h1 class="text-2xl font-bold text-[hsl(var(--foreground))] mb-4">History</h1>
 
-  <section class="mb-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+  <section class="mb-4 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 shadow-sm">
     <div class="mb-2 flex items-center justify-between gap-3">
-      <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Last 7 days</p>
+      <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[hsl(var(--muted-foreground))]">Last 7 days</p>
     </div>
     <div class="grid grid-cols-7 gap-1.5 sm:gap-2">
       {#each last7Days() as day (day.key)}
@@ -334,8 +333,7 @@
           >
             <span class="whitespace-pre-line px-1 leading-tight">{DAY_TILE_LABELS[day.category]}</span>
           </div>
-          <p class="text-[10px] font-medium text-slate-500">{day.dayLabel}</p>
-          <p class="text-[10px] text-slate-400">{new Date(day.ts).getDate()}</p>
+          <p class="whitespace-nowrap text-[10px] font-medium text-[hsl(var(--muted-foreground))]">{day.dayLabel} {new Date(day.ts).getDate()}</p>
         </div>
       {/each}
     </div>
@@ -429,10 +427,7 @@
               >
                 <div class="min-w-0">
                   <p class="truncate text-sm font-semibold text-[hsl(var(--foreground))]">
-                    {new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: timeFormat === '12h' })}
-                  </p>
-                  <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
-                    {getWorkoutCategoryLabel(getEffectiveWorkoutCategory(workout))}
+                    {new Date(workout.startTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} {new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: timeFormat === '12h' })} - {getWorkoutCategoryLabel(getEffectiveWorkoutCategory(workout))}
                   </p>
                   <p class="truncate text-xs text-[hsl(var(--muted-foreground))]">
                     {workout.sets.length} sets

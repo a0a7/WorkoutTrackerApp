@@ -29,6 +29,8 @@
     })
   );
 
+  const titleLabel = $derived(`${dateLabel} - ${categoryLabel}`);
+
   const timeLabel = $derived(
     new Date(workout.startTime).toLocaleTimeString('en-US', {
       hour: 'numeric',
@@ -45,13 +47,8 @@
 >
   <div class="flex items-center justify-between mb-2">
     <div>
-      <p class="font-semibold text-[hsl(var(--foreground))]">{dateLabel}</p>
+      <p class="font-semibold text-[hsl(var(--foreground))]">{titleLabel}</p>
       <p class="text-sm text-[hsl(var(--muted-foreground))]">{timeLabel}</p>
-      <p class="mt-1">
-        <span class="inline-flex items-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--muted))] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--foreground))]">
-          {categoryLabel}
-        </span>
-      </p>
     </div>
     <div class="text-right">
       <p class="text-sm font-medium text-[hsl(var(--foreground))]">
