@@ -3,11 +3,14 @@
   import { EXERCISE_MAP } from '../exercises';
   import { timeFormatPreference } from '$lib/stores/userStore';
   import { formatWorkoutLocation } from '$lib/location';
+  import { classifyWorkout, getWorkoutCategoryLabel } from '$lib/workoutCategorization';
 
   let { workout }: { workout: Workout } = $props();
 
   const durationMs = $derived(workout.endTime - workout.startTime);
   const durationMin = $derived(Math.round(durationMs / 60000));
+  const category = $derived(classifyWorkout(workout));
+  const categoryLabel = $derived(getWorkoutCategoryLabel(category));
 
   const exerciseNames = $derived(() => {
     const seen = new Set<string>();
@@ -45,6 +48,11 @@
     <div>
       <p class="font-semibold text-[hsl(var(--foreground))]">{dateLabel}</p>
       <p class="text-sm text-[hsl(var(--muted-foreground))]">{timeLabel}</p>
+      <p class="mt-1">
+        <span class="inline-flex items-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--muted))] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--foreground))]">
+          {categoryLabel}
+        </span>
+      </p>
       {#if workout.location}
         <p class="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
           <span class="inline-flex items-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-0.5 font-medium text-[hsl(var(--foreground))]">

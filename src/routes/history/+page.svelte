@@ -6,6 +6,7 @@
   import type { Workout, WorkoutSet } from '$lib/types';
   import { unitPreference, initUnitPreference, timeFormatPreference, initTimeFormatPreference } from '$lib/stores/userStore';
   import { formatWorkoutLocation } from '$lib/location';
+  import { classifyWorkout, classifyWorkouts, getWorkoutCategoryLabel, type DayCategory } from '$lib/workoutCategorization';
 
   let workouts = $state<Workout[]>([]);
   let loading = $state(true);
@@ -17,6 +18,22 @@
   let compactness = $state<'card' | 'compact'>('card');
   const unit = $derived($unitPreference);
   const timeFormat = $derived($timeFormatPreference);
+
+  const DAY_TILE_STYLES: Record<DayCategory, string> = {
+    rest: 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] border-[hsl(var(--border))]',
+    push: 'bg-rose-200/80 text-rose-900 border-rose-300 dark:bg-rose-900/40 dark:text-rose-100 dark:border-rose-700',
+    pull: 'bg-blue-200/80 text-blue-900 border-blue-300 dark:bg-blue-900/40 dark:text-blue-100 dark:border-blue-700',
+    legs: 'bg-emerald-200/80 text-emerald-900 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-100 dark:border-emerald-700',
+    'antagonist pull': 'bg-indigo-200/80 text-indigo-900 border-indigo-300 dark:bg-indigo-900/40 dark:text-indigo-100 dark:border-indigo-700',
+    'antagonist push': 'bg-fuchsia-200/80 text-fuchsia-900 border-fuchsia-300 dark:bg-fuchsia-900/40 dark:text-fuchsia-100 dark:border-fuchsia-700',
+    upper: 'bg-sky-200/80 text-sky-900 border-sky-300 dark:bg-sky-900/40 dark:text-sky-100 dark:border-sky-700',
+    abs: 'bg-amber-200/80 text-amber-900 border-amber-300 dark:bg-amber-900/40 dark:text-amber-100 dark:border-amber-700',
+    back: 'bg-cyan-200/80 text-cyan-900 border-cyan-300 dark:bg-cyan-900/40 dark:text-cyan-100 dark:border-cyan-700',
+    chest: 'bg-pink-200/80 text-pink-900 border-pink-300 dark:bg-pink-900/40 dark:text-pink-100 dark:border-pink-700',
+    arms: 'bg-violet-200/80 text-violet-900 border-violet-300 dark:bg-violet-900/40 dark:text-violet-100 dark:border-violet-700',
+    shoulders: 'bg-orange-200/80 text-orange-900 border-orange-300 dark:bg-orange-900/40 dark:text-orange-100 dark:border-orange-700',
+    'full body': 'bg-teal-200/80 text-teal-900 border-teal-300 dark:bg-teal-900/40 dark:text-teal-100 dark:border-teal-700',
+  };
 
   onMount(async () => {
     initUnitPreference();
@@ -104,6 +121,46 @@
     return [...map.entries()];
   });
 
+  function startOfDayMs(ts: number) {
+    const d = new Date(ts);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }
+
+  function formatDayKey(ts: number) {
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  const last7Days = $derived(() => {
+    const workoutsByDay = new Map<string, Workout[]>();
+    for (const workout of workouts) {
+      const key = formatDayKey(workout.startTime);
+      if (!workoutsByDay.has(key)) workoutsByDay.set(key, []);
+      workoutsByDay.get(key)!.push(workout);
+    }
+
+    const days: Array<{ key: string; ts: number; dayLabel: string; dateLabel: string; category: DayCategory; categoryLabel: string; count: number }> = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let offset = 6; offset >= 0; offset--) {
+      const ts = today.getTime() - offset * 86400000;
+      const key = formatDayKey(ts);
+      const dayWorkouts = workoutsByDay.get(key) ?? [];
+      const category = classifyWorkouts(dayWorkouts);
+      days.push({
+        key,
+        ts,
+        dayLabel: new Date(ts).toLocaleDateString('en-US', { weekday: 'short' }),
+        dateLabel: new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        category,
+        categoryLabel: getWorkoutCategoryLabel(category),
+        count: dayWorkouts.length,
+      });
+    }
+    return days;
+  });
+
   function getUniqueExerciseNames(workout: Workout): string[] {
     const seen = new Set<string>();
     const names: string[] = [];
@@ -173,6 +230,26 @@
 
 <div class="px-4 pt-4">
   <h1 class="text-2xl font-bold text-[hsl(var(--foreground))] mb-4">History</h1>
+
+  <section class="mb-4 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 shadow-sm">
+    <div class="mb-2 flex items-center justify-between gap-3">
+      <h2 class="text-sm font-semibold text-[hsl(var(--foreground))]">Past 7 Days</h2>
+      <p class="text-xs text-[hsl(var(--muted-foreground))]">Day type auto-detected from muscle balance</p>
+    </div>
+    <div class="grid grid-cols-7 gap-2">
+      {#each last7Days() as day (day.key)}
+        <div class="flex flex-col items-center gap-1">
+          <div
+            class={`flex aspect-square w-full min-w-0 items-center justify-center rounded-xl border text-center text-[11px] font-semibold leading-tight ${DAY_TILE_STYLES[day.category]}`}
+            title={`${day.dateLabel}: ${day.categoryLabel}${day.count ? ` (${day.count} workout${day.count === 1 ? '' : 's'})` : ''}`}
+          >
+            {day.dayLabel}
+          </div>
+          <p class="text-[10px] text-[hsl(var(--muted-foreground))]">{new Date(day.ts).getDate()}</p>
+        </div>
+      {/each}
+    </div>
+  </section>
 
   <!-- Filters -->
   <div class="mb-4 flex flex-col gap-3 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 shadow-sm">
@@ -268,6 +345,9 @@
                 <div class="min-w-0">
                   <p class="truncate text-sm font-semibold text-[hsl(var(--foreground))]">
                     {new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: timeFormat === '12h' })}
+                  </p>
+                  <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+                    {getWorkoutCategoryLabel(classifyWorkout(workout))}
                   </p>
                   <p class="truncate text-xs text-[hsl(var(--muted-foreground))]">
                     {workout.sets.length} sets
