@@ -42,8 +42,8 @@
   <div class="w-full max-w-sm">
     <!-- Logo -->
     <div class="mb-8 text-center">
-      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[hsl(var(--foreground))] text-[hsl(var(--background))] shadow-lg">
-        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/></svg>
+      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-[hsl(var(--border))] bg-white p-2 shadow-lg dark:bg-[hsl(var(--card))]">
+        <img src="/icons/logo.png" alt="Logbook logo" class="h-full w-full object-contain" />
       </div>
       <h1 class="text-3xl font-bold text-[hsl(var(--foreground))]">Logbook</h1>
       <p class="mt-1 text-sm text-[hsl(var(--muted-foreground))]">log ur sessions broski</p>
