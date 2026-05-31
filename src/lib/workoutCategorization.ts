@@ -197,6 +197,11 @@ function strongestCategory(breakdown: WorkoutCategoryBreakdown): WorkoutCategory
 	const absScore = breakdown.abs;
 	const pushScore = breakdown.push;
 	const pullScore = breakdown.pull;
+	const broadShares = [shares.push, shares.pull, shares.legs, shares.abs];
+	const broadRegionsStrong = broadShares.filter((value) => value >= 0.18).length;
+	if (broadRegionsStrong >= 3 && Math.max(...broadShares) <= 0.52) {
+		return 'full body';
+	}
 
 	const regionsStrong = [shares.upper, shares.legs, shares.abs].filter((value) => value >= 0.2).length;
 	if (regionsStrong >= 3 && shares.legs >= 0.18 && shares.upper >= 0.25 && shares.abs >= 0.12) {
@@ -321,6 +326,35 @@ export function classifyWorkouts(workouts: Workout[]): WorkoutCategory | 'rest' 
 			}
 		}
 		return winner;
+	}
+
+	const dayCategories = workouts.map((workout) => getEffectiveWorkoutCategory(workout));
+	if (dayCategories.includes('full body')) return 'full body';
+
+	const broadGroups = new Set(
+		dayCategories.map((category) => {
+			switch (category) {
+				case 'push':
+				case 'chest':
+				case 'arms':
+				case 'shoulders':
+				case 'antagonist push':
+					return 'push';
+				case 'pull':
+				case 'back':
+				case 'antagonist pull':
+					return 'pull';
+				case 'legs':
+					return 'legs';
+				case 'abs':
+					return 'abs';
+				default:
+					return category;
+			}
+		})
+	);
+	if (broadGroups.has('push') && broadGroups.has('pull') && (broadGroups.has('legs') || broadGroups.has('abs'))) {
+		return 'full body';
 	}
 
 	const breakdown = createBreakdown();

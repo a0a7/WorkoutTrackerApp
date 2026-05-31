@@ -35,6 +35,15 @@ type SyncMapRow = {
 	source_updated_at: number;
 };
 
+type StravaActivityRow = {
+	id: number;
+	name: string;
+	type?: string;
+	sport_type?: string;
+	start_date?: string;
+	elapsed_time?: number;
+};
+
 type StravaConfig = {
 	clientId: string;
 	clientSecret: string;
@@ -565,6 +574,85 @@ async function getUploadStatus(
 	};
 }
 
+async function listStravaActivities(
+	accessToken: string,
+	after: number,
+	before: number
+): Promise<StravaActivityRow[]> {
+	const activities: StravaActivityRow[] = [];
+	for (let page = 1; page <= 3; page += 1) {
+		const params = new URLSearchParams({
+			after: String(after),
+			before: String(before),
+			page: String(page),
+			per_page: '100'
+		});
+		const res = await fetch(`${STRAVA_API_BASE}/athlete/activities?${params.toString()}`, {
+			headers: { Authorization: `Bearer ${accessToken}` }
+		});
+		if (!res.ok) throw error(502, `Strava activities fetch failed (${res.status})`);
+		const json = (await res.json()) as StravaActivityRow[];
+		activities.push(...json);
+		if (json.length < 100) break;
+	}
+	return activities;
+}
+
+function normalizeStravaText(value: string | undefined): string {
+	return (value ?? '').trim().toLowerCase();
+}
+
+function scoreApproximateActivityMatch(
+	workout: WorkoutRow,
+	activity: StravaActivityRow,
+	targetTitle: string,
+	targetDurationMs: number
+): number {
+	if (!activity.start_date || !Number.isFinite(Date.parse(activity.start_date))) return Number.POSITIVE_INFINITY;
+	const startDiffMinutes = Math.abs(Date.parse(activity.start_date) - workout.start_time) / 60000;
+	const elapsedMs = Math.max(1, (activity.elapsed_time ?? 0) * 1000);
+	const durationDiffMinutes = Math.abs(elapsedMs - targetDurationMs) / 60000;
+	const activityName = normalizeStravaText(activity.name);
+	const expectedName = normalizeStravaText(targetTitle);
+	const typeValue = normalizeStravaText(activity.type) || normalizeStravaText(activity.sport_type);
+
+	let score = startDiffMinutes * 3 + durationDiffMinutes * 1.25;
+	if (typeValue.includes('weight')) score -= 30;
+	if (activityName.includes('strength training')) score -= 18;
+	if (activityName.includes('workout')) score -= 6;
+	if (activityName === expectedName) score -= 40;
+	else if (activityName.includes(expectedName) || expectedName.includes(activityName)) score -= 18;
+	if (startDiffMinutes <= 20) score -= 12;
+	if (startDiffMinutes <= 90) score -= 6;
+	return score;
+}
+
+async function findClosestExistingActivity(
+	accessToken: string,
+	workout: WorkoutRow,
+	sets: SetRow[]
+): Promise<string | null> {
+	const targetStart = workout.start_time;
+	const targetEnd = workout.end_time;
+	const targetDurationMs = Math.max(1, targetEnd - targetStart);
+	const targetTitle = buildWorkoutUploadPayload(workout, sets).title;
+	const after = Math.max(0, Math.floor((targetStart - 7 * 24 * 60 * 60 * 1000) / 1000));
+	const before = Math.floor((targetEnd + 7 * 24 * 60 * 60 * 1000) / 1000);
+	const activities = await listStravaActivities(accessToken, after, before);
+	let bestActivityId: string | null = null;
+	let bestScore = Number.POSITIVE_INFINITY;
+	for (const activity of activities) {
+		const score = scoreApproximateActivityMatch(workout, activity, targetTitle, targetDurationMs);
+		if (score < bestScore) {
+			bestScore = score;
+			bestActivityId = String(activity.id);
+		}
+	}
+	if (bestActivityId == null) return null;
+	if (!Number.isFinite(bestScore) || bestScore > 240) return null;
+	return bestActivityId;
+}
+
 async function waitForUploadActivityId(accessToken: string, uploadId: string): Promise<string> {
 	for (let attempt = 0; attempt < 20; attempt += 1) {
 		const status = await getUploadStatus(accessToken, uploadId);
@@ -658,8 +746,14 @@ export async function syncWorkoutToStrava(
 	const accessToken = await getValidAccessToken(db, platform, userId);
 	const { workout, sets, sourceUpdatedAt } = result;
 	const existing = await getSyncMap(db, workoutId, userId);
-	if (existing && existing.upload_id && existing.source_updated_at >= sourceUpdatedAt) {
-		return { pushed: false, uploadId: existing.upload_id, activityId: existing.strava_activity_id };
+	if (existing && existing.source_updated_at >= sourceUpdatedAt) {
+		return { pushed: false, uploadId: existing.upload_id ?? undefined, activityId: existing.strava_activity_id };
+	}
+
+	const approximateActivityId = await findClosestExistingActivity(accessToken, workout, sets);
+	if (approximateActivityId) {
+		await saveSyncMap(db, userId, workoutId, approximateActivityId, null, sourceUpdatedAt);
+		return { pushed: true, activityId: approximateActivityId };
 	}
 	const summary = buildWorkoutUploadPayload(workout, sets);
 	const upload = await createStrengthTrainingUpload(accessToken, {
