@@ -8,19 +8,19 @@ export type AggregateMetric = 'time' | 'sets' | 'reps' | 'volume' | 'weight';
 
 export const DAY_TILE_STYLES: Record<DayCategory, string> = {
   rest: 'bg-slate-100 text-slate-900 border-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600',
-  cardio: 'bg-orange-500 text-white border-orange-600 dark:bg-orange-400 dark:border-orange-300',
+  cardio: 'bg-orange-600 text-white border-orange-700 dark:bg-orange-500 dark:border-orange-400',
   push: 'bg-red-600 text-white border-red-700 dark:bg-red-500 dark:border-red-400',
   pull: 'bg-blue-600 text-white border-blue-700 dark:bg-blue-500 dark:border-blue-400',
   legs: 'bg-emerald-600 text-white border-emerald-700 dark:bg-emerald-500 dark:border-emerald-400',
-  'antagonist pull': 'bg-blue-700 text-white border-blue-800 dark:bg-blue-600 dark:border-blue-500',
-  'antagonist push': 'bg-red-700 text-white border-red-800 dark:bg-red-600 dark:border-red-500',
-  upper: 'bg-violet-700 text-white border-violet-800 dark:bg-violet-600 dark:border-violet-500',
-  abs: 'bg-amber-600 text-white border-amber-700 dark:bg-amber-500 dark:border-amber-400',
-  back: 'bg-cyan-700 text-white border-cyan-800 dark:bg-cyan-600 dark:border-cyan-500',
+  'antagonist pull': 'bg-cyan-700 text-white border-cyan-800 dark:bg-cyan-600 dark:border-cyan-500',
+  'antagonist push': 'bg-fuchsia-700 text-white border-fuchsia-800 dark:bg-fuchsia-600 dark:border-fuchsia-500',
+  upper: 'bg-indigo-700 text-white border-indigo-800 dark:bg-indigo-600 dark:border-indigo-500',
+  abs: 'bg-yellow-600 text-slate-950 border-yellow-700 dark:bg-yellow-500 dark:text-slate-950 dark:border-yellow-400',
+  back: 'bg-teal-700 text-white border-teal-800 dark:bg-teal-600 dark:border-teal-500',
   chest: 'bg-rose-700 text-white border-rose-800 dark:bg-rose-600 dark:border-rose-500',
-  arms: 'bg-fuchsia-700 text-white border-fuchsia-800 dark:bg-fuchsia-600 dark:border-fuchsia-500',
-  shoulders: 'bg-orange-700 text-white border-orange-800 dark:bg-orange-600 dark:border-orange-500',
-  'full body': 'bg-amber-600 text-white border-amber-700 dark:bg-amber-500 dark:text-slate-950 dark:border-amber-400',
+  arms: 'bg-violet-700 text-white border-violet-800 dark:bg-violet-600 dark:border-violet-500',
+  shoulders: 'bg-amber-700 text-slate-950 border-amber-800 dark:bg-amber-600 dark:text-slate-950 dark:border-amber-500',
+  'full body': 'bg-lime-700 text-slate-950 border-lime-800 dark:bg-lime-600 dark:text-slate-950 dark:border-lime-500',
 };
 
 export const DAY_TILE_LABELS: Record<DayCategory, string> = {
@@ -42,19 +42,19 @@ export const DAY_TILE_LABELS: Record<DayCategory, string> = {
 
 const DAY_TILE_COLORS: Record<DayCategory, string> = {
   rest: '#e2e8f0',
-  cardio: '#f97316',
+  cardio: '#ea580c',
   push: '#dc2626',
   pull: '#2563eb',
   legs: '#16a34a',
-  'antagonist pull': '#1d4ed8',
-  'antagonist push': '#b91c1c',
-  upper: '#7c3aed',
-  abs: '#d97706',
-  back: '#0e7490',
+  'antagonist pull': '#0891b2',
+  'antagonist push': '#c026d3',
+  upper: '#4338ca',
+  abs: '#ca8a04',
+  back: '#0f766e',
   chest: '#be123c',
-  arms: '#c026d3',
-  shoulders: '#ea580c',
-  'full body': '#d97706',
+  arms: '#7c3aed',
+  shoulders: '#d97706',
+  'full body': '#65a30d',
 };
 
 const CALENDAR_LEGEND_ORDER: DayCategory[] = [
