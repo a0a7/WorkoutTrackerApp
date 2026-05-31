@@ -13,9 +13,9 @@
     if (!mapEl) return;
     map = new maplibregl.Map({
       container: mapEl,
-      style: 'https://demotiles.maplibre.org/style.json',
+      style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
       center: [location.lng, location.lat],
-      zoom: 15,
+      zoom: 16,
       attributionControl: false,
     });
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');

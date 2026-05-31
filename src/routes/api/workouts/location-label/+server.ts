@@ -19,8 +19,8 @@ export const PATCH: RequestHandler = async ({ request, platform }) => {
   if (typeof lat !== 'number' || typeof lng !== 'number') throw error(400, 'Location coordinates required');
 
   const label = typeof body.label === 'string' ? body.label.trim() : null;
-  const roundedLat = lat.toFixed(3);
-  const roundedLng = lng.toFixed(3);
+  const roundedLat = Number(lat.toFixed(3));
+  const roundedLng = Number(lng.toFixed(3));
   const now = Date.now();
 
   await db
@@ -30,8 +30,8 @@ export const PATCH: RequestHandler = async ({ request, platform }) => {
        WHERE user_id = ?
          AND location_lat IS NOT NULL
          AND location_lng IS NOT NULL
-         AND ROUND(location_lat, 3) = ?
-         AND ROUND(location_lng, 3) = ?`
+         AND ABS(location_lat - ?) < 0.0005
+         AND ABS(location_lng - ?) < 0.0005`
     )
     .bind(label || null, now, userId, roundedLat, roundedLng)
     .run();

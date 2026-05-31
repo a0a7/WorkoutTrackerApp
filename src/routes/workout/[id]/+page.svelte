@@ -8,13 +8,13 @@
   import WorkoutLocationMap from '$lib/components/WorkoutLocationMap.svelte';
   import SetRow from '$lib/components/SetRow.svelte';
   import NumericKeypad from '$lib/components/NumericKeypad.svelte';
-  import { deleteSet, deleteWorkout, getWorkout, saveSets, saveWorkout } from '$lib/db';
+  import { deleteSet, deleteWorkout, getAllWorkouts, getWorkout, saveSets, saveWorkout } from '$lib/db';
   import { EXERCISE_MAP } from '$lib/exercises';
   import { unitPreference, initUnitPreference, userStore, tertiaryActivationPreference, initTertiaryActivationPreference, timeFormatPreference, initTimeFormatPreference } from '$lib/stores/userStore';
   import { keypadConfig } from '$lib/stores/keypadStore';
   import { Share2, Pencil, Trash2 } from 'lucide-svelte';
   import { syncToServer } from '$lib/sync';
-  import { formatWorkoutLocation } from '$lib/location';
+  import { formatWorkoutLocation, locationMatchesCluster } from '$lib/location';
   import { classifyWorkout, getWorkoutCategoryLabel } from '$lib/workoutCategorization';
   import type { Workout, MuscleActivation, WorkoutCategory, WorkoutSet } from '$lib/types';
 
@@ -1039,6 +1039,55 @@
       return `${w}`;
     }).filter(Boolean).join(', ');
   }
+
+  async function nameWorkoutLocation() {
+    if (!workout?.location) return;
+    const currentLabel = workout.location.label?.trim() ?? '';
+    const nextLabel = window.prompt('Name this place', currentLabel);
+    if (nextLabel === null) return;
+    const label = nextLabel.trim();
+    if (!label) return;
+
+    const user = get(userStore);
+    try {
+      if (user) {
+        const res = await fetch('/api/workouts/location-label', {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            lat: workout.location.lat,
+            lng: workout.location.lng,
+            label,
+          })
+        });
+        if (!res.ok) throw new Error(`Failed (${res.status})`);
+      }
+
+      const localWorkouts = await getAllWorkouts();
+      await Promise.all(
+        localWorkouts
+          .filter((item): item is Workout => Boolean(item.location))
+          .filter((item) => locationMatchesCluster(item.location!, workout.location!.lat, workout.location!.lng))
+          .map((item) => saveWorkout({
+            ...item,
+            location: { ...item.location!, label },
+          }, false))
+      );
+
+      workout = {
+        ...workout,
+        location: {
+          ...workout.location,
+          label,
+        },
+      };
+    } catch (error) {
+      stravaMessage = error instanceof Error ? error.message : 'Failed to save location name.';
+    }
+  }
 </script>
 
 <svelte:head>
@@ -1153,24 +1202,6 @@
             {/if}
           </div>
 
-          {#if workout.location}
-            <div class="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
-              <div class="flex items-start gap-2 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2">
-                <div class="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 21s6-5.686 6-11a6 6 0 1 0-12 0c0 5.314 6 11 6 11Z"/>
-                    <circle cx="12" cy="10" r="2.5"/>
-                  </svg>
-                </div>
-                <div class="min-w-0">
-                  <p class="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Location</p>
-                  <p class="truncate text-sm font-medium text-[hsl(var(--foreground))]">{formatWorkoutLocation(workout.location)}</p>
-                </div>
-              </div>
-              <WorkoutLocationMap location={workout.location} />
-            </div>
-          {/if}
-
           {#if editingTimes}
             <div class="mt-2 flex flex-wrap items-center gap-2">
               <div class="flex items-center gap-1">
@@ -1222,6 +1253,26 @@
                   </div>
                 {/if}
               {/each}
+            </div>
+          {/if}
+
+          {#if workout.location}
+            <div class="mt-4 space-y-3">
+              <div class="flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Location</p>
+                  <p class="truncate text-sm font-medium text-[hsl(var(--foreground))]">{formatWorkoutLocation(workout.location)}</p>
+                </div>
+                {#if !workout.location.label?.trim()}
+                  <button
+                    class="shrink-0 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-xs font-semibold text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
+                    onclick={nameWorkoutLocation}
+                  >
+                    Name this place
+                  </button>
+                {/if}
+              </div>
+              <WorkoutLocationMap location={workout.location} />
             </div>
           {/if}
 

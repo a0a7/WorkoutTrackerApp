@@ -6,8 +6,9 @@
   import { userStore } from '$lib/stores/userStore';
   import { unitPreference, initUnitPreference, tertiaryActivationPreference, initTertiaryActivationPreference, timeFormatPreference, initTimeFormatPreference } from '$lib/stores/userStore';
   import ThemeToggle from '$lib/components/ThemeToggle.svelte';
+  import { getAllWorkouts, saveWorkout } from '$lib/db';
+  import { locationMatchesCluster, formatWorkoutLocation, locationGroupKey } from '$lib/location';
   import type { Workout } from '$lib/types';
-  import { formatWorkoutLocation, locationGroupKey } from '$lib/location';
 
   let user = $state<{ id: string; email: string; token: string } | null>(null);
   let unit = $state<'lbs' | 'kg'>('lbs');
@@ -115,6 +116,24 @@
         })
       });
       if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const localWorkouts = await getAllWorkouts();
+      await Promise.all(
+        localWorkouts
+          .filter((workout): workout is Workout => Boolean(workout.location))
+          .filter((workout) => locationMatchesCluster(workout.location!, cluster.lat, cluster.lng))
+          .map((workout) =>
+            saveWorkout(
+              {
+                ...workout,
+                location: {
+                  ...workout.location!,
+                  label: draftLabel || undefined,
+                },
+              },
+              false
+            )
+          )
+      );
       await loadLocations();
     } catch (e) {
       locationsError = e instanceof Error ? e.message : 'Failed to save location name';
