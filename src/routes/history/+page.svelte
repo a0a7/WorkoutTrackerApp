@@ -36,19 +36,19 @@
   const timeFormat = $derived($timeFormatPreference);
 
   const DAY_TILE_STYLES: Record<DayCategory, string> = {
-    rest: 'bg-slate-500 text-white',
-    push: 'bg-red-600 text-white',
-    pull: 'bg-blue-600 text-white',
-    legs: 'bg-black text-white',
-    'antagonist pull': 'bg-blue-800 text-white',
-    'antagonist push': 'bg-red-800 text-white',
-    upper: 'bg-slate-700 text-white',
-    abs: 'bg-amber-700 text-white',
-    back: 'bg-cyan-700 text-white',
-    chest: 'bg-rose-700 text-white',
-    arms: 'bg-violet-700 text-white',
-    shoulders: 'bg-orange-700 text-white',
-    'full body': 'bg-emerald-700 text-white',
+    rest: 'bg-slate-100 text-slate-700 border-slate-200',
+    push: 'bg-rose-500 text-white border-rose-600',
+    pull: 'bg-sky-500 text-white border-sky-600',
+    legs: 'bg-emerald-500 text-white border-emerald-600',
+    'antagonist pull': 'bg-blue-600 text-white border-blue-700',
+    'antagonist push': 'bg-rose-600 text-white border-rose-700',
+    upper: 'bg-violet-500 text-white border-violet-600',
+    abs: 'bg-amber-500 text-white border-amber-600',
+    back: 'bg-cyan-500 text-white border-cyan-600',
+    chest: 'bg-red-500 text-white border-red-600',
+    arms: 'bg-fuchsia-500 text-white border-fuchsia-600',
+    shoulders: 'bg-orange-500 text-white border-orange-600',
+    'full body': 'bg-lime-500 text-white border-lime-600',
   };
 
   const DAY_TILE_LABELS: Record<DayCategory, string> = {
@@ -321,17 +321,32 @@
 <div class="px-4 pt-4">
   <h1 class="text-2xl font-bold text-[hsl(var(--foreground))] mb-4">History</h1>
 
-  <section class="mb-4 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 shadow-sm">
-    <div class="grid grid-cols-7 gap-2">
+  <section class="mb-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+    <div class="mb-2 flex items-center justify-between gap-3">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Last 7 days</p>
+        <p class="text-sm text-slate-600">GitHub-style day view</p>
+      </div>
+      <div class="hidden items-center gap-2 text-[11px] text-slate-500 sm:flex">
+        <span>Less</span>
+        <div class="h-2.5 w-2.5 rounded-[4px] border border-slate-200 bg-slate-100"></div>
+        <div class="h-2.5 w-2.5 rounded-[4px] border border-slate-200 bg-emerald-200"></div>
+        <div class="h-2.5 w-2.5 rounded-[4px] border border-slate-200 bg-emerald-400"></div>
+        <div class="h-2.5 w-2.5 rounded-[4px] border border-slate-200 bg-emerald-500"></div>
+        <span>More</span>
+      </div>
+    </div>
+    <div class="grid grid-cols-7 gap-1.5 sm:gap-2">
       {#each last7Days() as day (day.key)}
         <div class="flex flex-col items-center gap-1">
           <div
-            class={`flex aspect-square w-full min-w-0 items-center justify-center rounded-2xl text-center text-[10px] font-bold leading-tight tracking-wide shadow-sm ${DAY_TILE_STYLES[day.category]}`}
+            class={`flex aspect-square w-full min-w-0 items-center justify-center rounded-[6px] border text-center text-[10px] font-semibold leading-tight tracking-wide shadow-[0_0_0_1px_rgba(15,23,42,0.02)] transition-transform hover:-translate-y-0.5 ${DAY_TILE_STYLES[day.category]}`}
             title={`${day.dateLabel}: ${day.categoryLabel}${day.count ? ` (${day.count} workout${day.count === 1 ? '' : 's'})` : ''}`}
           >
-            <span class="whitespace-pre-line px-1">{DAY_TILE_LABELS[day.category]}</span>
+            <span class="whitespace-pre-line px-1 text-[9px] leading-tight">{DAY_TILE_LABELS[day.category]}</span>
           </div>
-          <p class="text-[10px] text-[hsl(var(--muted-foreground))]">{new Date(day.ts).getDate()}</p>
+          <p class="text-[10px] font-medium text-slate-500">{day.dayLabel}</p>
+          <p class="text-[10px] text-slate-400">{new Date(day.ts).getDate()}</p>
         </div>
       {/each}
     </div>
