@@ -106,6 +106,20 @@
     return new Date(`${date}T${time}:00`).getTime();
   }
 
+  const workoutTitleDate = $derived(
+    workout
+      ? new Date(workout.startTime).toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        })
+      : ''
+  );
+
+  const workoutTitleCategory = $derived(
+    workout ? getWorkoutCategoryLabel(workout.categoryOverride ?? classifyWorkout(workout)) : ''
+  );
+
   function beginEditTimes() {
     if (!workout) return;
     editStartDate = toDateInput(workout.startTime);
@@ -1028,7 +1042,7 @@
 </script>
 
 <svelte:head>
-  <title>Logbook – Workout</title>
+  <title>{workout ? `Logbook – ${workoutTitleDate} - ${workoutTitleCategory}` : 'Logbook – Workout'}</title>
 </svelte:head>
 
 <div class="px-4 pt-4">
@@ -1061,7 +1075,7 @@
         <section class="order-2 lg:order-1 min-w-0">
           <div class="flex items-center justify-between gap-3">
             <div class="min-w-0">
-              <h1 class="text-lg font-black text-[hsl(var(--foreground))] truncate">{new Date(workout.startTime).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} at {formatTime(workout.startTime)}</h1>
+              <h1 class="text-lg font-black text-[hsl(var(--foreground))] truncate">{workoutTitleDate} - {workoutTitleCategory}</h1>
               <div class="mt-1 flex flex-wrap items-center gap-3">
                 <p class="text-md font-bold text-[hsl(var(--foreground))]">
                   {(() => {

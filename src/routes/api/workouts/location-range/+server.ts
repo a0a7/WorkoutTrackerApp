@@ -11,6 +11,11 @@ function toTimestamp(value: unknown, label: string): number {
   throw error(400, `Invalid ${label}`);
 }
 
+function parseOffsetMinutes(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
+  return 0;
+}
+
 export const PATCH: RequestHandler = async ({ request, platform }) => {
   const db = platform?.env?.DB;
   if (!db) throw error(503, 'Database not available');
@@ -22,6 +27,7 @@ export const PATCH: RequestHandler = async ({ request, platform }) => {
     lat?: number;
     lng?: number;
     label?: string | null;
+    timezoneOffsetMinutes?: number;
   };
 
   try {
@@ -37,6 +43,11 @@ export const PATCH: RequestHandler = async ({ request, platform }) => {
   const toTs = toTimestamp(body.to, 'to');
   if (toTs < fromTs) throw error(400, 'to must be greater than or equal to from');
 
+  const offsetMinutes = parseOffsetMinutes(body.timezoneOffsetMinutes);
+  const offsetMs = offsetMinutes * 60_000;
+  const adjustedFrom = fromTs + offsetMs;
+  const adjustedTo = toTs + offsetMs;
+
   const now = Date.now();
   const label = typeof body.label === 'string' ? body.label.trim() : null;
 
@@ -49,19 +60,20 @@ export const PATCH: RequestHandler = async ({ request, platform }) => {
            updated_at = ?,
            synced = 0
        WHERE user_id = ?
-         AND start_time >= ?
-         AND start_time <= ?`
+          AND start_time >= ?
+          AND start_time <= ?`
     )
-    .bind(body.lat, body.lng, label || null, now, userId, fromTs, toTs)
+        .bind(body.lat, body.lng, label || null, now, userId, adjustedFrom, adjustedTo)
     .run();
 
   return json({
     ok: true,
     updated: result.meta.changes ?? 0,
-    from: fromTs,
-    to: toTs,
+    from: adjustedFrom,
+    to: adjustedTo,
     lat: body.lat,
     lng: body.lng,
     label: label || null,
+    timezoneOffsetMinutes: offsetMinutes,
   });
 };

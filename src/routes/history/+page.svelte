@@ -433,11 +433,6 @@
                   <p class="truncate text-xs text-[hsl(var(--muted-foreground))]">
                     {workout.sets.length} sets
                   </p>
-                  {#if workout.location}
-                    <p class="truncate text-[11px] text-[hsl(var(--muted-foreground))]">
-                      {formatWorkoutLocation(workout.location)}
-                    </p>
-                  {/if}
                 </div>
                 <p class="shrink-0 text-xs font-medium text-[hsl(var(--foreground))]">
                   {(() => {
