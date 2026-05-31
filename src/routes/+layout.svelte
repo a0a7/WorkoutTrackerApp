@@ -20,7 +20,14 @@
   const navItems = [
     { href: '/', label: 'Today', icon: 'today' },
     { href: '/history', label: 'History', icon: 'history' },
+    { href: '/trends', label: 'Trends', icon: 'trends' },
     { href: '/settings', label: 'Settings', icon: 'settings' },
+  ];
+
+  const trendsNavItems = [
+    { href: '/trends/calendar', label: 'Calendar' },
+    { href: '/trends/aggregate', label: 'General' },
+    { href: '/trends/exercise', label: 'By Movement' },
   ];
 
   const STRAVA_DUE_SYNC_INTERVAL_MS = 5 * 60_000;
@@ -185,6 +192,7 @@
   }
 
   import { CalendarDays, Home, Settings, Sun, Moon } from 'lucide-svelte';
+  import { TrendingUp } from 'lucide-svelte';
   import { unitPreference } from '$lib/stores/userStore';
 
   function toggleMode() {
@@ -220,6 +228,8 @@
           >
             {#if pt.icon === 'today'}
               <Home class="w-4 h-4" />
+            {:else if pt.icon === 'trends'}
+              <TrendingUp class="w-4 h-4" />
             {:else if pt.icon === 'history'}
               <CalendarDays class="w-4 h-4" />
             {:else if pt.icon === 'settings'}
@@ -227,6 +237,21 @@
             {/if}
             {pt.label}
           </a>
+          {#if pt.icon === 'trends'}
+            <div class="ml-4 border-l border-[hsl(var(--border))] pl-3">
+              <div class="space-y-1 py-1">
+                {#each trendsNavItems as item}
+                  <a
+                    href={item.href}
+                    class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors {currentPath === item.href || currentPath.startsWith(item.href) ? 'text-[hsl(var(--foreground))] font-bold' : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'}"
+                  >
+                    <span class="h-1.5 w-1.5 rounded-full bg-current opacity-70"></span>
+                    {item.label}
+                  </a>
+                {/each}
+              </div>
+            </div>
+          {/if}
         {/each}
       </nav>
       <div class="px-3 pb-3 flex items-center gap-2 justify-between">
@@ -280,6 +305,8 @@
         >
           {#if item.icon === 'today'}
             <Home class="w-[1.4rem] h-[1.4rem]" strokeWidth={isActive(item.href) ? 2.5 : 2} />
+          {:else if item.icon === 'trends'}
+            <TrendingUp class="w-[1.4rem] h-[1.4rem]" strokeWidth={isActive(item.href) ? 2.5 : 2} />
           {:else if item.icon === 'history'}
             <CalendarDays class="w-[1.4rem] h-[1.4rem]" strokeWidth={isActive(item.href) ? 2.5 : 2} />
           {:else if item.icon === 'settings'}
