@@ -51,6 +51,7 @@ export type WorkoutCategory =
 	| 'chest'
 	| 'arms'
 	| 'shoulders'
+	| 'cardio'
 	| 'full body';
 
 export interface WorkoutSet {
@@ -74,6 +75,7 @@ export interface Workout {
 	startTime: number;
 	endTime: number;
 	categoryOverride?: WorkoutCategory;
+	activityType?: string;
 	location?: { lat: number; lng: number; label?: string };
 	notes?: string;
 	sets: WorkoutSet[];

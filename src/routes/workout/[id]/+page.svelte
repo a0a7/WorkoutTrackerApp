@@ -407,6 +407,7 @@
     stravaSyncing = true;
     stravaMessage = '';
     try {
+      await syncToServer(user);
       const res = await fetch(`/api/strava/workouts/${encodeURIComponent(workout.id)}/sync`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${user.token}` }
@@ -1041,8 +1042,9 @@
   }
 
   async function nameWorkoutLocation() {
-    if (!workout?.location) return;
-    const currentLabel = workout.location.label?.trim() ?? '';
+    const currentWorkout = workout;
+    if (!currentWorkout?.location) return;
+    const currentLabel = currentWorkout.location.label?.trim() ?? '';
     const nextLabel = window.prompt('Name this place', currentLabel);
     if (nextLabel === null) return;
     const label = nextLabel.trim();
@@ -1051,6 +1053,8 @@
     const user = get(userStore);
     try {
       if (user) {
+        const currentLocation = currentWorkout.location;
+        if (!currentLocation) return;
         const res = await fetch('/api/workouts/location-label', {
           method: 'PATCH',
           headers: {
@@ -1058,8 +1062,8 @@
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            lat: workout.location.lat,
-            lng: workout.location.lng,
+            lat: currentLocation.lat,
+            lng: currentLocation.lng,
             label,
           })
         });
@@ -1070,7 +1074,7 @@
       await Promise.all(
         localWorkouts
           .filter((item): item is Workout => Boolean(item.location))
-          .filter((item) => locationMatchesCluster(item.location!, workout.location!.lat, workout.location!.lng))
+          .filter((item) => locationMatchesCluster(item.location!, currentWorkout.location!.lat, currentWorkout.location!.lng))
           .map((item) => saveWorkout({
             ...item,
             location: { ...item.location!, label },
@@ -1078,9 +1082,9 @@
       );
 
       workout = {
-        ...workout,
+        ...currentWorkout,
         location: {
-          ...workout.location,
+          ...currentWorkout.location,
           label,
         },
       };

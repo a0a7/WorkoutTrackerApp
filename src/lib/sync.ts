@@ -142,10 +142,21 @@ export async function syncFromServer(user: User): Promise<void> {
   }
 }
 
+export async function syncFromStrava(user: User): Promise<void> {
+  if (!navigator.onLine) return;
+  try {
+    const res = await apiFetch('/strava/import', user, { method: 'POST' });
+    if (!res.ok && res.status !== 404) throw new Error(`Sync failed (${res.status})`);
+  } catch (e) {
+    syncStore.update((s) => ({ ...s, error: e instanceof Error ? e.message : 'Strava import failed' }));
+  }
+}
+
 export function setupSyncListeners(user: User): () => void {
   const handleOnline = async () => {
     try {
       await syncToServer(user);
+      await syncFromStrava(user);
       await syncFromServer(user);
     } catch {
       // ignored

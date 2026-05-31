@@ -9,6 +9,7 @@ interface DbWorkout {
 	start_time: number;
 	end_time: number;
 	category_override: WorkoutCategory | null;
+	activity_type: string | null;
 	notes: string | null;
 	location_lat: number | null;
 	location_lng: number | null;
@@ -25,6 +26,7 @@ function rowToWorkout(row: DbWorkout) {
 		startTime: row.start_time,
 		endTime: row.end_time,
 		categoryOverride: row.category_override ?? undefined,
+		activityType: row.activity_type ?? undefined,
 		notes: row.notes ?? undefined,
 		location:
 			row.location_lat != null && row.location_lng != null
@@ -65,15 +67,17 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	const now = Date.now();
 	const location = body.location as { lat?: number; lng?: number; label?: string } | undefined;
 	const categoryOverride = body.categoryOverride ?? null;
+	const activityType = typeof body.activityType === 'string' ? body.activityType.trim() : null;
 
 	await db
 		.prepare(
-			`INSERT INTO workouts (id, user_id, start_time, end_time, category_override, notes, location_lat, location_lng, location_label, synced, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+			`INSERT INTO workouts (id, user_id, start_time, end_time, category_override, activity_type, notes, location_lat, location_lng, location_label, synced, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          start_time = excluded.start_time,
          end_time = excluded.end_time,
 				 category_override = excluded.category_override,
+			 activity_type = excluded.activity_type,
          notes = excluded.notes,
          location_lat = excluded.location_lat,
          location_lng = excluded.location_lng,
@@ -88,6 +92,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 			body.startTime,
 			body.endTime,
 			categoryOverride,
+			activityType,
 			body.notes ?? null,
 			location?.lat ?? null,
 			location?.lng ?? null,

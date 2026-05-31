@@ -6,7 +6,6 @@
   import { getAllWorkouts } from '$lib/db';
   import type { Workout, WorkoutSet } from '$lib/types';
   import { unitPreference, initUnitPreference, timeFormatPreference, initTimeFormatPreference } from '$lib/stores/userStore';
-  import { formatWorkoutLocation } from '$lib/location';
   import { classifyWorkouts, getEffectiveWorkoutCategory, getWorkoutCategoryLabel, type DayCategory } from '$lib/workoutCategorization';
 
   let workouts = $state<Workout[]>([]);
@@ -30,13 +29,27 @@
   let dateWindow = $state<DateWindow>('all');
   let sortMode = $state<'newest' | 'oldest' | 'duration-desc' | 'duration-asc' | 'volume-desc' | 'volume-asc'>('newest');
   let onlyWithLocation = $state(false);
+  let exerciseTypeFilter = $state('all');
   let compactness = $state<'card' | 'compact'>('card');
   let queryHydrated = $state(false);
   const unit = $derived($unitPreference);
   const timeFormat = $derived($timeFormatPreference);
 
+  function getWorkoutExerciseType(workout: Workout): string {
+    return workout.activityType?.trim() || (workout.sets.length > 0 ? 'Strength Training' : 'Cardio');
+  }
+
+  const exerciseTypeOptions = $derived(() => {
+    const types = new Set<string>(['Strength Training']);
+    for (const workout of workouts) {
+      types.add(getWorkoutExerciseType(workout));
+    }
+    return ['all', ...[...types].sort((a, b) => a.localeCompare(b))];
+  });
+
   const DAY_TILE_STYLES: Record<DayCategory, string> = {
     rest: 'bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600',
+    cardio: 'bg-sky-600 text-white border-sky-700 dark:bg-sky-500 dark:border-sky-400',
     push: 'bg-red-600 text-white border-red-700 dark:bg-red-500 dark:border-red-400',
     pull: 'bg-blue-600 text-white border-blue-700 dark:bg-blue-500 dark:border-blue-400',
     legs: 'bg-emerald-600 text-white border-emerald-700 dark:bg-emerald-500 dark:border-emerald-400',
@@ -53,6 +66,7 @@
 
   const DAY_TILE_LABELS: Record<DayCategory, string> = {
     rest: 'Rest',
+    cardio: 'Cardio',
     push: 'Push',
     pull: 'Pull',
     legs: 'Legs',
@@ -78,6 +92,11 @@
     const dateParam = params.get('date');
     if (dateParam && DATE_WINDOWS.includes(dateParam as DateWindow)) {
       dateWindow = dateParam as DateWindow;
+    }
+
+    const typeParam = params.get('type');
+    if (typeParam) {
+      exerciseTypeFilter = typeParam;
     }
 
     const sortParam = params.get('sort');
@@ -123,6 +142,9 @@
     if (onlyWithLocation) url.searchParams.set('loc', '1');
     else url.searchParams.delete('loc');
 
+    if (exerciseTypeFilter !== 'all') url.searchParams.set('type', exerciseTypeFilter);
+    else url.searchParams.delete('type');
+
     if (compactness !== 'card') url.searchParams.set('view', compactness);
     else url.searchParams.delete('view');
 
@@ -139,6 +161,7 @@
     dateWindow;
     sortMode;
     onlyWithLocation;
+    exerciseTypeFilter;
     compactness;
     syncQueryParams();
   });
@@ -200,6 +223,9 @@
     result = result.filter(passesDateWindow);
     if (onlyWithLocation) {
       result = result.filter((w) => Boolean(w.location));
+    }
+    if (exerciseTypeFilter !== 'all') {
+      result = result.filter((w) => getWorkoutExerciseType(w) === exerciseTypeFilter);
     }
     return [...result].sort(compareWorkouts);
   });
@@ -279,18 +305,6 @@
     return getUniqueExerciseNames(workout).join(', ');
   }
 
-  function formatCompactDateTime(startTime: number): string {
-    const time = new Date(startTime).toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: timeFormat === '12h',
-    });
-    return `${new Date(startTime).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    })}, ${time}`;
-  }
-
   function computeTotalVolume(sets: WorkoutSet[]) {
     let total = 0;
     for (const s of sets) {
@@ -311,6 +325,20 @@
   function getWorkoutCountLabel() {
     const count = filtered().length;
     return `${count} workout${count === 1 ? '' : 's'}`;
+  }
+
+  function formatWorkoutTitle(workout: Workout) {
+    const date = new Date(workout.startTime).toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+    const time = new Date(workout.startTime).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: timeFormat === '12h',
+    });
+    return `${date} ${time} - ${getWorkoutCategoryLabel(getEffectiveWorkoutCategory(workout))}`;
   }
 </script>
 
@@ -376,6 +404,14 @@
           <option value="volume-desc">Highest volume</option>
           <option value="volume-asc">Lowest volume</option>
         </select>
+        <select
+          bind:value={exerciseTypeFilter}
+          class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]"
+        >
+          {#each exerciseTypeOptions() as option}
+            <option value={option}>{option === 'all' ? 'All types' : option}</option>
+          {/each}
+        </select>
         <div class="inline-flex rounded-xl bg-[hsl(var(--muted))] p-1">
           <button
             type="button"
@@ -427,7 +463,7 @@
               >
                 <div class="min-w-0">
                   <p class="truncate text-sm font-semibold text-[hsl(var(--foreground))]">
-                    {new Date(workout.startTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} {new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: timeFormat === '12h' })} - {getWorkoutCategoryLabel(getEffectiveWorkoutCategory(workout))}
+                    {formatWorkoutTitle(workout)}
                   </p>
                   <p class="truncate text-xs text-[hsl(var(--muted-foreground))]">
                     {workout.sets.length} sets
@@ -451,7 +487,7 @@
         <a href="/workout/{workout.id}" class="py-2 active:scale-[0.995] transition-transform">
           <div class="flex items-start justify-between gap-1.5 text-sm text-[hsl(var(--foreground))]">
             <div class="min-w-0">
-              <p class="truncate text-sm font-semibold text-[hsl(var(--foreground))]">{formatCompactDateTime(workout.startTime)}</p>
+              <p class="truncate text-sm font-semibold text-[hsl(var(--foreground))]">{formatWorkoutTitle(workout)}</p>
               <p class="truncate text-xs text-[hsl(var(--muted-foreground))]">{getExerciseNamesString(workout)}</p>
             </div>
             <div class="flex flex-col items-end shrink-0 ml-3">

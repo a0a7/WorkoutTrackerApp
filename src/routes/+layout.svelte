@@ -1,11 +1,12 @@
 <script lang="ts">
   import '../app.css';
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { get } from 'svelte/store';
   import { initDB } from '$lib/db';
   import { userStore } from '$lib/stores/userStore';
-  import { refreshSyncStatus, setupSyncListeners, syncFromServer, syncToServer } from '$lib/sync';
+  import { refreshSyncStatus, setupSyncListeners, syncFromServer, syncFromStrava, syncToServer } from '$lib/sync';
 
   let { children } = $props();
   let mainEl = $state<HTMLElement | null>(null);
@@ -95,11 +96,13 @@
     const handleVisibility = () => {
       const u = get(userStore);
       if (!u || document.visibilityState !== 'visible') return;
+      syncFromStrava(u);
       triggerStravaDueSync(u.token);
     };
     const handleOnline = () => {
       const u = get(userStore);
       if (!u) return;
+      syncFromStrava(u);
       triggerStravaDueSync(u.token);
     };
     document.addEventListener('visibilitychange', handleVisibility);
@@ -115,6 +118,7 @@
         // Initial two-way sync: push queued local changes first, then pull latest server state
         (async () => {
           await syncToServer(u);
+          await syncFromStrava(u);
           await syncFromServer(u);
           await triggerStravaDueSync(u.token);
         })().catch(() => {});
@@ -169,6 +173,8 @@
     pullSyncing = true;
     try {
       await syncToServer(u);
+      await syncFromStrava(u);
+      await syncFromServer(u);
       await syncFromServer(u);
       await refreshSyncStatus();
     } catch {
@@ -229,7 +235,7 @@
             onclick={() => { unitPreference.set($unitPreference === 'lbs' ? 'kg' : 'lbs'); }}
             class="px-3 py-1 cursor-pointer transition-colors text-xs font-semibold m-0 rounded-none {$unitPreference === 'lbs' ? 'bg-[hsl(var(--foreground))] text-[hsl(var(--background))]' : 'bg-transparent text-[hsl(var(--muted-foreground))]'}"
           >lbs</button>
-          <div class="w-[1px] h-3 bg-[hsl(var(--border))]"></div>
+          <div style="width:1px" class="h-3 bg-[hsl(var(--border))]"></div>
           <button
             onclick={() => { unitPreference.set($unitPreference === 'lbs' ? 'kg' : 'lbs'); }}
             class="px-3 py-1 cursor-pointer transition-colors text-xs font-semibold m-0 rounded-none {$unitPreference === 'kg' ? 'bg-[hsl(var(--foreground))] text-[hsl(var(--background))]' : 'bg-transparent text-[hsl(var(--muted-foreground))]'}"

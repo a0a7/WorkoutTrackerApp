@@ -15,6 +15,7 @@ const WORKOUT_CATEGORIES: WorkoutCategory[] = [
 	'chest',
 	'arms',
 	'shoulders',
+	'cardio',
 	'full body',
 ];
 
@@ -34,6 +35,14 @@ export interface WorkoutCategoryBreakdown {
 	back: number;
 	arms: number;
 	shoulders: number;
+}
+
+function isCardioWorkout(workout: Workout): boolean {
+	if (isWorkoutCategory(workout.categoryOverride) && workout.categoryOverride === 'cardio') return true;
+	if (workout.sets.length > 0) return false;
+	const activityType = workout.activityType?.trim().toLowerCase();
+	if (!activityType) return false;
+	return activityType !== 'strength training' && activityType !== 'weighttraining';
 }
 
 const ACTIVATION_WEIGHTS: Record<MuscleActivation['activation'], number> = {
@@ -247,24 +256,30 @@ function strongestCategory(breakdown: WorkoutCategoryBreakdown): WorkoutCategory
 
 		if (
 			shares.back >= 0.18 &&
-			breakdown.back >= breakdown.chest * 1.15 &&
-			breakdown.back >= breakdown.shoulders * 1.05 &&
-			breakdown.back >= breakdown.arms * 1.05
+			breakdown.back >= breakdown.chest * 1.2 &&
+			breakdown.back >= breakdown.shoulders * 1.15 &&
+			breakdown.back >= breakdown.arms * 1.15 &&
+			breakdown.back >= pullScore * 0.95
 		) {
 			return 'back';
 		}
 
 		if (
 			shares.shoulders >= 0.24 &&
-			breakdown.shoulders >= breakdown.chest * 1.18 &&
-			breakdown.shoulders >= breakdown.back * 1.12 &&
-			breakdown.shoulders >= breakdown.arms * 1.05 &&
-			breakdown.shoulders >= pushScore * 0.9
+			breakdown.shoulders >= breakdown.chest * 1.22 &&
+			breakdown.shoulders >= breakdown.back * 1.15 &&
+			breakdown.shoulders >= breakdown.arms * 1.15 &&
+			breakdown.shoulders >= pushScore * 1.02
 		) {
 			return 'shoulders';
 		}
 
-		if (shares.arms >= 0.18 && breakdown.arms >= breakdown.chest * 1.05 && breakdown.arms >= breakdown.back * 1.05) {
+		if (
+			shares.arms >= 0.22 &&
+			breakdown.arms >= breakdown.chest * 1.12 &&
+			breakdown.arms >= breakdown.back * 1.12 &&
+			breakdown.arms >= Math.max(pushScore, pullScore) * 0.95
+		) {
 			return 'arms';
 		}
 
@@ -303,12 +318,14 @@ export function classifyWorkout(workout: Workout): WorkoutCategory {
 }
 
 export function getEffectiveWorkoutCategory(workout: Workout): WorkoutCategory {
+	if (isCardioWorkout(workout)) return 'cardio';
 	if (isWorkoutCategory(workout.categoryOverride)) return workout.categoryOverride;
 	return classifyWorkout(workout);
 }
 
 export function classifyWorkouts(workouts: Workout[]): WorkoutCategory | 'rest' {
 	if (workouts.length === 0) return 'rest';
+	if (workouts.every((workout) => isCardioWorkout(workout))) return 'cardio';
 	const allManuallyCategorized = workouts.every((workout) => isWorkoutCategory(workout.categoryOverride));
 	if (allManuallyCategorized) {
 		const weightedCounts = new Map<WorkoutCategory, number>();

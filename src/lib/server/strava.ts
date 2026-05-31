@@ -14,6 +14,7 @@ type WorkoutRow = {
 	end_time: number;
 	updated_at: number;
 	notes: string | null;
+	activity_type: string | null;
 	location_lat: number | null;
 	location_lng: number | null;
 	location_label: string | null;
@@ -42,6 +43,9 @@ type StravaActivityRow = {
 	sport_type?: string;
 	start_date?: string;
 	elapsed_time?: number;
+	distance?: number;
+	moving_time?: number;
+	workout_type?: number;
 };
 
 type StravaConfig = {
@@ -198,7 +202,7 @@ export async function buildStravaAuthUrl(
 		redirect_uri: config.redirectUri,
 		response_type: 'code',
 		approval_prompt: 'auto',
-		scope: 'activity:write',
+		scope: 'activity:write,activity:read_all',
 		state
 	});
 	return `https://www.strava.com/oauth/authorize?${params.toString()}`;
@@ -274,6 +278,28 @@ function dayPeriodTitlePart(startTime: number): string {
 	return 'Night';
 }
 
+function normalizeCardioActivityType(activity: StravaActivityRow): string {
+	const sportType = activity.sport_type?.trim();
+	const type = activity.type?.trim();
+	const raw = sportType || type || 'Cardio';
+	if (raw === 'Ride') return 'Ride';
+	if (raw === 'VirtualRide') return 'Virtual Ride';
+	if (raw === 'Run') return 'Run';
+	if (raw === 'Walk') return 'Walk';
+	if (raw === 'Hike') return 'Hike';
+	if (raw === 'Swim') return 'Swim';
+	if (raw === 'Yoga') return 'Yoga';
+	if (raw === 'AlpineSki') return 'Alpine Ski';
+	if (raw === 'BackcountrySki') return 'Backcountry Ski';
+	if (raw === 'WeightTraining') return 'Strength Training';
+	return raw.replace(/([a-z])([A-Z])/g, '$1 $2');
+}
+
+function isStrengthActivity(activity: StravaActivityRow): boolean {
+	const raw = `${activity.type ?? ''} ${activity.sport_type ?? ''}`.toLowerCase();
+	return raw.includes('weighttraining');
+}
+
 type StrengthTrainingUploadSet = {
 	exercise_type: string;
 	repetitions?: number;
@@ -312,6 +338,20 @@ function describeLocation(workout: WorkoutRow): string | null {
 		return `${workout.location_lat.toFixed(5)}, ${workout.location_lng.toFixed(5)}`;
 	}
 	return null;
+}
+
+function buildCardioWorkoutTitle(activity: StravaActivityRow): string {
+	const startDate = activity.start_date ? new Date(activity.start_date) : new Date();
+	const dayPart = startDate.toLocaleDateString('en-US', {
+		weekday: 'short',
+		month: 'short',
+		day: 'numeric',
+	});
+	const timePart = startDate.toLocaleTimeString('en-US', {
+		hour: 'numeric',
+		minute: '2-digit',
+	});
+	return `${dayPart} ${timePart} - Cardio`;
 }
 
 function resolveStravaExerciseType(name: string): string {
@@ -530,6 +570,83 @@ function buildWorkoutUploadPayload(workout: WorkoutRow, sets: SetRow[]): { paylo
 	return { payload, title, description };
 }
 
+async function listStravaActivities(
+	accessToken: string,
+	after: number,
+	before: number
+): Promise<StravaActivityRow[]> {
+	const activities: StravaActivityRow[] = [];
+	for (let page = 1; page <= 10; page += 1) {
+		const params = new URLSearchParams({
+			after: String(after),
+			before: String(before),
+			page: String(page),
+			per_page: '100'
+		});
+		const res = await fetch(`${STRAVA_API_BASE}/athlete/activities?${params.toString()}`, {
+			headers: { Authorization: `Bearer ${accessToken}` }
+		});
+		if (!res.ok) throw error(502, `Strava activities fetch failed (${res.status})`);
+		const json = (await res.json()) as StravaActivityRow[];
+		activities.push(...json);
+		if (json.length < 100) break;
+	}
+	return activities;
+}
+
+function normalizeStravaText(value: string | undefined): string {
+	return (value ?? '').trim().toLowerCase();
+}
+
+function scoreApproximateActivityMatch(
+	workout: WorkoutRow,
+	activity: StravaActivityRow,
+	targetTitle: string,
+	targetDurationMs: number
+): number {
+	if (!activity.start_date || !Number.isFinite(Date.parse(activity.start_date))) return Number.POSITIVE_INFINITY;
+	const startDiffMinutes = Math.abs(Date.parse(activity.start_date) - workout.start_time) / 60000;
+	const elapsedMs = Math.max(1, (activity.elapsed_time ?? activity.moving_time ?? 0) * 1000);
+	const durationDiffMinutes = Math.abs(elapsedMs - targetDurationMs) / 60000;
+	const activityName = normalizeStravaText(activity.name);
+	const expectedName = normalizeStravaText(targetTitle);
+	const typeValue = normalizeStravaText(activity.type) || normalizeStravaText(activity.sport_type);
+
+	let score = startDiffMinutes * 3 + durationDiffMinutes * 1.25;
+	if (typeValue.includes('weight')) score -= 30;
+	if (activityName.includes('strength training')) score -= 18;
+	if (activityName.includes('workout')) score -= 6;
+	if (activityName === expectedName) score -= 40;
+	else if (activityName.includes(expectedName) || expectedName.includes(activityName)) score -= 18;
+	if (startDiffMinutes <= 20) score -= 12;
+	if (startDiffMinutes <= 90) score -= 6;
+	return score;
+}
+
+async function findClosestExistingActivity(
+	accessToken: string,
+	workout: WorkoutRow,
+	sets: SetRow[]
+): Promise<string | null> {
+	const targetDurationMs = Math.max(1, workout.end_time - workout.start_time);
+	const targetTitle = buildWorkoutUploadPayload(workout, sets).title;
+	const after = Math.max(0, Math.floor((workout.start_time - 7 * 24 * 60 * 60 * 1000) / 1000));
+	const before = Math.floor((workout.end_time + 7 * 24 * 60 * 60 * 1000) / 1000);
+	const activities = await listStravaActivities(accessToken, after, before);
+	let bestActivityId: string | null = null;
+	let bestScore = Number.POSITIVE_INFINITY;
+	for (const activity of activities) {
+		const score = scoreApproximateActivityMatch(workout, activity, targetTitle, targetDurationMs);
+		if (score < bestScore) {
+			bestScore = score;
+			bestActivityId = String(activity.id);
+		}
+	}
+	if (bestActivityId == null) return null;
+	if (!Number.isFinite(bestScore) || bestScore > 240) return null;
+	return bestActivityId;
+}
+
 async function createStrengthTrainingUpload(
 	accessToken: string,
 	input: { name: string; description: string; payload: StrengthTrainingUpload; workoutId: string }
@@ -574,85 +691,6 @@ async function getUploadStatus(
 	};
 }
 
-async function listStravaActivities(
-	accessToken: string,
-	after: number,
-	before: number
-): Promise<StravaActivityRow[]> {
-	const activities: StravaActivityRow[] = [];
-	for (let page = 1; page <= 3; page += 1) {
-		const params = new URLSearchParams({
-			after: String(after),
-			before: String(before),
-			page: String(page),
-			per_page: '100'
-		});
-		const res = await fetch(`${STRAVA_API_BASE}/athlete/activities?${params.toString()}`, {
-			headers: { Authorization: `Bearer ${accessToken}` }
-		});
-		if (!res.ok) throw error(502, `Strava activities fetch failed (${res.status})`);
-		const json = (await res.json()) as StravaActivityRow[];
-		activities.push(...json);
-		if (json.length < 100) break;
-	}
-	return activities;
-}
-
-function normalizeStravaText(value: string | undefined): string {
-	return (value ?? '').trim().toLowerCase();
-}
-
-function scoreApproximateActivityMatch(
-	workout: WorkoutRow,
-	activity: StravaActivityRow,
-	targetTitle: string,
-	targetDurationMs: number
-): number {
-	if (!activity.start_date || !Number.isFinite(Date.parse(activity.start_date))) return Number.POSITIVE_INFINITY;
-	const startDiffMinutes = Math.abs(Date.parse(activity.start_date) - workout.start_time) / 60000;
-	const elapsedMs = Math.max(1, (activity.elapsed_time ?? 0) * 1000);
-	const durationDiffMinutes = Math.abs(elapsedMs - targetDurationMs) / 60000;
-	const activityName = normalizeStravaText(activity.name);
-	const expectedName = normalizeStravaText(targetTitle);
-	const typeValue = normalizeStravaText(activity.type) || normalizeStravaText(activity.sport_type);
-
-	let score = startDiffMinutes * 3 + durationDiffMinutes * 1.25;
-	if (typeValue.includes('weight')) score -= 30;
-	if (activityName.includes('strength training')) score -= 18;
-	if (activityName.includes('workout')) score -= 6;
-	if (activityName === expectedName) score -= 40;
-	else if (activityName.includes(expectedName) || expectedName.includes(activityName)) score -= 18;
-	if (startDiffMinutes <= 20) score -= 12;
-	if (startDiffMinutes <= 90) score -= 6;
-	return score;
-}
-
-async function findClosestExistingActivity(
-	accessToken: string,
-	workout: WorkoutRow,
-	sets: SetRow[]
-): Promise<string | null> {
-	const targetStart = workout.start_time;
-	const targetEnd = workout.end_time;
-	const targetDurationMs = Math.max(1, targetEnd - targetStart);
-	const targetTitle = buildWorkoutUploadPayload(workout, sets).title;
-	const after = Math.max(0, Math.floor((targetStart - 7 * 24 * 60 * 60 * 1000) / 1000));
-	const before = Math.floor((targetEnd + 7 * 24 * 60 * 60 * 1000) / 1000);
-	const activities = await listStravaActivities(accessToken, after, before);
-	let bestActivityId: string | null = null;
-	let bestScore = Number.POSITIVE_INFINITY;
-	for (const activity of activities) {
-		const score = scoreApproximateActivityMatch(workout, activity, targetTitle, targetDurationMs);
-		if (score < bestScore) {
-			bestScore = score;
-			bestActivityId = String(activity.id);
-		}
-	}
-	if (bestActivityId == null) return null;
-	if (!Number.isFinite(bestScore) || bestScore > 240) return null;
-	return bestActivityId;
-}
-
 async function waitForUploadActivityId(accessToken: string, uploadId: string): Promise<string> {
 	for (let attempt = 0; attempt < 20; attempt += 1) {
 		const status = await getUploadStatus(accessToken, uploadId);
@@ -672,7 +710,7 @@ async function getWorkoutAndSets(
 	workoutId: string
 ): Promise<{ workout: WorkoutRow; sets: SetRow[]; sourceUpdatedAt: number } | null> {
 	const workout = await db
-		.prepare('SELECT id, start_time, end_time, updated_at, notes, location_lat, location_lng, location_label FROM workouts WHERE id = ? AND user_id = ?')
+		.prepare('SELECT id, start_time, end_time, updated_at, notes, activity_type, location_lat, location_lng, location_label FROM workouts WHERE id = ? AND user_id = ?')
 		.bind(workoutId, userId)
 		.first<WorkoutRow>();
 	if (!workout) return null;
@@ -695,6 +733,91 @@ async function getWorkoutAndSets(
 	};
 }
 
+async function getLastImportedCardioSyncedAt(db: D1Database, userId: string): Promise<number> {
+	const row = await db
+		.prepare(
+			`SELECT COALESCE(MAX(updated_at), 0) AS last_synced_at
+			 FROM workouts
+			 WHERE user_id = ?
+			   AND activity_type IS NOT NULL
+			   AND activity_type != 'Strength Training'`
+		)
+		.bind(userId)
+		.first<{ last_synced_at: number }>();
+	return row?.last_synced_at ?? 0;
+}
+
+function mapCardioActivityToWorkout(activity: StravaActivityRow, userId: string): WorkoutRow & { activity_type: string | null } {
+	const startTime = activity.start_date ? Date.parse(activity.start_date) : Date.now();
+	const elapsedSeconds = activity.elapsed_time ?? activity.moving_time ?? 0;
+	const endTime = startTime + Math.max(1, elapsedSeconds) * 1000;
+	return {
+		id: `strava-${activity.id}`,
+		start_time: Number.isFinite(startTime) ? startTime : Date.now(),
+		end_time: Number.isFinite(endTime) ? endTime : Date.now() + 1000,
+		updated_at: Date.now(),
+		notes: activity.name,
+		activity_type: normalizeCardioActivityType(activity),
+		location_lat: null,
+		location_lng: null,
+		location_label: null,
+	};
+}
+
+async function upsertImportedCardioWorkout(db: D1Database, userId: string, activity: StravaActivityRow): Promise<void> {
+	const workout = mapCardioActivityToWorkout(activity, userId);
+	await db
+		.prepare(
+			`INSERT INTO workouts (id, server_id, user_id, start_time, end_time, notes, activity_type, location_lat, location_lng, location_label, synced, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+			 ON CONFLICT(id) DO UPDATE SET
+			   server_id = excluded.server_id,
+			   start_time = excluded.start_time,
+			   end_time = excluded.end_time,
+			   notes = excluded.notes,
+			   activity_type = excluded.activity_type,
+			   location_lat = excluded.location_lat,
+			   location_lng = excluded.location_lng,
+			   location_label = excluded.location_label,
+			   synced = 1,
+			   updated_at = excluded.updated_at`
+		)
+		.bind(
+			workout.id,
+			String(activity.id),
+			userId,
+			workout.start_time,
+			workout.end_time,
+			workout.notes,
+			workout.activity_type,
+			workout.location_lat,
+			workout.location_lng,
+			workout.location_label,
+			workout.updated_at,
+			workout.updated_at
+		)
+		.run();
+}
+
+export async function syncCardioWorkoutsFromStrava(
+	db: D1Database,
+	platform: App.Platform | undefined,
+	userId: string
+): Promise<number> {
+	const accessToken = await getValidAccessToken(db, platform, userId);
+	const lastSyncedAt = await getLastImportedCardioSyncedAt(db, userId);
+	const after = Math.max(0, Math.floor((lastSyncedAt - 2 * 60 * 60 * 1000) / 1000));
+	const before = Math.floor(Date.now() / 1000);
+	const activities = await listStravaActivities(accessToken, after, before);
+	let imported = 0;
+	for (const activity of activities) {
+		if (isStrengthActivity(activity)) continue;
+		await upsertImportedCardioWorkout(db, userId, activity);
+		imported += 1;
+	}
+	return imported;
+}
+
 async function getSyncMap(db: D1Database, workoutId: string, userId: string): Promise<SyncMapRow | null> {
 	const row = await db
 		.prepare(
@@ -715,7 +838,7 @@ async function saveSyncMap(
 	userId: string,
 	workoutId: string,
 	activityId: string,
-	uploadId: string,
+	uploadId: string | null,
 	sourceUpdatedAt: number
 ): Promise<void> {
 	const now = Date.now();
