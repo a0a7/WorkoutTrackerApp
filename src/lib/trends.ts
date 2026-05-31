@@ -392,10 +392,10 @@ export function getChartThemePalette(isDark: boolean): ChartThemePalette {
       };
 }
 
-function svgHeader(width: number, height: number, title: string, subtitle: string, palette: ChartThemePalette, includeBackground = true): string {
+function svgHeader(width: number, height: number, title: string, subtitle: string, palette: ChartThemePalette, includeBackground = true, responsive = true): string {
   const hasSubtitle = subtitle.trim().length > 0;
   return `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${escapeXml(title)}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${escapeXml(title)}" preserveAspectRatio="xMidYMid meet" style="width:${responsive ? '100%' : `${width}px`};${responsive ? 'height:auto;display:block;' : 'height:auto;display:block;max-width:none;'}">
   <style>
     .bg { fill: ${palette.background}; }
     .panel { fill: ${palette.panel}; }
@@ -481,7 +481,8 @@ export function renderSeriesChartSvg(options: {
   const linePath: string[] = [];
   const smoothValues = options.format === 'moving-average'
     ? options.values.map((value, index) => {
-        const window = options.values.slice(Math.max(0, index - 1), Math.min(options.values.length, index + 2));
+        const windowRadius = 2;
+        const window = options.values.slice(Math.max(0, index - windowRadius), Math.min(options.values.length, index + windowRadius + 1));
         return window.reduce((sum, current) => sum + current, 0) / Math.max(1, window.length);
       })
     : options.values;
@@ -505,11 +506,16 @@ export function renderSeriesChartSvg(options: {
       }
       svg += `
   <circle cx="${x}" cy="${pointY}" r="4.5" fill="${accent}" />
+`;
+      if (options.format !== 'scatter' || i % Math.max(1, Math.ceil(points / 10)) === 0 || i === points - 1) {
+        svg += `
   <text class="small" x="${x}" y="${Math.max(top + 12, pointY - 8)}" text-anchor="middle">${escapeXml(formatChartValue(value, options.metric))}</text>
 `;
+      }
     }
 
-    const showLabel = points <= 8 || i % Math.max(1, Math.ceil(points / 8)) === 0 || i === points - 1;
+    const labelCadence = options.format === 'scatter' ? 6 : 8;
+    const showLabel = points <= labelCadence || i % Math.max(1, Math.ceil(points / labelCadence)) === 0 || i === points - 1;
     if (showLabel) {
       svg += `<text class="small" x="${x}" y="${height - 18}" text-anchor="middle">${escapeXml(label)}</text>`;
     }
@@ -535,6 +541,7 @@ export function renderCalendarSvg(options: {
   theme?: ChartThemePalette;
   includeBackground?: boolean;
   compact?: boolean;
+  responsive?: boolean;
 }): string {
   const compact = options.compact ?? false;
   const cellSize = compact ? 12 : 13;
@@ -548,7 +555,8 @@ export function renderCalendarSvg(options: {
   const width = left + weeks * weekWidth + (compact ? 12 : 24);
   const height = top + 7 * weekWidth + bottom;
   const palette = options.theme ?? getChartThemePalette(true);
-  let svg = svgHeader(width, height, options.title, options.subtitle, palette, options.includeBackground ?? true);
+  const responsive = options.responsive ?? true;
+  let svg = svgHeader(width, height, options.title, options.subtitle, palette, options.includeBackground ?? true, responsive);
   const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   weekdayLabels.forEach((label, index) => {
     if (index % 2 === 0) {

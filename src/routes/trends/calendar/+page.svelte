@@ -33,6 +33,7 @@
       subtitle: '',
       cells: view.cells,
       theme: palette,
+      responsive: false,
     });
   });
 </script>
@@ -71,7 +72,9 @@
       <div class="rounded-2xl border border-dashed border-[hsl(var(--border))] p-8 text-sm text-[hsl(var(--muted-foreground))]">Loading calendar...</div>
     {:else}
       <div class="overflow-x-auto rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 shadow-inner">
-        {@html calendarSvg()}
+        <div class="min-w-max">
+          {@html calendarSvg()}
+        </div>
       </div>
       <div class="mt-4 flex gap-2">
         <button class="inline-flex items-center gap-2 rounded-full border border-[hsl(var(--border))] px-3 py-2 text-xs font-semibold text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--accent))]" onclick={() => downloadSvg(calendarSvg(), `trends-calendar-${calendarMode}.svg`)}>Save</button>
