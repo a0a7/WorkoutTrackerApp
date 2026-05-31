@@ -5,8 +5,10 @@
   import type { Exercise } from '../types';
   import { EXERCISE_MAP } from '../exercises';
   import { openKeypad, closeKeypad, keypadConfig } from '$lib/stores/keypadStore';
+  import { unitPreference } from '$lib/stores/userStore';
 
   const TOUCH_MOVEMENT_THRESHOLD_PX = 10;
+  const currentWeightUnit = $derived($unitPreference);
 
   let {
     set,
@@ -224,6 +226,7 @@
             exerciseName: set.exerciseName,
             reps,
             weight,
+            weightUnit: currentWeightUnit,
             order: set.order + i,
             createdAt: now + i,
           }));
@@ -405,6 +408,7 @@
           exerciseName: resolvedExercise.exerciseName,
           reps,
           weight,
+          weightUnit: currentWeightUnit,
           order: set.order,
           createdAt: Date.now(),
         };
@@ -435,6 +439,7 @@
         exerciseName: resolvedExercise.exerciseName,
         reps,
         weight,
+        weightUnit: currentWeightUnit,
         order: set.order,
         createdAt: Date.now(),
       };
@@ -653,7 +658,7 @@
 >
   <!-- Set number / select -->
   <td class="w-10 py-0 align-middle">
-    <div class="h-[100%] w-[calc(100%+16px)] -ml-6">
+    <div class="h-full w-[calc(100%+16px)] -ml-6">
     {#if isEmpty}
       {#if hasDraftContent()}
         <button
@@ -776,7 +781,7 @@
 
   <!-- Delete / commit -->
   <td class="w-12 py-0 align-middle">
-      <div class={isEmpty ? 'px-4 h-full min-h-[2rem]' : 'h-full min-h-[2rem] w-[calc(100%+32px)]'}>
+      <div class={isEmpty ? 'px-4 h-full min-h-8' : 'h-full min-h-8 w-[calc(100%+32px)]'}>
     {#if !isEmpty}
       <div class="flex h-full items-center justify-center">
         <button

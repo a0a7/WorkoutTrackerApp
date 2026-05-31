@@ -2,6 +2,7 @@
   import type { Workout } from '../types';
   import { EXERCISE_MAP } from '../exercises';
   import { timeFormatPreference } from '$lib/stores/userStore';
+  import { formatWorkoutLocation } from '$lib/location';
 
   let { workout }: { workout: Workout } = $props();
 
@@ -44,6 +45,13 @@
     <div>
       <p class="font-semibold text-[hsl(var(--foreground))]">{dateLabel}</p>
       <p class="text-sm text-[hsl(var(--muted-foreground))]">{timeLabel}</p>
+      {#if workout.location}
+        <p class="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+          <span class="inline-flex items-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-0.5 font-medium text-[hsl(var(--foreground))]">
+            {formatWorkoutLocation(workout.location)}
+          </span>
+        </p>
+      {/if}
     </div>
     <div class="text-right">
       <p class="text-sm font-medium text-[hsl(var(--foreground))]">

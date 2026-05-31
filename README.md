@@ -40,7 +40,7 @@ Sign up at [cloudflare.com](https://cloudflare.com) if you don't have one.
 4. Note the **Database ID** shown on the database page.
 5. Click on the database → **Console** tab.
 6. Paste and run the contents of `migrations/001_init.sql` in the SQL console. This creates the tables.
-7. Run `migrations/002_workouts_updated_at.sql` and `migrations/003_strava_sync.sql`.
+7. Run `migrations/002_workouts_updated_at.sql`, `migrations/003_strava_sync.sql`, and `migrations/004_strava_strength_training_json.sql`.
 
 ### Step 3: Create the KV Namespace
 
@@ -68,6 +68,7 @@ Sign up at [cloudflare.com](https://cloudflare.com) if you don't have one.
    - `STRAVA_CLIENT_ID`
    - `STRAVA_CLIENT_SECRET`
    - `STRAVA_REDIRECT_URI` (example: `https://<your-project>.pages.dev/api/strava/callback`)
+   - No extra secret is required for the one-off duration repair endpoint; it uses your authenticated account.
 
 Your app will be live at `https://<your-project>.pages.dev`.
 
@@ -114,6 +115,7 @@ For local testing with the full Cloudflare Workers environment:
 npx wrangler d1 execute workout-tracker-db --local --file=migrations/001_init.sql
 npx wrangler d1 execute workout-tracker-db --local --file=migrations/002_workouts_updated_at.sql
 npx wrangler d1 execute workout-tracker-db --local --file=migrations/003_strava_sync.sql
+npx wrangler d1 execute workout-tracker-db --local --file=migrations/004_strava_strength_training_json.sql
 
 # Build and run with wrangler (simulates the production environment)
 npm run build

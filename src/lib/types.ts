@@ -46,6 +46,7 @@ export interface WorkoutSet {
 	exerciseName: string;
 	reps: number | null;
 	weight: number | null;
+	weightUnit?: 'lbs' | 'kg';
 	notes?: string;
 	order: number;
 	createdAt: number;

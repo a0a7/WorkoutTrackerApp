@@ -13,19 +13,25 @@ type WorkoutRow = {
 	start_time: number;
 	end_time: number;
 	updated_at: number;
+	notes: string | null;
+	location_lat: number | null;
+	location_lng: number | null;
+	location_label: string | null;
 };
 
 type SetRow = {
 	exercise_name: string;
 	reps: number | null;
 	weight: number | null;
+	weight_unit: string | null;
 	sort_order: number;
 	created_at: number;
 	updated_at: number;
 };
 
 type SyncMapRow = {
-	strava_activity_id: number;
+	strava_activity_id: string;
+	upload_id: string | null;
 	source_updated_at: number;
 };
 
@@ -259,85 +265,317 @@ function dayPeriodTitlePart(startTime: number): string {
 	return 'Night';
 }
 
+type StrengthTrainingUploadSet = {
+	exercise_type: string;
+	repetitions?: number;
+	weight?: number;
+	duration?: number;
+	start_time?: string;
+};
+
+type StrengthTrainingUpload = {
+	version: '1.0';
+	start_time: string;
+	utc_offset: number;
+	elapsed_time: number;
+	creator: { name: string };
+	sets: StrengthTrainingUploadSet[];
+	description?: string;
+};
+
 function formatSetPart(set: SetRow): string {
 	const reps = set.reps;
 	const weight = set.weight;
-	if (reps != null && weight != null) return `${reps}x${weight}`;
+	const unit = set.weight_unit === 'kg' ? 'kg' : 'lbs';
+	if (reps != null && weight != null) return `${reps}x${weight} ${unit}`;
 	if (reps != null) return `${reps} reps`;
-	if (weight != null) return `${weight}`;
+	if (weight != null) return `${weight} ${unit}`;
 	return '';
 }
 
-function buildWorkoutSummary(workout: WorkoutRow, sets: SetRow[]): { name: string; description: string } {
-	const grouped = new Map<string, SetRow[]>();
-	for (const s of sets) {
-		const list = grouped.get(s.exercise_name) ?? [];
-		list.push(s);
-		grouped.set(s.exercise_name, list);
+function toKg(weight: number, unit: string | null): number {
+	return unit === 'kg' ? weight : weight * 0.45359237;
+}
+
+function describeLocation(workout: WorkoutRow): string | null {
+	if (workout.location_label) return workout.location_label;
+	if (workout.location_lat != null && workout.location_lng != null) {
+		return `${workout.location_lat.toFixed(5)}, ${workout.location_lng.toFixed(5)}`;
 	}
+	return null;
+}
+
+function resolveStravaExerciseType(name: string): string {
+	const normalized = name.trim().toLowerCase();
+
+	if (normalized.includes('bench press') || normalized.includes('chest press') || normalized.includes('floor press')) {
+		if (normalized.includes('incline') && normalized.includes('dumbbell')) return 'INCLINE_DUMBBELL_BENCH_PRESS';
+		if (normalized.includes('incline') && normalized.includes('barbell')) return 'INCLINE_BARBELL_BENCH_PRESS';
+		if (normalized.includes('decline') && normalized.includes('dumbbell')) return 'DECLINE_DUMBBELL_BENCH_PRESS';
+		if (normalized.includes('close-grip') && normalized.includes('barbell')) return 'CLOSE_GRIP_BARBELL_BENCH_PRESS';
+		if (normalized.includes('wide') && normalized.includes('barbell')) return 'WIDE_GRIP_BARBELL_BENCH_PRESS';
+		if (normalized.includes('neutral') && normalized.includes('dumbbell')) return 'NEUTRAL_GRIP_DUMBBELL_BENCH_PRESS';
+		if (normalized.includes('floor') && normalized.includes('dumbbell')) return 'DUMBBELL_FLOOR_PRESS';
+		if (normalized.includes('floor') && normalized.includes('barbell')) return 'FLOOR_BENCH_PRESS';
+		if (normalized.includes('smith') && normalized.includes('incline')) return 'SMITH_MACHINE_INCLINE_BENCH_PRESS';
+		if (normalized.includes('machine') && normalized.includes('incline')) return 'MACHINE_INCLINE_CHEST_PRESS';
+		if (normalized.includes('machine') && normalized.includes('decline')) return 'MACHINE_DECLINE_BENCH_PRESS';
+		if (normalized.includes('machine')) return 'MACHINE_CHEST_PRESS';
+		if (normalized.includes('dumbbell')) return 'DUMBBELL_BENCH_PRESS';
+		if (normalized.includes('barbell')) return 'BARBELL_BENCH_PRESS';
+		return 'BENCH_PRESS_GENERIC';
+	}
+
+	if (normalized.includes('deadlift')) {
+		if (normalized.includes('romanian')) return 'ROMANIAN_DEADLIFTS';
+		if (normalized.includes('stiff-leg')) return 'BARBELL_STRAIGHT_LEG_DEADLIFT';
+		if (normalized.includes('trap bar')) return 'TRAP_BAR_DEADLIFT';
+		if (normalized.includes('sumo')) return 'SUMO_DEADLIFT';
+		if (normalized.includes('dumbbell')) return 'DUMBBELL_DEADLIFT';
+		if (normalized.includes('barbell')) return 'BARBELL_DEADLIFT';
+		return 'DEADLIFT_GENERIC';
+	}
+
+	if (normalized.includes('row')) {
+		if (normalized.includes('landmine')) return 'LANDMINE_ROW';
+		if (normalized.includes('seal')) return 'SEAL_ROW';
+		if (normalized.includes('meadows')) return 'MEADOWS_ROW';
+		if (normalized.includes('chest-supported')) return 'CHEST_SUPPORTED_ROW';
+		if (normalized.includes('hammer strength')) return 'MACHINE_CHEST_SUPPORTED_ROW';
+		if (normalized.includes('cable') && normalized.includes('wide')) return 'SEATED_CABLE_ROW';
+		if (normalized.includes('cable')) return 'SEATED_CABLE_ROW';
+		if (normalized.includes('machine')) return 'MACHINE_SEATED_ROW';
+		if (normalized.includes('t-bar')) return 'T_BAR_ROW';
+		if (normalized.includes('barbell')) return 'BENT_OVER_BARBELL_ROW';
+		if (normalized.includes('dumbbell') || normalized.includes('single-arm')) return 'DUMBBELL_ROW';
+		return 'ROW_GENERIC';
+	}
+
+	if (normalized.includes('pull-up') || normalized.includes('chin-up') || normalized.includes('lat pulldown') || normalized.includes('pull down')) {
+		if (normalized.includes('weighted') && normalized.includes('chin')) return 'WEIGHTED_CHIN_UP';
+		if (normalized.includes('weighted') && normalized.includes('pull')) return 'WIDE_PULL_UP';
+		if (normalized.includes('assisted') && normalized.includes('chin')) return 'ASSISTED_CHIN_UP';
+		if (normalized.includes('neutral')) return 'NEUTRAL_GRIP_LAT_PULLDOWN';
+		if (normalized.includes('underhand')) return 'UNDERHAND_LAT_PULLDOWN';
+		if (normalized.includes('wide')) return 'WIDE_PULL_UP';
+		if (normalized.includes('cable') && normalized.includes('close')) return 'CABLE_LAT_PULLDOWN_CLOSE_GRIP';
+		if (normalized.includes('straight-arm')) return 'STRAIGHT_ARM_PULLDOWN';
+		if (normalized.includes('pull-up') || normalized.includes('pull up')) return 'PULL_UP_GENERIC';
+		return 'LAT_PULLDOWN';
+	}
+
+	if (normalized.includes('curl')) {
+		if (normalized.includes('hammer')) return 'DUMBBELL_HAMMER_CURL';
+		if (normalized.includes('ez-bar') && normalized.includes('preacher')) return 'EZ_BAR_PREACHER_CURL';
+		if (normalized.includes('preacher') && normalized.includes('machine')) return 'PREACHER_CURL_MACHINE';
+		if (normalized.includes('barbell')) return 'BARBELL_BICEPS_CURL';
+		if (normalized.includes('cable') && normalized.includes('reverse')) return 'REVERSE_CABLE_CURLS';
+		if (normalized.includes('cable')) return 'CABLE_BICEPS_CURL';
+		if (normalized.includes('reverse')) return 'BARBELL_REVERSE_CURL';
+		return 'CURL_GENERIC';
+	}
+
+	if (normalized.includes('tricep') || normalized.includes('triceps') || normalized.includes('skull crusher') || normalized.includes('dip')) {
+		if (normalized.includes('chest dip')) return 'CHEST_DIP';
+		if (normalized.includes('bodyweight') && normalized.includes('dip')) return 'BODY_WEIGHT_DIP';
+		if (normalized.includes('machine') && normalized.includes('dip')) return 'SEATED_DIP_MACHINE';
+		if (normalized.includes('pushdown') && normalized.includes('rope')) return 'CABLE_TRICEPS_PUSHDOWN';
+		if (normalized.includes('pushdown')) return 'TRICEPS_PRESSDOWN';
+		if (normalized.includes('overhead') && normalized.includes('dumbbell')) return 'OVERHEAD_DUMBBELL_TRICEPS_EXTENSION';
+		if (normalized.includes('cable') && normalized.includes('overhead')) return 'CABLE_OVERHEAD_TRICEPS_EXTENSION';
+		if (normalized.includes('skull crusher') && normalized.includes('dumbbell')) return 'DUMBBELL_SKULLCRUSHER';
+		if (normalized.includes('skull crusher')) return 'SKULL_CRUSHER';
+		return 'TRICEPS_EXTENSION_GENERIC';
+	}
+
+	if (normalized.includes('squat') || normalized.includes('leg press') || normalized.includes('step up') || normalized.includes('bulgarian split') || normalized.includes('pistol')) {
+		if (normalized.includes('front squat')) return 'BARBELL_FRONT_SQUAT';
+		if (normalized.includes('back squat')) return 'BARBELL_BACK_SQUAT';
+		if (normalized.includes('goblet')) return 'GOBLET_SQUAT';
+		if (normalized.includes('hack')) return 'MACHINE_HACK_SQUAT';
+		if (normalized.includes('smith')) return 'SMITH_MACHINE_SQUAT';
+		if (normalized.includes('leg press')) return 'LEG_PRESS';
+		if (normalized.includes('bulgarian')) return 'BARBELL_BULGARIAN_SPLIT_SQUAT';
+		if (normalized.includes('step up')) return 'STEP_UP';
+		if (normalized.includes('pistol')) return 'PISTOL_SQUAT';
+		if (normalized.includes('lunge')) return 'BARBELL_LUNGE';
+		if (normalized.includes('zercher')) return 'ZERCHER_SQUAT';
+		return 'SQUAT_GENERIC';
+	}
+
+	if (normalized.includes('hip thrust') || normalized.includes('glute bridge') || normalized.includes('hip bridge')) {
+		if (normalized.includes('machine')) return 'HIP_RAISE';
+		if (normalized.includes('barbell')) return 'BARBELL_HIP_THRUST';
+		if (normalized.includes('dumbbell')) return 'DUMBBELL_HIP_THRUST';
+		return 'GLUTE_BRIDGE';
+	}
+
+	if (normalized.includes('calf raise')) {
+		if (normalized.includes('seated')) return 'SEATED_CALF_RAISE';
+		if (normalized.includes('machine')) return 'MACHINE_CALF_EXTENSION';
+		if (normalized.includes('standing')) return 'STANDING_CALF_RAISE';
+		return 'CALF_RAISE_GENERIC';
+	}
+
+	if (normalized.includes('lateral raise') || normalized.includes('front raise') || normalized.includes('rear delt fly') || normalized.includes('rear delt machine') || normalized.includes('upright row')) {
+		if (normalized.includes('cable') && normalized.includes('rear')) return 'CABLE_REAR_DELT_FLY';
+		if (normalized.includes('cable') && normalized.includes('lateral')) return 'CABLE_LATERAL_RAISE';
+		if (normalized.includes('machine') && normalized.includes('rear')) return 'MACHINE_REAR_DELT_REVERSE_FLY';
+		if (normalized.includes('machine') && normalized.includes('lateral')) return 'MACHINE_LATERAL_RAISE';
+		if (normalized.includes('front')) return 'PLATE_FRONT_RAISE';
+		if (normalized.includes('rear')) return 'DUMBBELL_REAR_DELT_FLY';
+		return 'LATERAL_RAISE_GENERIC';
+	}
+
+	if (normalized.includes('clean') || normalized.includes('snatch') || normalized.includes('jerk') || normalized.includes('thruster')) {
+		if (normalized.includes('clean and jerk')) return 'CLEAN_AND_JERK';
+		if (normalized.includes('power snatch')) return 'BARBELL_POWER_SNATCH';
+		if (normalized.includes('power clean')) return 'BARBELL_POWER_CLEAN';
+		if (normalized.includes('hang clean')) return 'BARBELL_HANG_POWER_CLEAN';
+		if (normalized.includes('snatch')) return 'BARBELL_SNATCH';
+		if (normalized.includes('clean')) return 'CLEAN';
+		if (normalized.includes('thruster')) return 'THRUSTERS';
+		return 'OLYMPIC_LIFT_GENERIC';
+	}
+
+	if (normalized.includes('carry')) {
+		if (normalized.includes('suitcase')) return 'SUITCASE_CARRY';
+		if (normalized.includes('farmer')) return 'FARMERS_CARRY';
+		return 'CARRY_GENERIC';
+	}
+
+	if (normalized.includes('plank') || normalized.includes('crunch') || normalized.includes('sit-up') || normalized.includes('sit up') || normalized.includes('leg raise') || normalized.includes('ab wheel') || normalized.includes('pallof') || normalized.includes('russian twist') || normalized.includes('wood chop') || normalized.includes('hollow') || normalized.includes('dragon flag')) {
+		if (normalized.includes('ab wheel')) return 'AB_WHEEL_ROLLOUT';
+		if (normalized.includes('pallof')) return 'PALLOF_PRESS';
+		if (normalized.includes('russian twist')) return 'RUSSIAN_TWIST';
+		if (normalized.includes('sit-up') || normalized.includes('sit up')) return 'SIT_UP_GENERIC';
+		if (normalized.includes('leg raise') && normalized.includes('hanging')) return 'HANGING_KNEE_RAISE';
+		if (normalized.includes('leg raise')) return 'LYING_KNEE_RAISE';
+		if (normalized.includes('plank') && normalized.includes('side')) return 'SIDE_PLANK_HOLD';
+		if (normalized.includes('plank')) return 'PLANK_HOLD';
+		if (normalized.includes('crunch')) return 'CRUNCH';
+		if (normalized.includes('wood chop')) return 'CABLE_WOODCHOP';
+		if (normalized.includes('dragon flag')) return 'DRAGON_FLAG';
+		if (normalized.includes('hollow')) return 'HOLLOW_ROCK';
+		return 'CORE_GENERIC';
+	}
+
+	if (normalized.includes('push-up') || normalized.includes('push up') || normalized.includes('dip') || normalized.includes('muscle up') || normalized.includes('inverted row')) {
+		if (normalized.includes('handstand')) return 'HANDSTAND_PUSH_UP';
+		if (normalized.includes('muscle up')) return 'MUSCLE_UP';
+		if (normalized.includes('ring dip')) return 'RING_DIP';
+		if (normalized.includes('inverted row')) return 'INVERTED_ROW';
+		if (normalized.includes('push-up')) return 'PUSH_UP_GENERIC';
+		return 'BODY_WEIGHT_DIP';
+	}
+
+	if (normalized.includes('battle rope')) return 'BATTLE_ROPES';
+	if (normalized.includes('rowing machine')) return 'ROWING_MACHINE';
+	if (normalized.includes('sled push')) return 'SLED_PUSH';
+
+	return 'TOTAL_BODY_GENERIC';
+}
+
+function buildWorkoutUploadPayload(workout: WorkoutRow, sets: SetRow[]): { payload: StrengthTrainingUpload; title: string; description: string } {
+	const orderedExercises = new Map<string, SetRow[]>();
+	for (const set of sets) {
+		const exerciseSets = orderedExercises.get(set.exercise_name) ?? [];
+		exerciseSets.push(set);
+		orderedExercises.set(set.exercise_name, exerciseSets);
+	}
+
+	const uploadSets: StrengthTrainingUploadSet[] = [];
 	const lines: string[] = [];
-	for (const [exercise, exSets] of grouped.entries()) {
-		const ordered = [...exSets].sort((a, b) => a.sort_order - b.sort_order || a.created_at - b.created_at);
-		const allSame =
-			ordered.length > 0 &&
-			ordered.every((s) => s.reps === ordered[0].reps && s.weight === ordered[0].weight) &&
-			ordered[0].reps != null &&
-			ordered[0].weight != null;
-		const detail = allSame
-			? `${ordered.length}x${ordered[0].reps}x${ordered[0].weight}`
-			: ordered.map(formatSetPart).filter(Boolean).join(', ');
-		lines.push(`${exercise}: ${detail}`);
+	for (const [exercise, exerciseSets] of orderedExercises.entries()) {
+		const ordered = [...exerciseSets].sort((a, b) => a.sort_order - b.sort_order || a.created_at - b.created_at);
+		for (const set of ordered) {
+			const uploadSet: StrengthTrainingUploadSet = {
+				exercise_type: resolveStravaExerciseType(exercise)
+			};
+			if (set.reps != null) uploadSet.repetitions = set.reps;
+			if (set.weight != null) uploadSet.weight = Number(toKg(set.weight, set.weight_unit).toFixed(2));
+			uploadSets.push(uploadSet);
+		}
+		lines.push(`${exercise}: ${ordered.map(formatSetPart).filter(Boolean).join(', ')}`);
 	}
-	const title = `${dayPeriodTitlePart(workout.start_time)} Weightlifting - ${sets.length} Sets`;
-	const description = `${lines.join('\n')}\n\nUnits: lbs · Automatically synced from Logbook`;
-	return { name: title, description };
+
+	const location = describeLocation(workout);
+	if (location) {
+		lines.unshift(`Location: ${location}`);
+	}
+	if (workout.notes) {
+		lines.unshift(`Notes: ${workout.notes}`);
+	}
+
+	const title = `${dayPeriodTitlePart(workout.start_time)} Strength Training - ${sets.length} Sets`;
+	const description = `${lines.join('\n')}\n\nSynced from WorkoutTrackerApp`;
+	const payload: StrengthTrainingUpload = {
+		version: '1.0',
+		start_time: new Date(workout.start_time).toISOString(),
+		utc_offset: 0,
+		elapsed_time: Math.max(1, Math.round((workout.end_time - workout.start_time) / 1000)),
+		creator: { name: 'WorkoutTrackerApp' },
+		sets: uploadSets,
+		description
+	};
+	return { payload, title, description };
 }
 
-async function stravaCreateActivity(
+async function createStrengthTrainingUpload(
 	accessToken: string,
-	input: { name: string; description: string; startTime: number; elapsedSec: number }
-): Promise<number> {
-	const body = new URLSearchParams({
-		name: input.name,
-		type: 'WeightTraining',
-		sport_type: 'WeightTraining',
-		start_date_local: new Date(input.startTime).toISOString(),
-		elapsed_time: String(Math.max(1, input.elapsedSec)),
-		description: input.description,
-		trainer: '1'
-	});
-	const res = await fetch(`${STRAVA_API_BASE}/activities`, {
+	input: { name: string; description: string; payload: StrengthTrainingUpload; workoutId: string }
+): Promise<{ uploadId: string; activityId: string }> {
+	const formData = new FormData();
+	formData.set('name', input.name);
+	formData.set('description', input.description);
+	formData.set('trainer', '1');
+	formData.set('commute', '0');
+	formData.set('activity_type', 'WeightTraining');
+	formData.set('data_type', 'json');
+	formData.set('external_id', input.workoutId);
+	formData.set('file', new Blob([JSON.stringify(input.payload)], { type: 'application/json' }), 'strength-training.json');
+
+	const res = await fetch(`${STRAVA_API_BASE}/uploads`, {
 		method: 'POST',
-		headers: {
-			Authorization: `Bearer ${accessToken}`,
-			'Content-Type': 'application/x-www-form-urlencoded'
-		},
-		body
+		headers: { Authorization: `Bearer ${accessToken}` },
+		body: formData
 	});
-	if (!res.ok) throw error(502, `Strava create failed (${res.status})`);
-	const json = (await res.json()) as { id: number };
-	return json.id;
+	if (!res.ok) throw error(502, `Strava upload failed (${res.status})`);
+	const json = (await res.json()) as { id?: number; id_str?: string; activity_id?: number | null; error?: string | null; status?: string };
+	if (json.error) throw error(502, `Strava upload failed: ${json.error}`);
+	const uploadId = json.id_str ?? (json.id != null ? String(json.id) : '');
+	if (!uploadId) throw error(502, 'Strava upload did not return an upload id');
+	return { uploadId, activityId: json.activity_id != null ? String(json.activity_id) : '' };
 }
 
-async function stravaUpdateActivity(
+async function getUploadStatus(
 	accessToken: string,
-	activityId: number,
-	input: { name: string; description: string; type: string }
-): Promise<void> {
-	const body = new URLSearchParams({
-		name: input.name,
-		description: input.description,
-		type: input.type
+	uploadId: string
+): Promise<{ uploadId: string; activityId: string | null; status: string; error: string | null }> {
+	const res = await fetch(`${STRAVA_API_BASE}/uploads/${encodeURIComponent(uploadId)}`, {
+		headers: { Authorization: `Bearer ${accessToken}` }
 	});
-	const res = await fetch(`${STRAVA_API_BASE}/activities/${activityId}`, {
-		method: 'PUT',
-		headers: {
-			Authorization: `Bearer ${accessToken}`,
-			'Content-Type': 'application/x-www-form-urlencoded'
-		},
-		body
-	});
-	if (!res.ok) throw error(502, `Strava update failed (${res.status})`);
+	if (!res.ok) throw error(502, `Strava upload status failed (${res.status})`);
+	const json = (await res.json()) as { id?: number; id_str?: string; activity_id?: number | null; status?: string; error?: string | null };
+	return {
+		uploadId: json.id_str ?? (json.id != null ? String(json.id) : uploadId),
+		activityId: json.activity_id != null ? String(json.activity_id) : null,
+		status: json.status ?? '',
+		error: json.error ?? null
+	};
+}
+
+async function waitForUploadActivityId(accessToken: string, uploadId: string): Promise<string> {
+	for (let attempt = 0; attempt < 20; attempt += 1) {
+		const status = await getUploadStatus(accessToken, uploadId);
+		if (status.error) throw error(502, `Strava upload failed: ${status.error}`);
+		if (status.activityId) return status.activityId;
+		if (status.status && !status.status.includes('still being processed')) {
+			throw error(502, `Strava upload did not complete: ${status.status}`);
+		}
+		await new Promise((resolve) => setTimeout(resolve, 1000));
+	}
+	throw error(504, 'Timed out waiting for Strava to process the upload');
 }
 
 async function getWorkoutAndSets(
@@ -346,13 +584,13 @@ async function getWorkoutAndSets(
 	workoutId: string
 ): Promise<{ workout: WorkoutRow; sets: SetRow[]; sourceUpdatedAt: number } | null> {
 	const workout = await db
-		.prepare('SELECT id, start_time, end_time, updated_at FROM workouts WHERE id = ? AND user_id = ?')
+		.prepare('SELECT id, start_time, end_time, updated_at, notes, location_lat, location_lng, location_label FROM workouts WHERE id = ? AND user_id = ?')
 		.bind(workoutId, userId)
 		.first<WorkoutRow>();
 	if (!workout) return null;
 	const setRows = await db
 		.prepare(
-			`SELECT exercise_name, reps, weight, sort_order, created_at, updated_at
+			`SELECT exercise_name, reps, weight, weight_unit, sort_order, created_at, updated_at
        FROM sets
        WHERE user_id = ? AND local_workout_id = ? AND deleted = 0
        ORDER BY created_at ASC, sort_order ASC`
@@ -370,36 +608,42 @@ async function getWorkoutAndSets(
 }
 
 async function getSyncMap(db: D1Database, workoutId: string, userId: string): Promise<SyncMapRow | null> {
-	return (
-		(await db
-			.prepare(
-				'SELECT strava_activity_id, source_updated_at FROM workout_strava_sync WHERE workout_id = ? AND user_id = ?'
-			)
-			.bind(workoutId, userId)
-			.first<SyncMapRow>()) ?? null
-	);
+	const row = await db
+		.prepare(
+			'SELECT strava_activity_id, upload_id, source_updated_at FROM workout_strava_sync WHERE workout_id = ? AND user_id = ?'
+		)
+		.bind(workoutId, userId)
+		.first<{ strava_activity_id: number | string; upload_id: string | null; source_updated_at: number }>();
+	if (!row) return null;
+	return {
+		strava_activity_id: String(row.strava_activity_id),
+		upload_id: row.upload_id ?? null,
+		source_updated_at: row.source_updated_at
+	};
 }
 
 async function saveSyncMap(
 	db: D1Database,
 	userId: string,
 	workoutId: string,
-	activityId: number,
+	activityId: string,
+	uploadId: string,
 	sourceUpdatedAt: number
 ): Promise<void> {
 	const now = Date.now();
 	await db
 		.prepare(
-			`INSERT INTO workout_strava_sync (workout_id, user_id, strava_activity_id, source_updated_at, last_synced_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+			`INSERT INTO workout_strava_sync (workout_id, user_id, strava_activity_id, upload_id, source_updated_at, last_synced_at, created_at, updated_at)
+	       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(workout_id) DO UPDATE SET
          user_id = excluded.user_id,
          strava_activity_id = excluded.strava_activity_id,
+         upload_id = excluded.upload_id,
          source_updated_at = excluded.source_updated_at,
          last_synced_at = excluded.last_synced_at,
          updated_at = excluded.updated_at`
 		)
-		.bind(workoutId, userId, activityId, sourceUpdatedAt, now, now, now)
+		.bind(workoutId, userId, activityId, uploadId, sourceUpdatedAt, now, now, now)
 		.run();
 }
 
@@ -408,32 +652,25 @@ export async function syncWorkoutToStrava(
 	platform: App.Platform | undefined,
 	userId: string,
 	workoutId: string
-): Promise<{ pushed: boolean; activityId?: number }> {
+): Promise<{ pushed: boolean; uploadId?: string; activityId?: string }> {
 	const result = await getWorkoutAndSets(db, userId, workoutId);
 	if (!result) return { pushed: false };
 	const accessToken = await getValidAccessToken(db, platform, userId);
 	const { workout, sets, sourceUpdatedAt } = result;
-	const summary = buildWorkoutSummary(workout, sets);
-	const elapsedSec = Math.max(1, Math.round((workout.end_time - workout.start_time) / 1000));
 	const existing = await getSyncMap(db, workoutId, userId);
-	let activityId: number;
-	if (!existing) {
-		activityId = await stravaCreateActivity(accessToken, {
-			name: summary.name,
-			description: summary.description,
-			startTime: workout.start_time,
-			elapsedSec
-		});
-	} else {
-		activityId = existing.strava_activity_id;
-		await stravaUpdateActivity(accessToken, activityId, {
-			name: summary.name,
-			description: summary.description,
-			type: 'WeightTraining'
-		});
+	if (existing && existing.upload_id && existing.source_updated_at >= sourceUpdatedAt) {
+		return { pushed: false, uploadId: existing.upload_id, activityId: existing.strava_activity_id };
 	}
-	await saveSyncMap(db, userId, workoutId, activityId, sourceUpdatedAt);
-	return { pushed: true, activityId };
+	const summary = buildWorkoutUploadPayload(workout, sets);
+	const upload = await createStrengthTrainingUpload(accessToken, {
+		name: summary.title,
+		description: summary.description,
+		payload: summary.payload,
+		workoutId
+	});
+	const activityId = upload.activityId || (await waitForUploadActivityId(accessToken, upload.uploadId));
+	await saveSyncMap(db, userId, workoutId, activityId, upload.uploadId, sourceUpdatedAt);
+	return { pushed: true, uploadId: upload.uploadId, activityId };
 }
 
 export async function syncDueWorkoutsToStrava(

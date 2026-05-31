@@ -6,6 +6,8 @@
   import { userStore } from '$lib/stores/userStore';
   import { unitPreference, initUnitPreference, tertiaryActivationPreference, initTertiaryActivationPreference, timeFormatPreference, initTimeFormatPreference } from '$lib/stores/userStore';
   import ThemeToggle from '$lib/components/ThemeToggle.svelte';
+  import type { Workout } from '$lib/types';
+  import { formatWorkoutLocation, locationGroupKey } from '$lib/location';
 
   let user = $state<{ id: string; email: string; token: string } | null>(null);
   let unit = $state<'lbs' | 'kg'>('lbs');
@@ -14,7 +16,110 @@
   let stravaConnected = $state(false);
   let stravaLoading = $state(false);
   let stravaError = $state('');
+  let locations = $state<LocationCluster[]>([]);
+  let locationsLoading = $state(false);
+  let locationsError = $state('');
   const stravaConnectedNow = $derived($page.url.searchParams.get('strava') === 'connected');
+
+  type LocationCluster = {
+    key: string;
+    lat: number;
+    lng: number;
+    count: number;
+    label: string;
+    draftLabel: string;
+  };
+
+  function groupLocations(workouts: Workout[]): LocationCluster[] {
+    const clusters = new Map<string, LocationCluster & { labels: Map<string, number> }>();
+
+    for (const workout of workouts) {
+      if (!workout.location) continue;
+      const key = locationGroupKey(workout.location);
+      const existing = clusters.get(key) ?? {
+        key,
+        lat: Number(workout.location.lat.toFixed(3)),
+        lng: Number(workout.location.lng.toFixed(3)),
+        count: 0,
+        label: '',
+        draftLabel: '',
+        labels: new Map<string, number>(),
+      };
+
+      existing.count += 1;
+      const label = workout.location.label?.trim();
+      if (label) {
+        existing.labels.set(label, (existing.labels.get(label) ?? 0) + 1);
+      }
+      clusters.set(key, existing);
+    }
+
+    return [...clusters.values()]
+      .map(({ labels, ...cluster }) => {
+        let preferredLabel = '';
+        let preferredCount = 0;
+        for (const [candidate, count] of labels.entries()) {
+          if (count > preferredCount) {
+            preferredLabel = candidate;
+            preferredCount = count;
+          }
+        }
+        return {
+          ...cluster,
+          label: preferredLabel,
+          draftLabel: preferredLabel,
+        };
+      })
+      .sort((left, right) => right.count - left.count || left.key.localeCompare(right.key));
+  }
+
+  async function loadLocations() {
+    if (!user) {
+      locations = [];
+      return;
+    }
+
+    locationsLoading = true;
+    locationsError = '';
+
+    try {
+      const res = await fetch('/api/workouts', {
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const data = (await res.json()) as { workouts?: Workout[] };
+      locations = groupLocations(data.workouts ?? []);
+    } catch (e) {
+      locationsError = e instanceof Error ? e.message : 'Failed to load locations';
+      locations = [];
+    } finally {
+      locationsLoading = false;
+    }
+  }
+
+  async function saveLocation(cluster: LocationCluster) {
+    if (!user) return;
+    const draftLabel = cluster.draftLabel.trim();
+
+    try {
+      const res = await fetch('/api/workouts/location-label', {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          lat: cluster.lat,
+          lng: cluster.lng,
+          label: draftLabel || null,
+        })
+      });
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      await loadLocations();
+    } catch (e) {
+      locationsError = e instanceof Error ? e.message : 'Failed to save location name';
+    }
+  }
 
   async function loadStravaStatus() {
     if (!user) {
@@ -40,6 +145,7 @@
     const unsub = userStore.subscribe((u) => {
       user = u;
       loadStravaStatus();
+      loadLocations();
     });
     const unsub2 = unitPreference.subscribe((u) => { unit = u; });
     const unsub3 = tertiaryActivationPreference.subscribe((value) => { showTertiary = value; });
@@ -167,7 +273,7 @@
             onclick={() => setUnit('lbs')}
             class="px-3 py-1 cursor-pointer transition-colors text-xs font-semibold m-0 rounded-none {unit === 'lbs' ? 'bg-[hsl(var(--foreground))] text-[hsl(var(--background))]' : 'bg-transparent text-[hsl(var(--muted-foreground))]'}"
           >lbs</button>
-          <div class="w-[1px] h-3 bg-[hsl(var(--border))]"></div>
+          <div class="w-px h-3 bg-[hsl(var(--border))]"></div>
           <button
             onclick={() => setUnit('kg')}
             class="px-3 py-1 cursor-pointer transition-colors text-xs font-semibold m-0 rounded-none {unit === 'kg' ? 'bg-[hsl(var(--foreground))] text-[hsl(var(--background))]' : 'bg-transparent text-[hsl(var(--muted-foreground))]'}"
@@ -188,7 +294,7 @@
             onclick={() => setTimeFormat('12h')}
             class="px-3 py-1 cursor-pointer transition-colors text-xs font-semibold m-0 rounded-none {timeFormat === '12h' ? 'bg-[hsl(var(--foreground))] text-[hsl(var(--background))]' : 'bg-transparent text-[hsl(var(--muted-foreground))]'}"
           >12h</button>
-          <div class="w-[1px] h-3 bg-[hsl(var(--border))]"></div>
+          <div class="w-px h-3 bg-[hsl(var(--border))]"></div>
           <button
             onclick={() => setTimeFormat('24h')}
             class="px-3 py-1 cursor-pointer transition-colors text-xs font-semibold m-0 rounded-none {timeFormat === '24h' ? 'bg-[hsl(var(--foreground))] text-[hsl(var(--background))]' : 'bg-transparent text-[hsl(var(--muted-foreground))]'}"
@@ -212,6 +318,57 @@
           {showTertiary ? 'On' : 'Off'}
         </button>
       </div>
+    </div>
+  </section>
+
+  <!-- Locations -->
+  <section class="mb-5">
+    <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Locations</h2>
+    <div class="rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] overflow-hidden shadow-sm">
+      <div class="border-b border-[hsl(var(--border))] px-4 py-3">
+        <p class="text-sm font-medium text-[hsl(var(--foreground))]">Name your most common workout spots</p>
+        <p class="text-xs text-[hsl(var(--muted-foreground))]">Locations are ranked by prevalence and apply to every workout in the cluster.</p>
+      </div>
+      {#if locationsError}
+        <p class="px-4 py-2 text-xs text-red-500">{locationsError}</p>
+      {/if}
+      {#if locationsLoading}
+        <div class="px-4 py-6 text-sm text-[hsl(var(--muted-foreground))]">Loading locations…</div>
+      {:else if locations.length === 0}
+        <div class="px-4 py-6 text-sm text-[hsl(var(--muted-foreground))]">No workouts with saved locations yet.</div>
+      {:else}
+        <div class="divide-y divide-[hsl(var(--border))]">
+          {#each locations as location}
+            <div class="grid gap-3 px-4 py-3 lg:grid-cols-[minmax(0,1fr)_16rem_auto] lg:items-center">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <p class="text-sm font-semibold text-[hsl(var(--foreground))]">
+                    {location.draftLabel.trim() || formatWorkoutLocation(location)}
+                  </p>
+                  <span class="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+                    {location.count} workout{location.count === 1 ? '' : 's'}
+                  </span>
+                </div>
+                <p class="text-xs text-[hsl(var(--muted-foreground))]">{location.lat.toFixed(3)}, {location.lng.toFixed(3)}</p>
+              </div>
+              <label class="block">
+                <span class="sr-only">Location name</span>
+                <input
+                  class="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] outline-none transition-colors focus:border-[hsl(var(--foreground))]"
+                  placeholder="Home gym"
+                  bind:value={location.draftLabel}
+                />
+              </label>
+              <button
+                class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm font-semibold text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
+                onclick={() => saveLocation(location)}
+              >
+                Save
+              </button>
+            </div>
+          {/each}
+        </div>
+      {/if}
     </div>
   </section>
 

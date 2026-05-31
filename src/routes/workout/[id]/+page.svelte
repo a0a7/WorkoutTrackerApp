@@ -5,6 +5,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import MuscleMap from '$lib/components/MuscleMap.svelte';
+  import WorkoutLocationMap from '$lib/components/WorkoutLocationMap.svelte';
   import SetRow from '$lib/components/SetRow.svelte';
   import NumericKeypad from '$lib/components/NumericKeypad.svelte';
   import { deleteSet, deleteWorkout, getWorkout, saveSets, saveWorkout } from '$lib/db';
@@ -13,6 +14,7 @@
   import { keypadConfig } from '$lib/stores/keypadStore';
   import { Share2, Pencil, Trash2 } from 'lucide-svelte';
   import { syncToServer } from '$lib/sync';
+  import { formatWorkoutLocation } from '$lib/location';
   import type { Workout, MuscleActivation, WorkoutSet } from '$lib/types';
 
   const workoutId = $derived($page.params.id);
@@ -1089,6 +1091,24 @@
           {/if}
           {#if shareMessage}
             <p class="mt-2 text-xs text-[hsl(var(--muted-foreground))]">{shareMessage}</p>
+          {/if}
+
+          {#if workout.location}
+            <div class="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
+              <div class="flex items-start gap-2 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2">
+                <div class="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 21s6-5.686 6-11a6 6 0 1 0-12 0c0 5.314 6 11 6 11Z"/>
+                    <circle cx="12" cy="10" r="2.5"/>
+                  </svg>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Location</p>
+                  <p class="truncate text-sm font-medium text-[hsl(var(--foreground))]">{formatWorkoutLocation(workout.location)}</p>
+                </div>
+              </div>
+              <WorkoutLocationMap location={workout.location} />
+            </div>
           {/if}
 
           {#if editingTimes}

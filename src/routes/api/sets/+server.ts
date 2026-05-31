@@ -10,6 +10,7 @@ interface DbSet {
 	exercise_name: string;
 	reps: number | null;
 	weight: number | null;
+	weight_unit: string | null;
 	notes: string | null;
 	sort_order: number;
 	created_at: number;
@@ -25,6 +26,7 @@ function rowToSet(row: DbSet) {
 		exerciseName: row.exercise_name,
 		reps: row.reps,
 		weight: row.weight,
+		weightUnit: row.weight_unit === 'kg' ? 'kg' : 'lbs',
 		notes: row.notes ?? undefined,
 		order: row.sort_order,
 		createdAt: row.created_at,
@@ -66,13 +68,14 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	// strictly greater than the stored value, so equal or older timestamps leave existing data intact.
 	// Equal timestamps (e.g. from clock skew between clients) are treated as ties and left unchanged.
 	const stmt = db.prepare(
-		`INSERT INTO sets (id, user_id, local_workout_id, exercise_id, exercise_name, reps, weight, notes, sort_order, created_at, updated_at, deleted)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+		`INSERT INTO sets (id, user_id, local_workout_id, exercise_id, exercise_name, reps, weight, weight_unit, notes, sort_order, created_at, updated_at, deleted)
+	     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
      ON CONFLICT(id) DO UPDATE SET
        exercise_id = excluded.exercise_id,
        exercise_name = excluded.exercise_name,
        reps = excluded.reps,
        weight = excluded.weight,
+	  weight_unit = excluded.weight_unit,
        notes = excluded.notes,
        sort_order = excluded.sort_order,
        updated_at = excluded.updated_at
@@ -89,6 +92,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 			set.exerciseName ?? '',
 			set.reps ?? null,
 			set.weight ?? null,
+			set.weightUnit === 'kg' ? 'kg' : 'lbs',
 			set.notes ?? null,
 			set.order ?? 0,
 			set.createdAt ?? now,
