@@ -74,30 +74,30 @@ function addScores(breakdown: WorkoutCategoryBreakdown, setWeight: number, muscl
 		case 'chest_upper':
 		case 'chest_mid':
 		case 'chest_lower':
-			breakdown.chest += setWeight * 1;
-			breakdown.push += setWeight * 1;
-			breakdown.upper += setWeight * 0.9;
+			breakdown.chest += setWeight * 1.2;
+			breakdown.push += setWeight * 1.05;
+			breakdown.upper += setWeight * 0.95;
 			return;
 		case 'front_delt':
-			breakdown.shoulders += setWeight * 1;
-			breakdown.push += setWeight * 0.9;
-			breakdown.upper += setWeight * 0.9;
+			breakdown.shoulders += setWeight * 0.9;
+			breakdown.push += setWeight * 0.8;
+			breakdown.upper += setWeight * 0.75;
 			return;
 		case 'side_delt':
-			breakdown.shoulders += setWeight * 1;
-			breakdown.push += setWeight * 0.4;
-			breakdown.upper += setWeight * 0.85;
+			breakdown.shoulders += setWeight * 1.05;
+			breakdown.push += setWeight * 0.25;
+			breakdown.upper += setWeight * 0.7;
 			return;
 		case 'rear_delt':
-			breakdown.shoulders += setWeight * 0.6;
+			breakdown.shoulders += setWeight * 0.55;
 			breakdown.back += setWeight * 0.8;
 			breakdown.pull += setWeight * 0.9;
 			breakdown.upper += setWeight * 0.75;
 			return;
 		case 'tricep':
 			breakdown.arms += setWeight * 1;
-			breakdown.push += setWeight * 0.85;
-			breakdown.upper += setWeight * 0.55;
+			breakdown.push += setWeight * 0.95;
+			breakdown.upper += setWeight * 0.5;
 			return;
 		case 'bicep':
 			breakdown.arms += setWeight * 1;
@@ -145,10 +145,10 @@ function addScores(breakdown: WorkoutCategoryBreakdown, setWeight: number, muscl
 			breakdown.upper += setWeight * 0.1;
 			return;
 		case 'serratus':
-			breakdown.push += setWeight * 0.45;
-			breakdown.chest += setWeight * 0.25;
-			breakdown.shoulders += setWeight * 0.35;
-			breakdown.upper += setWeight * 0.55;
+			breakdown.push += setWeight * 0.5;
+			breakdown.chest += setWeight * 0.3;
+			breakdown.shoulders += setWeight * 0.25;
+			breakdown.upper += setWeight * 0.45;
 			return;
 	}
 }
@@ -223,6 +223,16 @@ function strongestCategory(breakdown: WorkoutCategoryBreakdown): WorkoutCategory
 
 		if (
 			shares.chest >= 0.18 &&
+			pushScore >= total * 0.28 &&
+			breakdown.chest >= breakdown.shoulders * 0.92 &&
+			breakdown.chest >= breakdown.back * 1.1 &&
+			breakdown.chest >= breakdown.arms * 1.05
+		) {
+			return 'push';
+		}
+
+		if (
+			shares.chest >= 0.18 &&
 			breakdown.chest >= breakdown.back * 1.15 &&
 			breakdown.chest >= breakdown.shoulders * 1.1 &&
 			breakdown.chest >= breakdown.arms * 1.1
@@ -240,9 +250,11 @@ function strongestCategory(breakdown: WorkoutCategoryBreakdown): WorkoutCategory
 		}
 
 		if (
-			shares.shoulders >= 0.18 &&
-			breakdown.shoulders >= breakdown.chest * 1.05 &&
-			breakdown.shoulders >= breakdown.back * 1.05
+			shares.shoulders >= 0.24 &&
+			breakdown.shoulders >= breakdown.chest * 1.18 &&
+			breakdown.shoulders >= breakdown.back * 1.12 &&
+			breakdown.shoulders >= breakdown.arms * 1.05 &&
+			breakdown.shoulders >= pushScore * 0.9
 		) {
 			return 'shoulders';
 		}

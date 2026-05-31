@@ -36,19 +36,35 @@
   const timeFormat = $derived($timeFormatPreference);
 
   const DAY_TILE_STYLES: Record<DayCategory, string> = {
-    rest: 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] border-[hsl(var(--border))]',
-    push: 'bg-rose-200/80 text-rose-900 border-rose-300 dark:bg-rose-900/40 dark:text-rose-100 dark:border-rose-700',
-    pull: 'bg-blue-200/80 text-blue-900 border-blue-300 dark:bg-blue-900/40 dark:text-blue-100 dark:border-blue-700',
-    legs: 'bg-emerald-200/80 text-emerald-900 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-100 dark:border-emerald-700',
-    'antagonist pull': 'bg-indigo-200/80 text-indigo-900 border-indigo-300 dark:bg-indigo-900/40 dark:text-indigo-100 dark:border-indigo-700',
-    'antagonist push': 'bg-fuchsia-200/80 text-fuchsia-900 border-fuchsia-300 dark:bg-fuchsia-900/40 dark:text-fuchsia-100 dark:border-fuchsia-700',
-    upper: 'bg-sky-200/80 text-sky-900 border-sky-300 dark:bg-sky-900/40 dark:text-sky-100 dark:border-sky-700',
-    abs: 'bg-amber-200/80 text-amber-900 border-amber-300 dark:bg-amber-900/40 dark:text-amber-100 dark:border-amber-700',
-    back: 'bg-cyan-200/80 text-cyan-900 border-cyan-300 dark:bg-cyan-900/40 dark:text-cyan-100 dark:border-cyan-700',
-    chest: 'bg-pink-200/80 text-pink-900 border-pink-300 dark:bg-pink-900/40 dark:text-pink-100 dark:border-pink-700',
-    arms: 'bg-violet-200/80 text-violet-900 border-violet-300 dark:bg-violet-900/40 dark:text-violet-100 dark:border-violet-700',
-    shoulders: 'bg-orange-200/80 text-orange-900 border-orange-300 dark:bg-orange-900/40 dark:text-orange-100 dark:border-orange-700',
-    'full body': 'bg-teal-200/80 text-teal-900 border-teal-300 dark:bg-teal-900/40 dark:text-teal-100 dark:border-teal-700',
+    rest: 'bg-slate-500 text-white',
+    push: 'bg-red-600 text-white',
+    pull: 'bg-blue-600 text-white',
+    legs: 'bg-black text-white',
+    'antagonist pull': 'bg-blue-800 text-white',
+    'antagonist push': 'bg-red-800 text-white',
+    upper: 'bg-slate-700 text-white',
+    abs: 'bg-amber-700 text-white',
+    back: 'bg-cyan-700 text-white',
+    chest: 'bg-rose-700 text-white',
+    arms: 'bg-violet-700 text-white',
+    shoulders: 'bg-orange-700 text-white',
+    'full body': 'bg-emerald-700 text-white',
+  };
+
+  const DAY_TILE_LABELS: Record<DayCategory, string> = {
+    rest: 'Rest',
+    push: 'Push',
+    pull: 'Pull',
+    legs: 'Legs',
+    'antagonist pull': 'Anti Pull',
+    'antagonist push': 'Anti Push',
+    upper: 'Upper',
+    abs: 'Abs',
+    back: 'Back',
+    chest: 'Chest',
+    arms: 'Arms',
+    shoulders: 'Shoulders',
+    'full body': 'Full Body',
   };
 
   onMount(async () => {
@@ -306,18 +322,14 @@
   <h1 class="text-2xl font-bold text-[hsl(var(--foreground))] mb-4">History</h1>
 
   <section class="mb-4 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 shadow-sm">
-    <div class="mb-2 flex items-center justify-between gap-3">
-      <h2 class="text-sm font-semibold text-[hsl(var(--foreground))]">Past 7 Days</h2>
-      <p class="text-xs text-[hsl(var(--muted-foreground))]">Day type auto-detected from muscle balance</p>
-    </div>
     <div class="grid grid-cols-7 gap-2">
       {#each last7Days() as day (day.key)}
         <div class="flex flex-col items-center gap-1">
           <div
-            class={`flex aspect-square w-full min-w-0 items-center justify-center rounded-xl border text-center text-[11px] font-semibold leading-tight ${DAY_TILE_STYLES[day.category]}`}
+            class={`flex aspect-square w-full min-w-0 items-center justify-center rounded-2xl text-center text-[10px] font-bold leading-tight tracking-wide shadow-sm ${DAY_TILE_STYLES[day.category]}`}
             title={`${day.dateLabel}: ${day.categoryLabel}${day.count ? ` (${day.count} workout${day.count === 1 ? '' : 's'})` : ''}`}
           >
-            {day.dayLabel}
+            <span class="whitespace-pre-line px-1">{DAY_TILE_LABELS[day.category]}</span>
           </div>
           <p class="text-[10px] text-[hsl(var(--muted-foreground))]">{new Date(day.ts).getDate()}</p>
         </div>
@@ -326,62 +338,61 @@
   </section>
 
   <!-- Filters -->
-  <div class="mb-4 flex flex-col gap-3 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 shadow-sm">
-    <input
-      type="text"
-      bind:value={filterQuery}
-      placeholder="Search exercise, note, or location..."
-      class="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] placeholder:text-[hsl(var(--muted-foreground))]"
-    />
-    <button
-      type="button"
-      onclick={cycleDateWindow}
-      title="Tap to cycle date range"
-      class="w-fit rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm font-semibold text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
-    >
-      Date: {DATE_WINDOW_LABELS[dateWindow]}
-    </button>
-    <div class="grid gap-2 sm:grid-cols-[1fr_auto]">
-      <label class="block">
-        <span class="sr-only">Sort workouts</span>
+  <div class="mb-4 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 shadow-sm">
+    <div class="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+      <input
+        type="text"
+        bind:value={filterQuery}
+        placeholder="Search exercises, notes, locations"
+        class="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] placeholder:text-[hsl(var(--muted-foreground))]"
+      />
+      <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+        <button
+          type="button"
+          onclick={cycleDateWindow}
+          title="Tap to cycle date range"
+          class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm font-semibold text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
+        >
+          Date: {DATE_WINDOW_LABELS[dateWindow]}
+        </button>
+        <button
+          type="button"
+          onclick={() => { onlyWithLocation = !onlyWithLocation; }}
+          class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm font-semibold text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
+          aria-pressed={onlyWithLocation}
+        >
+          {onlyWithLocation ? 'Locations only' : 'All workouts'}
+        </button>
         <select
           bind:value={sortMode}
-          class="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]"
+          class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]"
         >
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
           <option value="duration-desc">Longest duration</option>
           <option value="duration-asc">Shortest duration</option>
           <option value="volume-desc">Highest volume</option>
           <option value="volume-asc">Lowest volume</option>
         </select>
-      </label>
-      <button
-        type="button"
-        onclick={() => { onlyWithLocation = !onlyWithLocation; }}
-        class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm font-medium text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
-        aria-pressed={onlyWithLocation}
-      >
-        {onlyWithLocation ? 'Locations only' : 'All workouts'}
-      </button>
+        <div class="inline-flex rounded-xl bg-[hsl(var(--muted))] p-1">
+          <button
+            type="button"
+            onclick={() => setCompactness('card')}
+            class="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors {compactness === 'card' ? 'bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-sm' : 'text-[hsl(var(--muted-foreground))]'}"
+          >
+            Card
+          </button>
+          <button
+            type="button"
+            onclick={() => setCompactness('compact')}
+            class="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors {compactness === 'compact' ? 'bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-sm' : 'text-[hsl(var(--muted-foreground))]'}"
+          >
+            Compact
+          </button>
+        </div>
+      </div>
     </div>
-    <div class="inline-flex w-fit rounded-xl bg-[hsl(var(--muted))] p-1">
-      <button
-        type="button"
-        onclick={() => setCompactness('card')}
-        class="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors {compactness === 'card' ? 'bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-sm' : 'text-[hsl(var(--muted-foreground))]'}"
-      >
-        Card
-      </button>
-      <button
-        type="button"
-        onclick={() => setCompactness('compact')}
-        class="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors {compactness === 'compact' ? 'bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-sm' : 'text-[hsl(var(--muted-foreground))]'}"
-      >
-        Compact
-      </button>
-    </div>
-    <p class="text-xs text-[hsl(var(--muted-foreground))]">Showing {getWorkoutCountLabel()}</p>
+    <p class="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Showing {getWorkoutCountLabel()}</p>
   </div>
 
   {#if loading}
