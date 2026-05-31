@@ -3,13 +3,13 @@
   import { EXERCISE_MAP } from '../exercises';
   import { timeFormatPreference } from '$lib/stores/userStore';
   import { formatWorkoutLocation } from '$lib/location';
-  import { classifyWorkout, getWorkoutCategoryLabel } from '$lib/workoutCategorization';
+  import { getEffectiveWorkoutCategory, getWorkoutCategoryLabel } from '$lib/workoutCategorization';
 
   let { workout }: { workout: Workout } = $props();
 
   const durationMs = $derived(workout.endTime - workout.startTime);
   const durationMin = $derived(Math.round(durationMs / 60000));
-  const category = $derived(classifyWorkout(workout));
+  const category = $derived(getEffectiveWorkoutCategory(workout));
   const categoryLabel = $derived(getWorkoutCategoryLabel(category));
 
   const exerciseNames = $derived(() => {

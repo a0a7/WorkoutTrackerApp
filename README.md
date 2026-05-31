@@ -40,7 +40,7 @@ Sign up at [cloudflare.com](https://cloudflare.com) if you don't have one.
 4. Note the **Database ID** shown on the database page.
 5. Click on the database → **Console** tab.
 6. Paste and run the contents of `migrations/001_init.sql` in the SQL console. This creates the tables.
-7. Run `migrations/002_workouts_updated_at.sql`, `migrations/003_strava_sync.sql`, and `migrations/004_strava_strength_training_json.sql`.
+7. Run `migrations/002_workouts_updated_at.sql`, `migrations/003_strava_sync.sql`, `migrations/004_strava_strength_training_json.sql`, and `migrations/005_workout_category_override.sql`.
 
 ### Step 3: Create the KV Namespace
 
@@ -116,6 +116,7 @@ npx wrangler d1 execute workout-tracker-db --local --file=migrations/001_init.sq
 npx wrangler d1 execute workout-tracker-db --local --file=migrations/002_workouts_updated_at.sql
 npx wrangler d1 execute workout-tracker-db --local --file=migrations/003_strava_sync.sql
 npx wrangler d1 execute workout-tracker-db --local --file=migrations/004_strava_strength_training_json.sql
+npx wrangler d1 execute workout-tracker-db --local --file=migrations/005_workout_category_override.sql
 
 # Build and run with wrangler (simulates the production environment)
 npm run build

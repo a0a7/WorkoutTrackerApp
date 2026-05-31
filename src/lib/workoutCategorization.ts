@@ -1,21 +1,27 @@
 import { EXERCISES, EXERCISE_MAP } from './exercises';
-import type { MuscleActivation, MuscleId, Workout, WorkoutSet } from './types';
-
-export type WorkoutCategory =
-	| 'push'
-	| 'pull'
-	| 'legs'
-	| 'antagonist pull'
-	| 'antagonist push'
-	| 'upper'
-	| 'abs'
-	| 'back'
-	| 'chest'
-	| 'arms'
-	| 'shoulders'
-	| 'full body';
+import type { MuscleActivation, MuscleId, Workout, WorkoutCategory, WorkoutSet } from './types';
 
 export type DayCategory = WorkoutCategory | 'rest';
+
+const WORKOUT_CATEGORIES: WorkoutCategory[] = [
+	'push',
+	'pull',
+	'legs',
+	'antagonist pull',
+	'antagonist push',
+	'upper',
+	'abs',
+	'back',
+	'chest',
+	'arms',
+	'shoulders',
+	'full body',
+];
+
+export function isWorkoutCategory(value: string | undefined | null): value is WorkoutCategory {
+	if (!value) return false;
+	return WORKOUT_CATEGORIES.includes(value as WorkoutCategory);
+}
 
 export interface WorkoutCategoryBreakdown {
 	activityTotal: number;
@@ -279,8 +285,32 @@ export function classifyWorkout(workout: Workout): WorkoutCategory {
 	return strongestCategory(scoreWorkoutSets(workout.sets));
 }
 
+export function getEffectiveWorkoutCategory(workout: Workout): WorkoutCategory {
+	if (isWorkoutCategory(workout.categoryOverride)) return workout.categoryOverride;
+	return classifyWorkout(workout);
+}
+
 export function classifyWorkouts(workouts: Workout[]): WorkoutCategory | 'rest' {
 	if (workouts.length === 0) return 'rest';
+	const allManuallyCategorized = workouts.every((workout) => isWorkoutCategory(workout.categoryOverride));
+	if (allManuallyCategorized) {
+		const weightedCounts = new Map<WorkoutCategory, number>();
+		for (const workout of workouts) {
+			const category = workout.categoryOverride as WorkoutCategory;
+			const weight = Math.max(1, workout.sets.length);
+			weightedCounts.set(category, (weightedCounts.get(category) ?? 0) + weight);
+		}
+		let winner: WorkoutCategory = 'full body';
+		let topScore = -1;
+		for (const [category, score] of weightedCounts.entries()) {
+			if (score > topScore) {
+				topScore = score;
+				winner = category;
+			}
+		}
+		return winner;
+	}
+
 	const breakdown = createBreakdown();
 	for (const workout of workouts) {
 		const scored = scoreWorkoutSets(workout.sets);

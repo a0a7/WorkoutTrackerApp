@@ -39,6 +39,20 @@ export type MuscleId =
 	| 'oblique'
 	| 'serratus';
 
+export type WorkoutCategory =
+	| 'push'
+	| 'pull'
+	| 'legs'
+	| 'antagonist pull'
+	| 'antagonist push'
+	| 'upper'
+	| 'abs'
+	| 'back'
+	| 'chest'
+	| 'arms'
+	| 'shoulders'
+	| 'full body';
+
 export interface WorkoutSet {
 	id: string;
 	localWorkoutId: string;
@@ -59,6 +73,7 @@ export interface Workout {
 	userId?: string;
 	startTime: number;
 	endTime: number;
+	categoryOverride?: WorkoutCategory;
 	location?: { lat: number; lng: number; label?: string };
 	notes?: string;
 	sets: WorkoutSet[];

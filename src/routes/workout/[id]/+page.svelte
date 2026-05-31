@@ -15,7 +15,8 @@
   import { Share2, Pencil, Trash2 } from 'lucide-svelte';
   import { syncToServer } from '$lib/sync';
   import { formatWorkoutLocation } from '$lib/location';
-  import type { Workout, MuscleActivation, WorkoutSet } from '$lib/types';
+  import { classifyWorkout, getWorkoutCategoryLabel } from '$lib/workoutCategorization';
+  import type { Workout, MuscleActivation, WorkoutCategory, WorkoutSet } from '$lib/types';
 
   const workoutId = $derived($page.params.id);
 
@@ -75,6 +76,20 @@
     stats: 'Stats',
     detailed: 'Detailed',
   };
+  const categoryOptions: WorkoutCategory[] = [
+    'push',
+    'pull',
+    'legs',
+    'antagonist pull',
+    'antagonist push',
+    'upper',
+    'abs',
+    'back',
+    'chest',
+    'arms',
+    'shoulders',
+    'full body',
+  ];
 
   function toDateInput(ts: number) {
     const d = new Date(ts);
@@ -389,6 +404,16 @@
     } finally {
       stravaSyncing = false;
     }
+  }
+
+  async function updateCategoryOverride(rawValue: string) {
+    if (!workout) return;
+    const nextOverride = rawValue === '__auto__' ? undefined : (rawValue as WorkoutCategory);
+    const nextWorkout = { ...workout, categoryOverride: nextOverride };
+    workout = nextWorkout;
+    await saveWorkout(nextWorkout);
+    const user = get(userStore);
+    if (user) syncToServer(user).catch(() => {});
   }
 
   function truncateTextToWidth(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
@@ -1079,11 +1104,15 @@
               </div>
             </div>
             <div class="flex text-right flex-col">
-              <!--{#if stravaConnected}
-                <button class="text-sm text-[hsl(var(--primary))]" disabled={stravaSyncing} onclick={pushWorkoutToStrava}>
-                  {stravaSyncing ? 'Pushing…' : 'Push to Strava'}
+              {#if stravaConnected}
+                <button
+                  class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-1.5 text-xs font-semibold text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))] disabled:opacity-60"
+                  disabled={stravaSyncing}
+                  onclick={pushWorkoutToStrava}
+                >
+                  {stravaSyncing ? 'Pushing…' : 'Sync to Strava'}
                 </button>
-              {/if}-->
+              {/if}
             </div>
           </div>
           {#if stravaMessage}
@@ -1092,6 +1121,23 @@
           {#if shareMessage}
             <p class="mt-2 text-xs text-[hsl(var(--muted-foreground))]">{shareMessage}</p>
           {/if}
+
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            <p class="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Category</p>
+            <select
+              class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-1.5 text-xs font-semibold text-[hsl(var(--foreground))] outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
+              value={workout.categoryOverride ?? '__auto__'}
+              onchange={(event) => updateCategoryOverride((event.currentTarget as HTMLSelectElement).value)}
+            >
+              <option value="__auto__">Auto ({getWorkoutCategoryLabel(classifyWorkout(workout))})</option>
+              {#each categoryOptions as option}
+                <option value={option}>{getWorkoutCategoryLabel(option)}</option>
+              {/each}
+            </select>
+            {#if workout.categoryOverride}
+              <span class="text-[11px] text-[hsl(var(--muted-foreground))]">Manual override enabled</span>
+            {/if}
+          </div>
 
           {#if workout.location}
             <div class="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">

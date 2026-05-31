@@ -6,13 +6,27 @@
   import type { Workout, WorkoutSet } from '$lib/types';
   import { unitPreference, initUnitPreference, timeFormatPreference, initTimeFormatPreference } from '$lib/stores/userStore';
   import { formatWorkoutLocation } from '$lib/location';
-  import { classifyWorkout, classifyWorkouts, getWorkoutCategoryLabel, type DayCategory } from '$lib/workoutCategorization';
+  import { classifyWorkouts, getEffectiveWorkoutCategory, getWorkoutCategoryLabel, type DayCategory } from '$lib/workoutCategorization';
 
   let workouts = $state<Workout[]>([]);
   let loading = $state(true);
   let filterQuery = $state('');
-  let fromDate = $state('');
-  let toDate = $state('');
+  type DateWindow = 'all' | '7d' | '30d' | '90d' | '365d';
+  const DATE_WINDOWS: DateWindow[] = ['all', '7d', '30d', '90d', '365d'];
+  const DATE_WINDOW_LABELS: Record<DateWindow, string> = {
+    all: 'All time',
+    '7d': 'Last 7 days',
+    '30d': 'Last 30 days',
+    '90d': 'Last 90 days',
+    '365d': 'Last year',
+  };
+  const DATE_WINDOW_DAYS: Record<Exclude<DateWindow, 'all'>, number> = {
+    '7d': 7,
+    '30d': 30,
+    '90d': 90,
+    '365d': 365,
+  };
+  let dateWindow = $state<DateWindow>('all');
   let sortMode = $state<'newest' | 'oldest' | 'duration-desc' | 'duration-asc' | 'volume-desc' | 'volume-asc'>('newest');
   let onlyWithLocation = $state(false);
   let compactness = $state<'card' | 'compact'>('card');
@@ -88,20 +102,24 @@
     }
   }
 
+  function cycleDateWindow() {
+    const current = DATE_WINDOWS.indexOf(dateWindow);
+    dateWindow = DATE_WINDOWS[(current + 1) % DATE_WINDOWS.length];
+  }
+
+  function passesDateWindow(workout: Workout) {
+    if (dateWindow === 'all') return true;
+    const cutoff = Date.now() - DATE_WINDOW_DAYS[dateWindow] * 86400000;
+    return workout.startTime >= cutoff;
+  }
+
   const filtered = $derived(() => {
     let result = workouts;
     const q = filterQuery.trim().toLowerCase();
     if (filterQuery.trim()) {
       result = result.filter((w) => matchesFilter(w, q));
     }
-    if (fromDate) {
-      const from = new Date(fromDate).getTime();
-      result = result.filter((w) => w.startTime >= from);
-    }
-    if (toDate) {
-      const to = new Date(toDate).getTime() + 86400000;
-      result = result.filter((w) => w.startTime <= to);
-    }
+    result = result.filter(passesDateWindow);
     if (onlyWithLocation) {
       result = result.filter((w) => Boolean(w.location));
     }
@@ -120,12 +138,6 @@
     }
     return [...map.entries()];
   });
-
-  function startOfDayMs(ts: number) {
-    const d = new Date(ts);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
-  }
 
   function formatDayKey(ts: number) {
     const d = new Date(ts);
@@ -259,18 +271,14 @@
       placeholder="Search exercise, note, or location..."
       class="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] placeholder:text-[hsl(var(--muted-foreground))]"
     />
-    <div class="grid gap-2 sm:grid-cols-2">
-      <input
-        type="date"
-        bind:value={fromDate}
-        class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]"
-      />
-      <input
-        type="date"
-        bind:value={toDate}
-        class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]"
-      />
-    </div>
+    <button
+      type="button"
+      onclick={cycleDateWindow}
+      title="Tap to cycle date range"
+      class="w-fit rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm font-semibold text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
+    >
+      Date: {DATE_WINDOW_LABELS[dateWindow]}
+    </button>
     <div class="grid gap-2 sm:grid-cols-[1fr_auto]">
       <label class="block">
         <span class="sr-only">Sort workouts</span>
@@ -347,7 +355,7 @@
                     {new Date(workout.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: timeFormat === '12h' })}
                   </p>
                   <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
-                    {getWorkoutCategoryLabel(classifyWorkout(workout))}
+                    {getWorkoutCategoryLabel(getEffectiveWorkoutCategory(workout))}
                   </p>
                   <p class="truncate text-xs text-[hsl(var(--muted-foreground))]">
                     {workout.sets.length} sets
