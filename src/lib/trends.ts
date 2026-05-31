@@ -8,7 +8,7 @@ export type AggregateMetric = 'time' | 'sets' | 'reps' | 'volume' | 'weight';
 
 export const DAY_TILE_STYLES: Record<DayCategory, string> = {
   rest: 'bg-slate-100 text-slate-900 border-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600',
-  cardio: 'bg-sky-600 text-white border-sky-700 dark:bg-sky-500 dark:border-sky-400',
+  cardio: 'bg-orange-500 text-white border-orange-600 dark:bg-orange-400 dark:border-orange-300',
   push: 'bg-red-600 text-white border-red-700 dark:bg-red-500 dark:border-red-400',
   pull: 'bg-blue-600 text-white border-blue-700 dark:bg-blue-500 dark:border-blue-400',
   legs: 'bg-emerald-600 text-white border-emerald-700 dark:bg-emerald-500 dark:border-emerald-400',
@@ -39,6 +39,39 @@ export const DAY_TILE_LABELS: Record<DayCategory, string> = {
   shoulders: 'Shoulders',
   'full body': 'Full Body',
 };
+
+const DAY_TILE_COLORS: Record<DayCategory, string> = {
+  rest: '#e2e8f0',
+  cardio: '#f97316',
+  push: '#dc2626',
+  pull: '#2563eb',
+  legs: '#16a34a',
+  'antagonist pull': '#1d4ed8',
+  'antagonist push': '#b91c1c',
+  upper: '#7c3aed',
+  abs: '#d97706',
+  back: '#0e7490',
+  chest: '#be123c',
+  arms: '#c026d3',
+  shoulders: '#ea580c',
+  'full body': '#d97706',
+};
+
+const CALENDAR_LEGEND_ORDER: DayCategory[] = [
+  'cardio',
+  'push',
+  'pull',
+  'legs',
+  'antagonist push',
+  'antagonist pull',
+  'upper',
+  'shoulders',
+  'arms',
+  'chest',
+  'back',
+  'abs',
+  'full body',
+];
 
 export interface CalendarCell {
   dateKey: string;
@@ -374,6 +407,12 @@ function svgHeader(width: number, height: number, title: string, subtitle: strin
     .grid { stroke: ${palette.grid}; stroke-width: 1; }
     .axis { stroke: ${palette.axis}; stroke-width: 1; }
   </style>
+  <defs>
+    <radialGradient id="calendar-cell-inner-shadow" cx="50%" cy="38%" r="82%">
+      <stop offset="68%" stop-color="#020617" stop-opacity="0" />
+      <stop offset="100%" stop-color="#020617" stop-opacity="0.22" />
+    </radialGradient>
+  </defs>
 ${includeBackground ? `  <rect class="bg" x="0" y="0" width="${width}" height="${height}" rx="24" />
 ` : ''}
   <text class="title" x="24" y="32">${escapeXml(title)}</text>
@@ -412,7 +451,8 @@ export function renderSeriesChartSvg(options: {
   const height = compact ? 320 : 360;
   const left = compact ? 36 : 52;
   const right = compact ? 12 : 24;
-  const top = compact ? 48 : 72;
+  const subtitleGap = options.subtitle.trim().length > 0 ? (compact ? 14 : 18) : 0;
+  const top = (compact ? 48 : 72) + subtitleGap;
   const bottom = compact ? 36 : 56;
   const chartWidth = width - left - right;
   const chartHeight = height - top - bottom;
@@ -539,18 +579,16 @@ export function renderCalendarSvg(options: {
     const fill = calendarColor(cell.category, cell.inRange, cell.count, palette);
     svg += `
   <rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="4" fill="${fill}" />
+  <rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="4" fill="url(#calendar-cell-inner-shadow)" opacity="0.9" />
 `;
   }
 
-  const legendEntries: Array<{ label: string; color: string }> = [
-    { label: 'Rest', color: palette.background === '#f8fafc' ? '#e2e8f0' : '#334155' },
-    { label: 'Cardio', color: '#0284c7' },
-    { label: 'Push', color: '#dc2626' },
-    { label: 'Pull', color: '#2563eb' },
-    { label: 'Legs', color: '#16a34a' },
-    { label: 'Upper', color: '#7c3aed' },
-    { label: 'Full body', color: '#d97706' },
-  ];
+  const presentCategories = new Set(
+    grid.filter((cell) => cell.count > 0 && cell.category !== 'rest').map((cell) => cell.category),
+  );
+  const legendEntries = CALENDAR_LEGEND_ORDER
+    .filter((category) => presentCategories.has(category))
+    .map((category) => ({ label: DAY_TILE_LABELS[category], color: DAY_TILE_COLORS[category] }));
   const legendY = height - (compact ? 10 : 20);
   let legendX = 24;
   for (const entry of legendEntries) {
@@ -570,19 +608,19 @@ function calendarColor(category: DayCategory, inRange: boolean, count: number, p
   if (!inRange) return isLightMode ? '#cbd5e1' : '#1f2937';
   if (count <= 0) return isLightMode ? '#e2e8f0' : '#334155';
   switch (category) {
-    case 'cardio': return '#0284c7';
-    case 'push': return '#dc2626';
-    case 'pull': return '#2563eb';
-    case 'legs': return '#16a34a';
-    case 'upper': return '#7c3aed';
-    case 'abs': return '#d97706';
-    case 'back': return '#0e7490';
-    case 'chest': return '#be123c';
-    case 'arms': return '#c026d3';
-    case 'shoulders': return '#ea580c';
-    case 'antagonist pull': return '#1d4ed8';
-    case 'antagonist push': return '#b91c1c';
-    case 'full body': return '#d97706';
+    case 'cardio': return DAY_TILE_COLORS.cardio;
+    case 'push': return DAY_TILE_COLORS.push;
+    case 'pull': return DAY_TILE_COLORS.pull;
+    case 'legs': return DAY_TILE_COLORS.legs;
+    case 'upper': return DAY_TILE_COLORS.upper;
+    case 'abs': return DAY_TILE_COLORS.abs;
+    case 'back': return DAY_TILE_COLORS.back;
+    case 'chest': return DAY_TILE_COLORS.chest;
+    case 'arms': return DAY_TILE_COLORS.arms;
+    case 'shoulders': return DAY_TILE_COLORS.shoulders;
+    case 'antagonist pull': return DAY_TILE_COLORS['antagonist pull'];
+    case 'antagonist push': return DAY_TILE_COLORS['antagonist push'];
+    case 'full body': return DAY_TILE_COLORS['full body'];
     case 'rest':
     default:
       return isLightMode ? '#e2e8f0' : '#475569';

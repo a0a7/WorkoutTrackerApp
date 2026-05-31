@@ -62,7 +62,7 @@
   <span class="sr-only">Trends</span>
 
   <div class="grid gap-4">
-    <a href="/trends/calendar" class="group rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-sm transition-transform hover:-translate-y-0.5 hover:shadow-md">
+    <a href="/trends/calendar" class="group rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-sm no-underline transition-transform hover:-translate-y-0.5 hover:shadow-md">
       <div class="mb-2 flex items-center justify-between gap-3">
         <h2 class="text-lg font-semibold text-[hsl(var(--foreground))]">Calendar</h2>
         <ChevronRight class="h-5 w-5 text-[hsl(var(--foreground))] opacity-80 group-hover:opacity-100" />
@@ -75,7 +75,7 @@
       {/if}
     </a>
 
-    <a href="/trends/aggregate" class="group rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-sm transition-transform hover:-translate-y-0.5 hover:shadow-md">
+    <a href="/trends/aggregate" class="group rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-sm no-underline transition-transform hover:-translate-y-0.5 hover:shadow-md">
       <div class="mb-2 flex items-center justify-between gap-3">
         <h2 class="text-lg font-semibold text-[hsl(var(--foreground))]">General</h2>
         <ChevronRight class="h-5 w-5 text-[hsl(var(--foreground))] opacity-80 group-hover:opacity-100" />
@@ -88,8 +88,8 @@
       {/if}
     </a>
 
-    <a href="/trends/exercise" class="group rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-sm transition-transform hover:-translate-y-0.5 hover:shadow-md">
-      <div class="mb-3 flex items-center justify-between gap-3">
+    <a href="/trends/exercise" class="group rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 pb-3 shadow-sm no-underline transition-transform hover:-translate-y-0.5 hover:shadow-md">
+      <div class="mb-0 flex items-center justify-between gap-3">
         <h2 class="text-lg font-semibold text-[hsl(var(--foreground))]">By Movement</h2>
         <ChevronRight class="h-5 w-5 text-[hsl(var(--foreground))] opacity-80 group-hover:opacity-100" />
       </div>
