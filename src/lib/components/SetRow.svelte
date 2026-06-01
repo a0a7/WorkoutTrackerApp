@@ -120,6 +120,22 @@
     return null;
   }
 
+  function getBodyweightVariant(exerciseId: string, exerciseName: string): Exercise | null {
+    if (exerciseId.startsWith('weighted-')) {
+      const baseId = exerciseId.slice('weighted-'.length);
+      const byId = EXERCISE_MAP.get(baseId);
+      if (byId?.category === 'bodyweight') return byId;
+    }
+    const weightedPrefix = /^weighted\s+/i;
+    if (weightedPrefix.test(exerciseName)) {
+      const baseName = exerciseName.replace(weightedPrefix, '').trim().toLowerCase();
+      for (const ex of EXERCISE_MAP.values()) {
+        if (ex.category === 'bodyweight' && ex.name.toLowerCase() === baseName) return ex;
+      }
+    }
+    return null;
+  }
+
   function maybeConvertBodyweightToWeighted(weightText: string, emptyRow: boolean) {
     const parsed = parseFloat(weightText);
     if (!Number.isFinite(parsed) || parsed <= 0) return;
@@ -142,6 +158,28 @@
     }
   }
 
+  function maybeConvertWeightedToBodyweight(weightText: string, emptyRow: boolean) {
+    const parsed = parseFloat(weightText);
+    if (Number.isFinite(parsed) && parsed > 0) return;
+
+    const currentExerciseId = emptyRow ? draftExerciseId : set.exerciseId;
+    const currentExerciseName = emptyRow ? draftExerciseName : set.exerciseName;
+    if (!currentExerciseId || !currentExerciseName) return;
+
+    const currentExercise = EXERCISE_MAP.get(currentExerciseId);
+    if (!currentExercise || currentExercise.category === 'bodyweight') return;
+
+    const bodyweightVariant = getBodyweightVariant(currentExerciseId, currentExerciseName);
+    if (!bodyweightVariant) return;
+
+    if (emptyRow) {
+      draftExerciseId = bodyweightVariant.id;
+      draftExerciseName = bodyweightVariant.name;
+    } else {
+      onExerciseUpdate?.(set.id, bodyweightVariant.id, bodyweightVariant.name);
+    }
+  }
+
   // ── Reps ─────────────────────────────────────────────────────────────────
 
   function handleRepsInput(v: string) {
@@ -160,7 +198,7 @@
   function doOpenWeightKeypad() {
     dismissNativeKeyboard();
     const initialValue = isEmpty ? draftWeight : localWeight;
-    let captured = '';
+    let captured = initialValue;
     const revisionAtOpen = draftRevision;
     openKeypad({
       id: `${set.id}:weight`,
@@ -180,6 +218,9 @@
         }
         if ((!Number.isFinite(previousWeight) || previousWeight <= 0) && Number.isFinite(nextWeight) && nextWeight > 0) {
           maybeConvertBodyweightToWeighted(v, isEmpty);
+        }
+        if (Number.isFinite(previousWeight) && previousWeight > 0 && (!Number.isFinite(nextWeight) || nextWeight <= 0)) {
+          maybeConvertWeightedToBodyweight(v, isEmpty);
         }
       },
       onDone: async () => {
@@ -349,7 +390,11 @@
     };
 
     const resolveExerciseForWeight = (exerciseId: string, exerciseName: string, weight: number | null) => {
-      if (weight === null || weight <= 0) return { exerciseId, exerciseName };
+      if (weight === null || weight <= 0) {
+        const bodyweightVariant = getBodyweightVariant(exerciseId, exerciseName);
+        if (bodyweightVariant) return { exerciseId: bodyweightVariant.id, exerciseName: bodyweightVariant.name };
+        return { exerciseId, exerciseName };
+      }
       const currentExercise = EXERCISE_MAP.get(exerciseId);
       if (!currentExercise || currentExercise.category !== 'bodyweight') return { exerciseId, exerciseName };
       const weightedVariant = getWeightedVariant(exerciseId, exerciseName);
