@@ -97,7 +97,7 @@
   }
 </script>
 
-<div class="relative z-20 -ml-5 w-full min-w-0">
+<div class="relative z-[160] -ml-5 w-full min-w-0">
   <input
     bind:this={inputEl}
     type="text"
@@ -118,7 +118,7 @@
   />
 
   {#if showDropdown}
-    <div class="absolute left-0 right-0 top-full z-[80] mt-1 max-h-56 overflow-y-auto rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-xl">
+    <div class="absolute left-0 right-0 top-full z-[200] mt-1 max-h-56 overflow-y-auto rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-xl">
       {#each filtered() as ex, i}
         <button
           type="button"

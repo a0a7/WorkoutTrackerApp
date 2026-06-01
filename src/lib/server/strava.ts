@@ -270,6 +270,13 @@ export async function isStravaConnected(db: D1Database, userId: string): Promise
 	return Boolean(row);
 }
 
+export async function disconnectStrava(db: D1Database, userId: string): Promise<void> {
+	await db.batch([
+		db.prepare('DELETE FROM user_strava_tokens WHERE user_id = ?').bind(userId),
+		db.prepare('DELETE FROM workout_strava_sync WHERE user_id = ?').bind(userId)
+	]);
+}
+
 function dayPeriodTitlePart(startTime: number): string {
 	const h = new Date(startTime).getHours();
 	if (h < 12) return 'Morning';

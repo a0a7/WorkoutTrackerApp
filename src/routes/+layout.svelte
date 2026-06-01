@@ -53,9 +53,50 @@
     standaloneQuery.addEventListener('change', updateStandalone);
 
     const KEYBOARD_THRESHOLD_PX = 140;
-    const isTextInput = (el: Element | null) =>
-      !!el
-      && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable);
+    const NON_TEXT_INPUT_TYPES = new Set([
+      'button',
+      'checkbox',
+      'color',
+      'date',
+      'datetime-local',
+      'file',
+      'hidden',
+      'image',
+      'month',
+      'radio',
+      'range',
+      'reset',
+      'submit',
+      'time',
+      'week'
+    ]);
+    const isTextInput = (el: Element | null): el is HTMLElement => {
+      if (!(el instanceof HTMLElement)) return false;
+      if (el instanceof HTMLTextAreaElement) return !el.disabled && !el.readOnly;
+      if (el instanceof HTMLInputElement) {
+        return !el.disabled && !el.readOnly && !NON_TEXT_INPUT_TYPES.has(el.type);
+      }
+      return el.isContentEditable;
+    };
+    const ensureFocusedInputVisible = (behavior: ScrollBehavior = 'smooth') => {
+      const el = document.activeElement;
+      if (!isTextInput(el)) return;
+      const vv = window.visualViewport;
+      const rect = el.getBoundingClientRect();
+      const margin = 16;
+      if (vv) {
+        const viewTop = vv.offsetTop || 0;
+        const viewBottom = viewTop + vv.height;
+        const overlapTop = rect.top < viewTop + margin;
+        const overlapBottom = rect.bottom > viewBottom - margin;
+        if (overlapTop || overlapBottom) {
+          const targetScroll = window.scrollY + (rect.top - (viewTop + (vv.height / 2 - rect.height / 2)));
+          window.scrollTo({ top: Math.max(0, Math.round(targetScroll)), behavior });
+        }
+        return;
+      }
+      el.scrollIntoView({ block: 'center', behavior });
+    };
     const updateKeyboardVisibility = () => {
       const vv = window.visualViewport;
       const viewportHeight = vv?.height ?? window.innerHeight;
@@ -64,11 +105,21 @@
     };
     const handleFocusChange = () => {
       setTimeout(updateKeyboardVisibility, 0);
+      setTimeout(() => ensureFocusedInputVisible('smooth'), 80);
     };
-    const handleViewportChange = () => updateKeyboardVisibility();
+    const handleViewportChange = () => {
+      updateKeyboardVisibility();
+      ensureFocusedInputVisible('auto');
+    };
+    const handleTextInput = (event: Event) => {
+      if (isTextInput(event.target as Element | null)) {
+        ensureFocusedInputVisible('smooth');
+      }
+    };
     window.addEventListener('focusin', handleFocusChange);
     window.addEventListener('focusout', handleFocusChange);
     window.addEventListener('resize', handleViewportChange);
+    window.addEventListener('input', handleTextInput, true);
     window.visualViewport?.addEventListener('resize', handleViewportChange);
     window.visualViewport?.addEventListener('scroll', handleViewportChange);
     updateKeyboardVisibility();
@@ -146,6 +197,7 @@
       window.removeEventListener('focusin', handleFocusChange);
       window.removeEventListener('focusout', handleFocusChange);
       window.removeEventListener('resize', handleViewportChange);
+      window.removeEventListener('input', handleTextInput, true);
       window.visualViewport?.removeEventListener('resize', handleViewportChange);
       window.visualViewport?.removeEventListener('scroll', handleViewportChange);
     };

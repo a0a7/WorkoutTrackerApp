@@ -687,7 +687,7 @@
     {selected ? 'bg-[hsl(var(--primary)/0.06)]' : 'hover:bg-[hsl(var(--muted)/0.25)]'}
   {dragOver ? 'outline-2 outline-[hsl(var(--primary))] -outline-offset-1' : ''}
     {handleDragging ? 'z-20 bg-[hsl(var(--card))] shadow-2xl ring-2 ring-[hsl(var(--primary)/0.45)] scale-[1.01]' : ''}
-    {isEmpty || editingExercise ? 'z-10' : ''}"
+    {isEmpty || editingExercise ? 'z-[140]' : ''}"
   draggable="false"
   style:transition-duration={(handleDragging || swipeActive) ? '0ms' : undefined}
   style="transform: translateX({handleDragging ? 0 : swipeOffsetX}px) translateY({handleDragging ? dragOffsetY : 0}px) translateZ({handleDragging ? 16 : 0}px);"
