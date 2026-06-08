@@ -391,7 +391,7 @@
   <title>Logbook – Today</title>
 </svelte:head>
 
-<div class="px-4 pt-safe-top lg:pt-4 flex-1 flex flex-col overflow-x-hidden">
+<div class="px-4 pt-[max(env(safe-area-inset-top),0.75rem)] lg:pt-4 flex-1 flex flex-col overflow-x-hidden">
   <!-- Header -->
   <div class="sticky top-0 z-10 bg-[hsl(var(--background)/0.9)] backdrop-blur-sm pb-3 flex items-center justify-between">
     <div class="flex flex-col min-w-0">

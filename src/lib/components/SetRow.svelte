@@ -228,14 +228,10 @@
           await flushEmptyRow();
         }
       },
-      onCancel: () => {
+      onCancel: async () => {
         if (isEmpty) {
-          if (revisionAtOpen !== draftRevision) return;
-          draftWeight = initialValue;
-          return;
-        }
-        localWeight = set.weight !== null ? String(set.weight) : '';
-      },
+          await flushEmptyRow();
+        }      },
     });
     scrollRowIntoView();
   }
@@ -311,14 +307,8 @@
       onDone: async () => {
         if (!await commitRepsValue()) doOpenWeightKeypad();
       },
-      onCancel: () => {
-        if (isEmpty) {
-          if (revisionAtOpen !== draftRevision) return;
-          draftReps = initialValue;
-          return;
-        }
-        localReps = set.reps !== null ? String(set.reps) : '';
-        localWeight = set.weight !== null ? String(set.weight) : '';
+      onCancel: async () => {
+        await commitRepsValue();
       },
     });
     scrollRowIntoView();
@@ -690,6 +680,7 @@
     {isEmpty || editingExercise ? 'z-[140]' : ''}"
   draggable="false"
   style:transition-duration={(handleDragging || swipeActive) ? '0ms' : undefined}
+  style:background-color={swipingToDelete ? 'hsl(var(--destructive)/0.2)' : undefined}
   style="transform: translateX({handleDragging ? 0 : swipeOffsetX}px) translateY({handleDragging ? dragOffsetY : 0}px) translateZ({handleDragging ? 16 : 0}px);"
   onfocusin={handleRowFocusIn}
   onfocusout={handleRowFocusOut}
