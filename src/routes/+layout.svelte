@@ -111,15 +111,13 @@
       updateKeyboardVisibility();
       ensureFocusedInputVisible('auto');
     };
-    const handleTextInput = (event: Event) => {
-      if (isTextInput(event.target as Element | null)) {
-        ensureFocusedInputVisible('smooth');
-      }
+        const handleTextInput = (event: Event) => {
+      // Only scroll on blur/focus, not every input event which causes jittery behavior
     };
     window.addEventListener('focusin', handleFocusChange);
     window.addEventListener('focusout', handleFocusChange);
     window.addEventListener('resize', handleViewportChange);
-    window.addEventListener('input', handleTextInput, true);
+    // window.addEventListener('input', handleTextInput, true);
     window.visualViewport?.addEventListener('resize', handleViewportChange);
     window.visualViewport?.addEventListener('scroll', handleViewportChange);
     updateKeyboardVisibility();
@@ -194,10 +192,10 @@
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('online', handleOnline);
       standaloneQuery.removeEventListener('change', updateStandalone);
-      window.removeEventListener('focusin', handleFocusChange);
+            window.removeEventListener('focusin', handleFocusChange);
       window.removeEventListener('focusout', handleFocusChange);
       window.removeEventListener('resize', handleViewportChange);
-      window.removeEventListener('input', handleTextInput, true);
+      // window.removeEventListener('input', handleTextInput, true);
       window.visualViewport?.removeEventListener('resize', handleViewportChange);
       window.visualViewport?.removeEventListener('scroll', handleViewportChange);
     };
