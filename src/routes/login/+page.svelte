@@ -46,7 +46,7 @@
         <img src="/icons/logo.png" alt="Logbook logo" class="h-full w-full object-contain" />
       </div>
       <h1 class="text-3xl font-bold text-[hsl(var(--foreground))]">Logbook</h1>
-      <p class="mt-1 text-sm text-[hsl(var(--muted-foreground))]">log ur sessions broski</p>
+      <p class="mt-1 text-sm text-[hsl(var(--muted-foreground))]">www.grindset.website</p>
     </div>
 
     <!-- Card -->
