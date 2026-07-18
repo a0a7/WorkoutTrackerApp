@@ -233,7 +233,7 @@
           await flushEmptyRow();
         }      },
     });
-    scrollRowIntoView();
+      scrollRowIntoViewOnce();
   }
 
   function doOpenRepsKeypad() {
@@ -311,35 +311,31 @@
         await commitRepsValue();
       },
     });
-    scrollRowIntoView();
+    scrollRowIntoViewOnce();
   }
 
-  function scrollRowIntoView() {
+let lastScrolledFor: string | null = null;
+
+function scrollRowIntoViewOnce() {
+    const keypadId = `${set.id}:${
+        $keypadConfig?.id?.endsWith(':weight')
+            ? 'weight'
+            : 'reps'
+    }`;
+
+    if (lastScrolledFor === keypadId) {
+        return;
+    }
+
+    lastScrolledFor = keypadId;
+
     setTimeout(() => {
-      const el = trEl;
-      if (!el) return;
-      // Prefer visualViewport when available (mobile keyboards change visualViewport)
-      const vv = (window as any).visualViewport;
-      if (vv) {
-        // Element rect relative to layout viewport
-        const rect = el.getBoundingClientRect();
-        const margin = 12; // small padding above/below
-        const viewTop = vv.offsetTop || 0;
-        const viewBottom = viewTop + vv.height;
-        const elemTop = rect.top;
-        const elemBottom = rect.bottom;
-
-        if (elemTop < viewTop + margin || elemBottom > viewBottom - margin) {
-          // center the element within the visual viewport
-          const targetScroll = window.scrollY + (elemTop - (viewTop + (vv.height / 2 - rect.height / 2)));
-          window.scrollTo({ top: Math.max(0, Math.round(targetScroll)), behavior: 'smooth' });
-        }
-      } else {
-        // Fallback
-        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      }
-    }, 50);
-  }
+        trEl?.scrollIntoView({
+            block: 'center',
+            behavior: 'smooth'
+        });
+    }, 250);
+}
 
   // ── Weight ────────────────────────────────────────────────────────────────
 
