@@ -1,7 +1,7 @@
 export interface Exercise {
 	id: string;
 	name: string;
-	category: 'free-weight' | 'machine' | 'bodyweight' | 'cable' | 'barbell';
+	category: 'free-weight' | 'machine' | 'bodyweight';
 	muscleActivations: MuscleActivation[];
 	equipment?: string;
 }
@@ -39,6 +39,21 @@ export type MuscleId =
 	| 'oblique'
 	| 'serratus';
 
+export type WorkoutCategory =
+	| 'push'
+	| 'pull'
+	| 'legs'
+	| 'antagonist pull'
+	| 'antagonist push'
+	| 'upper'
+	| 'abs'
+	| 'back'
+	| 'chest'
+	| 'arms'
+	| 'shoulders'
+	| 'cardio'
+	| 'full body';
+
 export interface WorkoutSet {
 	id: string;
 	localWorkoutId: string;
@@ -46,6 +61,7 @@ export interface WorkoutSet {
 	exerciseName: string;
 	reps: number | null;
 	weight: number | null;
+	weightUnit?: 'lbs' | 'kg';
 	notes?: string;
 	order: number;
 	createdAt: number;
@@ -58,6 +74,8 @@ export interface Workout {
 	userId?: string;
 	startTime: number;
 	endTime: number;
+	categoryOverride?: WorkoutCategory;
+	activityType?: string;
 	location?: { lat: number; lng: number; label?: string };
 	notes?: string;
 	sets: WorkoutSet[];

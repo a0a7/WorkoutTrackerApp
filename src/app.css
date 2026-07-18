@@ -61,6 +61,8 @@
 
   html {
     font-family: var(--font-sans);
+    touch-action: pan-y;
+    overscroll-behavior-x: none;
   }
 
   body {
@@ -68,6 +70,15 @@
     color: hsl(var(--foreground));
     -webkit-font-smoothing: antialiased;
     overscroll-behavior: none;
+    overscroll-behavior-x: none;
+    touch-action: pan-y;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  button {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
   }
 
   input[type='number']::-webkit-inner-spin-button,
@@ -75,10 +86,18 @@
     -webkit-appearance: none;
     margin: 0;
   }
+
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }
 
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
 .safe-top { padding-top: env(safe-area-inset-top, 0px); }
+.pt-safe-top { padding-top: env(safe-area-inset-top, 0px); }
+.pb-safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
 
 .glass {
   backdrop-filter: blur(20px) saturate(180%);

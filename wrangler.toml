@@ -1,16 +1,19 @@
 name = "workout-tracker"
-main = "src/worker/index.ts"
-compatibility_date = "2024-01-01"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
 
-[assets]
-directory = ".svelte-kit/cloudflare"
-binding = "ASSETS"
+pages_build_output_dir = ".svelte-kit/cloudflare"
+
+[vars]
+STRAVA_CLIENT_ID="98135"
+STRAVA_REDIRECT_URI="https://workouttrackerapp-6tv.pages.dev/api/strava/callback"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "workout-tracker-db"
-database_id = "local-dev-id"
+database_id = "5219de50-232e-4bfc-871d-515d71cf0c86"
+migrations_dir = "migrations"
 
 [[kv_namespaces]]
 binding = "SESSIONS"
-id = "local-kv-id"
+id = "051c538b4c224f02b823b6b3f51cf3df"

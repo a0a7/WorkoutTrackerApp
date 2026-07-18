@@ -1,39 +1,233 @@
 <script lang="ts">
-  export const ssr = false;
 
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
   import WorkoutCard from '$lib/components/WorkoutCard.svelte';
   import { getAllWorkouts } from '$lib/db';
-  import type { Workout } from '$lib/types';
+  import type { Workout, WorkoutSet } from '$lib/types';
+  import { unitPreference, initUnitPreference, timeFormatPreference, initTimeFormatPreference } from '$lib/stores/userStore';
+  import { classifyWorkouts, getEffectiveWorkoutCategory, getWorkoutCategoryLabel, type DayCategory } from '$lib/workoutCategorization';
 
   let workouts = $state<Workout[]>([]);
   let loading = $state(true);
   let filterQuery = $state('');
-  let fromDate = $state('');
-  let toDate = $state('');
+  type DateWindow = 'all' | '7d' | '30d' | '90d' | '365d';
+  const DATE_WINDOWS: DateWindow[] = ['all', '7d', '30d', '90d', '365d'];
+  const DATE_WINDOW_LABELS: Record<DateWindow, string> = {
+    all: 'All time',
+    '7d': 'Last 7 days',
+    '30d': 'Last 30 days',
+    '90d': 'Last 90 days',
+    '365d': 'Last year',
+  };
+  const DATE_WINDOW_DAYS: Record<Exclude<DateWindow, 'all'>, number> = {
+    '7d': 7,
+    '30d': 30,
+    '90d': 90,
+    '365d': 365,
+  };
+  let dateWindow = $state<DateWindow>('all');
+  let sortMode = $state<'newest' | 'oldest' | 'duration-desc' | 'duration-asc' | 'volume-desc' | 'volume-asc'>('newest');
+  let onlyWithLocation = $state(false);
+  let exerciseTypeFilter = $state('all');
+  let compactness = $state<'card' | 'compact'>('card');
+  let queryHydrated = $state(false);
+  const unit = $derived($unitPreference);
+  const timeFormat = $derived($timeFormatPreference);
+
+  function getWorkoutExerciseType(workout: Workout): string {
+    return workout.activityType?.trim() || (workout.sets.length > 0 ? 'Strength Training' : 'Cardio');
+  }
+
+  const exerciseTypeOptions = $derived(() => {
+    const types = new Set<string>(['Strength Training']);
+    for (const workout of workouts) {
+      types.add(getWorkoutExerciseType(workout));
+    }
+    return ['all', ...[...types].sort((a, b) => a.localeCompare(b))];
+  });
+
+  const DAY_TILE_STYLES: Record<DayCategory, string> = {
+    rest: 'bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600',
+    cardio: 'bg-orange-600 text-white border-orange-700 dark:bg-orange-500 dark:border-orange-400',
+    push: 'bg-red-600 text-white border-red-700 dark:bg-red-500 dark:border-red-400',
+    pull: 'bg-blue-600 text-white border-blue-700 dark:bg-blue-500 dark:border-blue-400',
+    legs: 'bg-emerald-600 text-white border-emerald-700 dark:bg-emerald-500 dark:border-emerald-400',
+    'antagonist pull': 'bg-cyan-700 text-white border-cyan-800 dark:bg-cyan-600 dark:border-cyan-500',
+    'antagonist push': 'bg-fuchsia-700 text-white border-fuchsia-800 dark:bg-fuchsia-600 dark:border-fuchsia-500',
+    upper: 'bg-indigo-700 text-white border-indigo-800 dark:bg-indigo-600 dark:border-indigo-500',
+    abs: 'bg-yellow-600 text-slate-950 border-yellow-700 dark:bg-yellow-500 dark:text-slate-950 dark:border-yellow-400',
+    back: 'bg-teal-700 text-white border-teal-800 dark:bg-teal-600 dark:border-teal-500',
+    chest: 'bg-rose-700 text-white border-rose-800 dark:bg-rose-600 dark:border-rose-500',
+    arms: 'bg-violet-700 text-white border-violet-800 dark:bg-violet-600 dark:border-violet-500',
+    shoulders: 'bg-amber-700 text-slate-950 border-amber-800 dark:bg-amber-600 dark:text-slate-950 dark:border-amber-500',
+    'full body': 'bg-lime-700 text-slate-950 border-lime-800 dark:bg-lime-600 dark:text-slate-950 dark:border-lime-500',
+  };
+
+  const DAY_TILE_LABELS: Record<DayCategory, string> = {
+    rest: 'Rest',
+    cardio: 'Cardio',
+    push: 'Push',
+    pull: 'Pull',
+    legs: 'Legs',
+    'antagonist pull': 'Anti Pull',
+    'antagonist push': 'Anti Push',
+    upper: 'Upper',
+    abs: 'Abs',
+    back: 'Back',
+    chest: 'Chest',
+    arms: 'Arms',
+    shoulders: 'Shoulders',
+    'full body': 'Full Body',
+  };
 
   onMount(async () => {
+    initUnitPreference();
+    initTimeFormatPreference();
+    const params = new URLSearchParams(window.location.search);
+
+    const q = params.get('q');
+    if (q) filterQuery = q;
+
+    const dateParam = params.get('date');
+    if (dateParam && DATE_WINDOWS.includes(dateParam as DateWindow)) {
+      dateWindow = dateParam as DateWindow;
+    }
+
+    const typeParam = params.get('type');
+    if (typeParam) {
+      exerciseTypeFilter = typeParam;
+    }
+
+    const sortParam = params.get('sort');
+    if (sortParam && ['newest', 'oldest', 'duration-desc', 'duration-asc', 'volume-desc', 'volume-asc'].includes(sortParam)) {
+      sortMode = sortParam as typeof sortMode;
+    }
+
+    onlyWithLocation = params.get('loc') === '1';
+
+    const viewParam = params.get('view');
+    if (viewParam === 'card' || viewParam === 'compact') {
+      compactness = viewParam;
+    } else {
+      const savedCompactness = localStorage.getItem('history-compactness');
+      if (savedCompactness === 'card' || savedCompactness === 'compact') {
+        compactness = savedCompactness;
+      }
+    }
+
+    queryHydrated = true;
     workouts = await getAllWorkouts();
     loading = false;
   });
 
+  function setCompactness(mode: 'card' | 'compact') {
+    compactness = mode;
+    localStorage.setItem('history-compactness', mode);
+  }
+
+  function syncQueryParams() {
+    if (!browser || !queryHydrated) return;
+    const url = new URL(window.location.href);
+    const q = filterQuery.trim();
+    if (q) url.searchParams.set('q', q);
+    else url.searchParams.delete('q');
+
+    if (dateWindow !== 'all') url.searchParams.set('date', dateWindow);
+    else url.searchParams.delete('date');
+
+    if (sortMode !== 'newest') url.searchParams.set('sort', sortMode);
+    else url.searchParams.delete('sort');
+
+    if (onlyWithLocation) url.searchParams.set('loc', '1');
+    else url.searchParams.delete('loc');
+
+    if (exerciseTypeFilter !== 'all') url.searchParams.set('type', exerciseTypeFilter);
+    else url.searchParams.delete('type');
+
+    if (compactness !== 'card') url.searchParams.set('view', compactness);
+    else url.searchParams.delete('view');
+
+    const next = `${url.pathname}${url.search}${url.hash}`;
+    const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (next !== current) {
+      window.history.replaceState(window.history.state, '', next);
+    }
+  }
+
+  $effect(() => {
+    if (!queryHydrated) return;
+    filterQuery;
+    dateWindow;
+    sortMode;
+    onlyWithLocation;
+    exerciseTypeFilter;
+    compactness;
+    syncQueryParams();
+  });
+
+  function getWorkoutDurationMinutes(workout: Workout) {
+    return Math.max(0, Math.round((workout.endTime - workout.startTime) / 60000));
+  }
+
+  function getWorkoutVolume(workout: Workout) {
+    return computeTotalVolume(workout.sets);
+  }
+
+  function matchesFilter(workout: Workout, query: string) {
+    if (!query) return true;
+    const locationText = workout.location?.label?.toLowerCase() ?? '';
+    const notesText = workout.notes?.toLowerCase() ?? '';
+    return (
+      workout.sets.some((s) => s.exerciseName.toLowerCase().includes(query)) ||
+      notesText.includes(query) ||
+      locationText.includes(query)
+    );
+  }
+
+  function compareWorkouts(a: Workout, b: Workout) {
+    switch (sortMode) {
+      case 'oldest':
+        return a.startTime - b.startTime;
+      case 'duration-desc':
+        return getWorkoutDurationMinutes(b) - getWorkoutDurationMinutes(a) || b.startTime - a.startTime;
+      case 'duration-asc':
+        return getWorkoutDurationMinutes(a) - getWorkoutDurationMinutes(b) || b.startTime - a.startTime;
+      case 'volume-desc':
+        return getWorkoutVolume(b) - getWorkoutVolume(a) || b.startTime - a.startTime;
+      case 'volume-asc':
+        return getWorkoutVolume(a) - getWorkoutVolume(b) || b.startTime - a.startTime;
+      case 'newest':
+      default:
+        return b.startTime - a.startTime;
+    }
+  }
+
+  function cycleDateWindow() {
+    const current = DATE_WINDOWS.indexOf(dateWindow);
+    dateWindow = DATE_WINDOWS[(current + 1) % DATE_WINDOWS.length];
+  }
+
+  function passesDateWindow(workout: Workout) {
+    if (dateWindow === 'all') return true;
+    const cutoff = Date.now() - DATE_WINDOW_DAYS[dateWindow] * 86400000;
+    return workout.startTime >= cutoff;
+  }
+
   const filtered = $derived(() => {
     let result = workouts;
+    const q = filterQuery.trim().toLowerCase();
     if (filterQuery.trim()) {
-      const q = filterQuery.toLowerCase();
-      result = result.filter((w) =>
-        w.sets.some((s) => s.exerciseName.toLowerCase().includes(q))
-      );
+      result = result.filter((w) => matchesFilter(w, q));
     }
-    if (fromDate) {
-      const from = new Date(fromDate).getTime();
-      result = result.filter((w) => w.startTime >= from);
+    result = result.filter(passesDateWindow);
+    if (onlyWithLocation) {
+      result = result.filter((w) => Boolean(w.location));
     }
-    if (toDate) {
-      const to = new Date(toDate).getTime() + 86400000;
-      result = result.filter((w) => w.startTime <= to);
+    if (exerciseTypeFilter !== 'all') {
+      result = result.filter((w) => getWorkoutExerciseType(w) === exerciseTypeFilter);
     }
-    return result;
+    return [...result].sort(compareWorkouts);
   });
 
   // Group by date
@@ -48,41 +242,200 @@
     }
     return [...map.entries()];
   });
+
+  function formatDayKey(ts: number) {
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  const last7Days = $derived(() => {
+    const workoutsByDay = new Map<string, Workout[]>();
+    for (const workout of workouts) {
+      const key = formatDayKey(workout.startTime);
+      if (!workoutsByDay.has(key)) workoutsByDay.set(key, []);
+      workoutsByDay.get(key)!.push(workout);
+    }
+
+    const days: Array<{ key: string; ts: number; dayLabel: string; dateLabel: string; category: DayCategory; categoryLabel: string; count: number }> = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let offset = 6; offset >= 0; offset--) {
+      const ts = today.getTime() - offset * 86400000;
+      const key = formatDayKey(ts);
+      const dayWorkouts = workoutsByDay.get(key) ?? [];
+      const category = classifyWorkouts(dayWorkouts);
+      days.push({
+        key,
+        ts,
+        dayLabel: new Date(ts).toLocaleDateString('en-US', { weekday: 'short' }),
+        dateLabel: new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        category,
+        categoryLabel: getWorkoutCategoryLabel(category),
+        count: dayWorkouts.length,
+      });
+    }
+    return days;
+  });
+
+  function getUniqueExerciseNames(workout: Workout): string[] {
+    const seen = new Set<string>();
+    const names: string[] = [];
+    for (const s of workout.sets) {
+      if (!seen.has(s.exerciseName)) {
+        seen.add(s.exerciseName);
+        names.push(s.exerciseName);
+      }
+    }
+    return names;
+  }
+
+  function getCompactPills(workout: Workout) {
+    const names = getUniqueExerciseNames(workout);
+    const shown = names.slice(0, 2);
+    const remaining = Math.max(0, names.length - shown.length);
+    return { shown, remaining };
+  }
+
+  function getCompactSummary(workout: Workout) {
+    const names = getUniqueExerciseNames(workout);
+    return { first: names[0] ?? '', remaining: Math.max(0, names.length - 1) };
+  }
+
+  function getExerciseNamesString(workout: Workout) {
+    return getUniqueExerciseNames(workout).join(', ');
+  }
+
+  function computeTotalVolume(sets: WorkoutSet[]) {
+    let total = 0;
+    for (const s of sets) {
+      if (typeof s.reps === 'number' && typeof s.weight === 'number' && s.reps > 0 && s.weight > 0) {
+        total += s.reps * s.weight;
+      }
+    }
+    return Math.round(total);
+  }
+
+  function formatVolume(sets: WorkoutSet[]) {
+    const total = computeTotalVolume(sets);
+    if (!total) return `0 ${unit === 'kg' ? 'kg' : 'lbs'}`;
+    const formatted = new Intl.NumberFormat('en-US').format(total);
+    return `${formatted} ${unit === 'kg' ? 'kg' : 'lbs'}`;
+  }
+
+  function getWorkoutCountLabel() {
+    const count = filtered().length;
+    return `${count} workout${count === 1 ? '' : 's'}`;
+  }
+
+  function formatWorkoutTitle(workout: Workout) {
+    const date = new Date(workout.startTime).toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+    const time = new Date(workout.startTime).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: timeFormat === '12h',
+    });
+    return `${date} ${time} - ${getWorkoutCategoryLabel(getEffectiveWorkoutCategory(workout))}`;
+  }
 </script>
 
 <svelte:head>
-  <title>WorkOut – History</title>
+  <title>Logbook – History</title>
 </svelte:head>
 
 <div class="px-4 pt-4">
-  <h1 class="text-2xl font-bold text-[hsl(var(--foreground))] mb-4">History</h1>
+
+  <section class="mb-4 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 shadow-sm">
+    <div class="mb-2 flex items-center justify-between gap-3">
+      <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[hsl(var(--muted-foreground))]">Last 7 days</p>
+    </div>
+    <div class="grid grid-cols-7 gap-1.5 sm:gap-2">
+      {#each last7Days() as day (day.key)}
+        <div class="flex flex-col items-center gap-1">
+          <div
+            class={`flex aspect-square w-full min-w-0 items-center justify-center rounded-[4px] border text-center text-[9px] font-semibold leading-tight tracking-wide shadow-[inset_0_1px_1px_rgba(255,255,255,0.16),inset_0_-3px_8px_rgba(0,0,0,0.22)] transition-transform hover:-translate-y-0.5 ${DAY_TILE_STYLES[day.category]}`}
+            title={`${day.dateLabel}: ${day.categoryLabel}${day.count ? ` (${day.count} workout${day.count === 1 ? '' : 's'})` : ''}`}
+          >
+            <span class="whitespace-pre-line px-1 leading-tight">{DAY_TILE_LABELS[day.category]}</span>
+          </div>
+          <p class="whitespace-nowrap text-[10px] font-medium text-[hsl(var(--muted-foreground))]">{day.dayLabel} {new Date(day.ts).getDate()}</p>
+        </div>
+      {/each}
+    </div>
+  </section>
 
   <!-- Filters -->
-  <div class="mb-4 flex flex-col gap-2">
-    <input
-      type="text"
-      bind:value={filterQuery}
-      placeholder="Filter by exercise..."
-      class="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] placeholder:text-[hsl(var(--muted-foreground))]"
-    />
-    <div class="flex gap-2">
+  <div class="mb-4 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 shadow-sm">
+    <div class="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
       <input
-        type="date"
-        bind:value={fromDate}
-        class="flex-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]"
+        type="text"
+        bind:value={filterQuery}
+        placeholder="Search exercises, notes, locations"
+        class="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] placeholder:text-[hsl(var(--muted-foreground))]"
       />
-      <span class="flex items-center text-[hsl(var(--muted-foreground))]">–</span>
-      <input
-        type="date"
-        bind:value={toDate}
-        class="flex-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]"
-      />
+      <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+        <button
+          type="button"
+          onclick={cycleDateWindow}
+          title="Tap to cycle date range"
+          class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm font-semibold text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
+        >
+          Date: {DATE_WINDOW_LABELS[dateWindow]}
+        </button>
+        <button
+          type="button"
+          onclick={() => { onlyWithLocation = !onlyWithLocation; }}
+          class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm font-semibold text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
+          aria-pressed={onlyWithLocation}
+        >
+          {onlyWithLocation ? 'Locations only' : 'All workouts'}
+        </button>
+        <select
+          bind:value={sortMode}
+          class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]"
+        >
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+          <option value="duration-desc">Longest duration</option>
+          <option value="duration-asc">Shortest duration</option>
+          <option value="volume-desc">Highest volume</option>
+          <option value="volume-asc">Lowest volume</option>
+        </select>
+        <select
+          bind:value={exerciseTypeFilter}
+          class="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]"
+        >
+          {#each exerciseTypeOptions() as option}
+            <option value={option}>{option === 'all' ? 'All types' : option}</option>
+          {/each}
+        </select>
+        <div class="inline-flex rounded-xl bg-[hsl(var(--muted))] p-1">
+          <button
+            type="button"
+            onclick={() => setCompactness('card')}
+            class="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors {compactness === 'card' ? 'bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-sm' : 'text-[hsl(var(--muted-foreground))]'}"
+          >
+            Card
+          </button>
+          <button
+            type="button"
+            onclick={() => setCompactness('compact')}
+            class="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors {compactness === 'compact' ? 'bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-sm' : 'text-[hsl(var(--muted-foreground))]'}"
+          >
+            Compact
+          </button>
+        </div>
+      </div>
     </div>
+    <p class="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Showing {getWorkoutCountLabel()}</p>
   </div>
 
   {#if loading}
     <div class="flex items-center justify-center py-16">
-      <div class="h-8 w-8 animate-spin rounded-full border-2 border-[hsl(var(--primary))] border-t-transparent"></div>
+      <div class="h-8 w-8 animate-spin rounded-full border-2 border-[hsl(var(--foreground))] border-t-transparent"></div>
     </div>
   {:else if grouped().length === 0}
     <div class="flex flex-col items-center gap-3 py-16 text-center">
@@ -94,16 +447,56 @@
       <p class="font-medium text-[hsl(var(--foreground))]">No workouts yet</p>
       <p class="text-sm text-[hsl(var(--muted-foreground))]">Start tracking on the Today tab</p>
     </div>
-  {:else}
-    {#each grouped() as [dateLabel, dayWorkouts]}
+  {:else if compactness === 'card'}
+    {#each grouped() as [dateLabel, dayWorkouts] (dateLabel)}
       <div class="mb-5">
         <h2 class="mb-2 text-sm font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide">{dateLabel}</h2>
         <div class="flex flex-col gap-3">
           {#each dayWorkouts as workout (workout.id)}
-            <WorkoutCard {workout} />
+            {#if compactness === 'card'}
+              <WorkoutCard {workout} />
+            {:else}
+              <a
+                href="/workout/{workout.id}"
+                data-sveltekit-preload-data="off"
+                class="flex items-center justify-between rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2 active:scale-[0.99] transition-transform"
+              >
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-semibold text-[hsl(var(--foreground))]">
+                    {formatWorkoutTitle(workout)}
+                  </p>
+                  <p class="truncate text-xs text-[hsl(var(--muted-foreground))]">
+                    {workout.sets.length} sets
+                  </p>
+                </div>
+                <p class="shrink-0 text-xs font-medium text-[hsl(var(--foreground))]">
+                  {(() => {
+                    const mins = Math.round((workout.endTime - workout.startTime) / 60000);
+                    return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+                  })()}
+                </p>
+              </a>
+            {/if}
           {/each}
         </div>
       </div>
     {/each}
+  {:else}
+    <div class="flex flex-col divide-y divide-[hsl(var(--border))]">
+      {#each filtered() as workout (workout.id)}
+        <a href="/workout/{workout.id}" class="py-2 active:scale-[0.995] transition-transform">
+          <div class="flex items-start justify-between gap-1.5 text-sm text-[hsl(var(--foreground))]">
+            <div class="min-w-0">
+              <p class="truncate text-sm font-semibold text-[hsl(var(--foreground))]">{formatWorkoutTitle(workout)}</p>
+              <p class="truncate text-xs text-[hsl(var(--muted-foreground))]">{getExerciseNamesString(workout)}</p>
+            </div>
+            <div class="flex flex-col items-end shrink-0 ml-3">
+              <p class="text-xs font-medium text-[hsl(var(--foreground))]">{(() => { const mins = Math.round((workout.endTime - workout.startTime) / 60000); return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`; })()}</p>
+              <p class="text-xs text-[hsl(var(--muted-foreground))]">{formatVolume(workout.sets)}</p>
+            </div>
+          </div>
+        </a>
+      {/each}
+    </div>
   {/if}
 </div>

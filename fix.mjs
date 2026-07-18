@@ -1,0 +1,2 @@
+﻿const fs = require('fs'); const lines = fs.readFileSync('old_data/mapped_sets.csv','utf8').split('\n'); let sql=''; for(let i=1;i<lines.length;i++){ if(!lines[i].trim()) continue; const p = lines[i].split(','); let w = p[7]||'null'; if(w==='\
+\') w='null'; sql += \INSERT OR IGNORE INTO sets (id, user_id, local_workout_id, exercise_id, exercise_name, reps, weight, sort_order, created_at, updated_at, deleted) VALUES ('\', '7a03dfd2-5600-49c1-9d64-88269fdce26c', '\', '\', '\', \, \, \, \, \, \);\n\; } fs.writeFileSync('push_sets.sql', sql);

@@ -37,10 +37,62 @@ export const userStore = createUserStore();
 export const isLoggedIn = derived(userStore, ($u) => $u !== null);
 
 export const unitPreference = writable<'lbs' | 'kg'>('lbs');
+export const tertiaryActivationPreference = writable<boolean>(true);
+export const timeFormatPreference = writable<'12h' | '24h'>('12h');
+
+// Locales/regions that use lbs by convention (US, Liberia, Myanmar)
+const LBS_LOCALE_PREFIXES = [
+  'en-US', // United States
+  'en-LR', // Liberia
+  'my',    // Myanmar (Burma)
+];
+
+function detectRegionUnit(): 'lbs' | 'kg' {
+  try {
+    const lang = navigator.language || 'en-US';
+    for (const prefix of LBS_LOCALE_PREFIXES) {
+      if (lang.startsWith(prefix)) return 'lbs';
+    }
+  } catch {
+    // navigator unavailable (SSR)
+  }
+  return 'kg';
+}
 
 export function initUnitPreference() {
   if (typeof localStorage !== 'undefined') {
     const saved = localStorage.getItem('unit_preference') as 'lbs' | 'kg' | null;
-    if (saved) unitPreference.set(saved);
+    if (saved) {
+      unitPreference.set(saved);
+    } else {
+      // First launch — auto-detect based on browser locale
+      const detected = detectRegionUnit();
+      unitPreference.set(detected);
+      localStorage.setItem('unit_preference', detected);
+    }
+  }
+}
+
+export function initTertiaryActivationPreference() {
+  if (typeof localStorage !== 'undefined') {
+    const saved = localStorage.getItem('show_tertiary_activations');
+    if (saved === 'true' || saved === 'false') {
+      tertiaryActivationPreference.set(saved === 'true');
+    } else {
+      tertiaryActivationPreference.set(true);
+      localStorage.setItem('show_tertiary_activations', 'true');
+    }
+  }
+}
+
+export function initTimeFormatPreference() {
+  if (typeof localStorage !== 'undefined') {
+    const saved = localStorage.getItem('time_format_preference');
+    if (saved === '12h' || saved === '24h') {
+      timeFormatPreference.set(saved);
+    } else {
+      timeFormatPreference.set('12h');
+      localStorage.setItem('time_format_preference', '12h');
+    }
   }
 }

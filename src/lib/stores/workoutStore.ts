@@ -11,7 +11,7 @@ export const hasRedo = derived(redoStack, ($s) => $s.length > 0);
 export const selectedCount = derived(selectedIds, ($s) => $s.size);
 
 export function pushUndo(description: string, sets: WorkoutSet[]) {
-  undoStack.update((stack) => [...stack, { description, sets: structuredClone(sets) }]);
+  undoStack.update((stack) => [...stack, { description, sets: sets.map((s) => ({ ...s })) }]);
   redoStack.set([]);
 }
 
@@ -21,7 +21,7 @@ export function undo(currentSets: WorkoutSet[]): WorkoutSet[] | null {
     if (stack.length === 0) return stack;
     const last = stack[stack.length - 1];
     result = last.sets;
-    redoStack.update((r) => [...r, { description: last.description, sets: structuredClone(currentSets) }]);
+    redoStack.update((r) => [...r, { description: last.description, sets: currentSets.map((s) => ({ ...s })) }]);
     return stack.slice(0, -1);
   });
   return result;
@@ -33,7 +33,7 @@ export function redo(currentSets: WorkoutSet[]): WorkoutSet[] | null {
     if (stack.length === 0) return stack;
     const last = stack[stack.length - 1];
     result = last.sets;
-    undoStack.update((u) => [...u, { description: last.description, sets: structuredClone(currentSets) }]);
+    undoStack.update((u) => [...u, { description: last.description, sets: currentSets.map((s) => ({ ...s })) }]);
     return stack.slice(0, -1);
   });
   return result;

@@ -1,5 +1,4 @@
 <script lang="ts">
-  export const ssr = false;
 
   import { goto } from '$app/navigation';
   import { userStore } from '$lib/stores/userStore';
@@ -20,45 +19,34 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
+      const data = await res.json() as any;
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        error = data.error ?? 'Request failed';
+        error = data.message ?? data.error ?? `Request failed (${res.status})`;
         return;
       }
-      const data = await res.json();
       userStore.login({ id: data.userId, email, token: data.token });
       goto('/');
-    } catch {
-      error = 'Network error. Continuing in offline mode.';
-      // Allow offline use
-      userStore.login({ id: 'local-user', email, token: 'offline' });
-      goto('/');
+    } catch (e) {
+      error = (e as Error).message ?? 'An unexpected error occurred';
     } finally {
       loading = false;
     }
   }
-
-  function continueOffline() {
-    userStore.login({ id: 'local-user', email: 'offline@local', token: 'offline' });
-    goto('/');
-  }
 </script>
 
 <svelte:head>
-  <title>WorkOut – Sign In</title>
+  <title>Logbook - Sign in</title>
 </svelte:head>
 
 <div class="flex min-h-screen items-center justify-center px-4 bg-[hsl(var(--background))]">
   <div class="w-full max-w-sm">
     <!-- Logo -->
     <div class="mb-8 text-center">
-      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--accent))] shadow-lg">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round">
-          <path d="M6.5 6.5h11M6.5 12h11M6.5 17.5h11"/>
-        </svg>
+      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-[hsl(var(--border))] bg-white p-2 shadow-lg dark:bg-[hsl(var(--card))]">
+        <img src="/icons/logo.png" alt="Logbook logo" class="h-full w-full object-contain" />
       </div>
-      <h1 class="text-3xl font-bold text-[hsl(var(--foreground))]">WorkOut</h1>
-      <p class="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Track your fitness journey</p>
+      <h1 class="text-3xl font-bold text-[hsl(var(--foreground))]">Logbook</h1>
+      <p class="mt-1 text-sm text-[hsl(var(--muted-foreground))]">www.grindset.website</p>
     </div>
 
     <!-- Card -->
@@ -95,37 +83,17 @@
           <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">{error}</p>
         {/if}
 
-        <button
-          type="submit"
+        <button 
+          type="submit" 
           disabled={loading}
-          class="mt-1 w-full rounded-xl bg-[hsl(var(--primary))] py-3 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 disabled:opacity-60 active:scale-[0.98]"
+          class="mt-1 w-full rounded-xl bg-[hsl(var(--foreground))] text-[hsl(var(--background))] py-3 text-sm font-semibold shadow-sm transition-all hover:opacity-90 disabled:opacity-60 active:scale-[0.98] cursor-pointer"
         >
-          {#if loading}
-            <span class="flex items-center justify-center gap-2">
-              <div class="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
-              {mode === 'login' ? 'Signing in...' : 'Creating account...'}
-            </span>
-          {:else}
-            {mode === 'login' ? 'Sign In' : 'Create Account'}
-          {/if}
+          {loading ? 'Please wait...' : (mode === 'login' ? 'Sign In' : 'Create Account')}
         </button>
       </form>
 
-      <div class="mt-4 flex items-center gap-3">
-        <div class="flex-1 border-t border-[hsl(var(--border))]"></div>
-        <span class="text-xs text-[hsl(var(--muted-foreground))]">or</span>
-        <div class="flex-1 border-t border-[hsl(var(--border))]"></div>
-      </div>
-
-      <button
-        onclick={continueOffline}
-        class="mt-4 w-full rounded-xl border border-[hsl(var(--border))] py-3 text-sm font-medium text-[hsl(var(--foreground))] transition-all hover:bg-[hsl(var(--muted))] active:scale-[0.98]"
-      >
-        Continue Offline
-      </button>
-
       <p class="mt-4 text-center text-xs text-[hsl(var(--muted-foreground))]">
-        Works fully offline · Syncs when online
+        Your data is stored locally and syncs when online.
       </p>
     </div>
   </div>

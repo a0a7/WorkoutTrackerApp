@@ -1,11 +1,15 @@
 <script lang="ts">
   import type { Workout } from '../types';
   import { EXERCISE_MAP } from '../exercises';
+  import { timeFormatPreference } from '$lib/stores/userStore';
+  import { getEffectiveWorkoutCategory, getWorkoutCategoryLabel } from '$lib/workoutCategorization';
 
   let { workout }: { workout: Workout } = $props();
 
   const durationMs = $derived(workout.endTime - workout.startTime);
   const durationMin = $derived(Math.round(durationMs / 60000));
+  const category = $derived(getEffectiveWorkoutCategory(workout));
+  const categoryLabel = $derived(getWorkoutCategoryLabel(category));
 
   const exerciseNames = $derived(() => {
     const seen = new Set<string>();
@@ -25,32 +29,41 @@
     })
   );
 
+  const titleLabel = $derived(`${dateLabel} - ${categoryLabel}`);
+
   const timeLabel = $derived(
     new Date(workout.startTime).toLocaleTimeString('en-US', {
-      hour: 'numeric', minute: '2-digit',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: $timeFormatPreference === '12h',
     })
   );
 </script>
 
 <a
   href="/workout/{workout.id}"
+  data-sveltekit-preload-data="off"
   class="block rounded-2xl bg-[hsl(var(--card))] p-4 shadow-sm border border-[hsl(var(--border))] active:scale-[0.98] transition-transform"
 >
   <div class="flex items-center justify-between mb-2">
     <div>
-      <p class="font-semibold text-[hsl(var(--foreground))]">{dateLabel}</p>
+      <p class="font-semibold text-[hsl(var(--foreground))]">{titleLabel}</p>
       <p class="text-sm text-[hsl(var(--muted-foreground))]">{timeLabel}</p>
     </div>
     <div class="text-right">
-      <p class="text-sm font-medium text-[hsl(var(--primary))]">
-        {durationMin >= 60 ? `${Math.floor(durationMin / 60)}h ${durationMin % 60}m` : `${durationMin}m`}
+      <p class="text-sm font-medium text-[hsl(var(--foreground))]">
+        {workout.endTime === null
+          ? 'In progress'
+          : durationMin >= 60
+          ? `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`
+          : `${durationMin}m`}
       </p>
       <p class="text-xs text-[hsl(var(--muted-foreground))]">{workout.sets.length} sets</p>
     </div>
   </div>
 
   <div class="flex flex-wrap gap-1.5 mt-3">
-    {#each exerciseNames().slice(0, 4) as name}
+    {#each exerciseNames().slice(0, 4) as name (name)}
       <span class="inline-flex items-center rounded-full bg-[hsl(var(--secondary))] px-2.5 py-0.5 text-xs font-medium text-[hsl(var(--secondary-foreground))]">
         {name}
       </span>
